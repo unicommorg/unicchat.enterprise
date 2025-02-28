@@ -10,6 +10,8 @@ services:
       - ROOT_URL=http://localhost:8080
       - PORT=8080
       - DEPLOY_METHOD=docker
+      - LIVEKIT_HOST=wss://lk-yc.unic.chat # ВКС по умолчанию развернут и поддерживается компанией Uniccom. При необходимости, возможно настроить и использовать собственное решение.
+
     ports:
       # указать свой порт на котором будет доступен сервер UnicChat
       - "8080:8080"
