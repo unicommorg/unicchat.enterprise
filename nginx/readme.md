@@ -110,6 +110,10 @@ sudo certbot certonly --manual --manual-auth-hook /etc/letsencrypt/acme-dns-auth
 sudo certbot certonly --manual --manual-auth-hook /etc/letsencrypt/acme-dns-auth.py --preferred-challenges dns --debug-challenges -d www.app-api.unic.chat -d app-api.unic.chat -v
 ``` 
 
+либо через  standalone
+``` shell
+sudo certbot certonly --standalone -d   app.unic.chat -d  www.app.unic.chat
+``` 
 ### Шаг 7. Настройка автоматической проверки сертификата certbot
 
 Добавить правила проверки сертификата, например, в 7-00 каждый день, в `/etc/cron.daily/certbot`
