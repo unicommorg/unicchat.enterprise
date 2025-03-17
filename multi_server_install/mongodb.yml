@@ -5,7 +5,7 @@ services:
     container_name: unic.chat.db.mongo.4.4
     restart: on-failure
     volumes:
-      - mongodb_data:/bitnami/mongodb1
+      - mongodb_data:/bitnami/mongodb
     environment:
       MONGODB_REPLICA_SET_MODE: primary
       MONGODB_REPLICA_SET_NAME: ${MONGODB_REPLICA_SET_NAME:-rs0}
