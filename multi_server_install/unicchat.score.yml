@@ -3,7 +3,7 @@
 version: "3"
 services:
   uc.media.score:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid/prod:prod250211
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid/prod:prod250310
     container_name: uc.score
     restart: unless-stopped
     network_mode: "host"
