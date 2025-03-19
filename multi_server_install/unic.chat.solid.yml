@@ -1,0 +1,19 @@
+# unicomm medua server egress
+# support@unicomm.pro
+version: "3"
+services:
+  uc.media.score:
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid/prod:prod250310
+    container_name: unic.chat.solid
+    restart: unless-stopped
+    ports:
+      - 8881:8080
+      - 4443:443
+    env_file:
+      - ./app/environment.env
+    networks:
+      - unicchat-backend
+networks:
+  unicchat-backend:
+    driver: bridge
+    external: true
