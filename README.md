@@ -2,6 +2,7 @@
 
 - [Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat](#-unicchat)
    * [Оглавление](#)
+   * [Скачать инструкцию в PDF](#pdf)
    * [Архитектура установки](#-)
       + [Установка на 1-м сервере](#-1-)
       + [Установка на 2-х серверах (рекомендуется для промышленного использования)](#-2-)
@@ -82,7 +83,15 @@
 <!-- TOC --><a name=""></a>
 ### Оглавление
 
+<!-- TOC --><a name="pdf"></a>
+### Скачать инструкцию в PDF 
 
+Инструкции для unicchat лежат в репозитории docs
+
+* [Инструкция пользователя UnicChat.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%98%D0%BD%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%86%D0%B8%D1%8F%20%D0%BF%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8F%20UnicChat.pdf)
+* [Инструкция_по_администрированию_UnicChat.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%98%D0%BD%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%86%D0%B8%D1%8F_%D0%BF%D0%BE_%D0%B0%D0%B4%D0%BC%D0%B8%D0%BD%D0%B8%D1%81%D1%82%D1%80%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D1%8E_UnicChat.pdf)
+* [Инструкция_по_лицензированию_UnicChat.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%98%D0%BD%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%86%D0%B8%D1%8F_%D0%BF%D0%BE_%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D1%8E_UnicChat.pdf)
+* [Описание архитектуры UnicChat.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5%20%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D1%8B%20UnicChat.pdf)
 <!-- TOC --><a name="-"></a>
 ### Архитектура установки
 
@@ -97,6 +106,8 @@ ___
 #### Установка на 2-х серверах (рекомендуется для промышленного использования)
 
 ![](./assets/2vm-unicchat-install-scheme.jpg "Архитектура установки на 2-х серверах")
+
+
 
 <!-- TOC --><a name="--1"></a>
 ### Обязательные компоненты
@@ -148,6 +159,8 @@ ___
 Используется для получения списка пользователей в системе. UnicChat может обслуживать как пользователей, заведенных в
 LDAP каталоге,
 так и внутренних пользователей в собсвенной базе. **Интеграция с LDAP не является обязательным условием**
+
+
 
 <!-- TOC --><a name="-1--1"></a>
 ### Шаг 1. Подготовка окружения
