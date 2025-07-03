@@ -5,8 +5,8 @@ services:
     image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.1.69
     restart: on-failure
     environment:
-      - MONGO_URL=mongodb://username:password@mongodb:27017/?replicaSet=rs0
-      - MONGO_OPLOG_URL=mongodb://username:password@mongodb:27017/local
+      - MONGO_URL=mongodb://setyouusername:setyoupassword@mongodb:27017/setyoudatabasename?replicaSet=rs0
+      - MONGO_OPLOG_URL=mongodb://setyouusername:setyoupassword@mongodb:27017/local
       - ROOT_URL=http://localhost:3000
       # ваш адрес solid
       - UNIC_SOLID_HOST=http://адрес_solid:8081
