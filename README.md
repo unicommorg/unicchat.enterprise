@@ -2,7 +2,7 @@
 
 - [Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat](#-unicchat)
    * [Оглавление](#)
-   * [Скачать инструкции в PDF](#pdf)
+   * [Скачать инструкции в PDF ](#-pdf)
    * [Архитектура установки](#-)
       + [Установка на 1-м сервере](#-1-)
       + [Установка на 2-х серверах (рекомендуется для промышленного использования)](#-2-)
@@ -44,30 +44,29 @@
    * [Шаг 5. Настройка push-уведомлений](#-5-push-)
    * [Шаг 6. Настройка подключения к SMTP серверу для отправки уведомлений в почту](#-6-smtp-)
    * [Шаг 7. Настройка подключения к LDAP серверу](#-7-ldap-)
-   * [Шаг 8. Настройка DLP](#-8-dlp)
    * [Быстрый старт. Запуск на одном сервере](#--7)
    * [Быстрый старт. Запуск на двух серверах](#--8)
-   * [Шаг 9. Установка локального медиа сервера для ВКС](#-9-)
+   * [Шаг 8. Установка локального медиа сервера для ВКС](#-8-)
       + [Порядок установки сервера](#--9)
       + [Проверка открытия портов](#--10)
-   * [Шаг.10  Развертывание базы знаний для UNICCHAT](#10-unicchat)
-      + [10.1 Подготовка сервера](#101-)
-      + [10.2 Настройка nginx ](#102-nginx)
-      + [10.3 Размещение в локальной сети ](#103-)
-      + [10.4 Развертывание MinIO S3](#104-minio-s3)
-         - [10.4.1 Перейдите в директорию knowledgebase/minio.](#1041-knowledgebaseminio)
-         - [10.4.2 Запустите MinIO:](#1042-minio)
-         - [10.4.3 Доступ к MinIO:](#1043-minio)
-         - [10.4.4 Создание bucket](#1044-bucket)
-      + [10.5 Развертывание OnlyOffice](#105-onlyoffice)
-         - [10.5.1 Запуск OnlyOffice](#1051-onlyoffice)
-         - [10.5.2 Доступ к OnlyOffice:](#1052-onlyoffice)
-      + [10.6 Редактироваие сервиcа unic.chat.solid](#106-c-unicchatsolid)
-         - [10.6.1 Редактироваие env файла](#1061-env-)
-         - [10.6.2 Пересоздание сервиса unic.chat.solid](#1062-unicchatsolid)
-      + [10.7 Редактироваие сервиcа unic.chat.appserver](#107-c-unicchatappserver)
-         - [10.7.1 Добавление переменной окружения ONLYOFFICE_HOST ](#1071-onlyoffice_host)
-         - [10.7.2 Пересоздание сервиса unic.chat.appserver](#1072-unicchatappserver)
+   * [Шаг.9  Развертывание базы знаний для UNICCHAT](#9-unicchat)
+      + [9.1 Подготовка сервера](#91-)
+      + [9.2 Настройка nginx ](#92-nginx)
+      + [9.3 Размещение в локальной сети ](#93-)
+      + [9.4 Развертывание MinIO S3](#94-minio-s3)
+         - [9.4.1 Перейдите в директорию knowledgebase/minio.](#941-knowledgebaseminio)
+         - [9.4.2 Запустите MinIO:](#942-minio)
+         - [9.4.3 Доступ к MinIO:](#943-minio)
+         - [9.4.4 Создание bucket](#944-bucket)
+      + [9.5 Развертывание OnlyOffice](#95-onlyoffice)
+         - [9.5.1 Запуск OnlyOffice](#951-onlyoffice)
+         - [9.5.2 Доступ к OnlyOffice:](#952-onlyoffice)
+      + [9.6 Редактироваие сервиcа unic.chat.solid](#96-c-unicchatsolid)
+         - [9.6.1 Редактироваие env файла](#961-env-)
+         - [9.6.2 Пересоздание сервиса unic.chat.solid](#962-unicchatsolid)
+      + [9.7 Редактироваие сервиcа unic.chat.appserver](#97-c-unicchatappserver)
+         - [9.7.1 Добавление переменной окружения ONLYOFFICE_HOST ](#971-onlyoffice_host)
+         - [9.7.2 Пересоздание сервиса unic.chat.appserver](#972-unicchatappserver)
       + [Частые проблемы при установке](#--11)
       + [Клиентские приложения](#--12)
       + [Частые проблемы при установке](#--13)
@@ -83,7 +82,7 @@
 <!-- TOC --><a name=""></a>
 ### Оглавление
 
-<!-- TOC --><a name="pdf"></a>
+<!-- TOC --><a name="-pdf"></a>
 ### Скачать инструкции в PDF 
 
 Инструкции для unicchat лежат в репозитории [docs](https://github.com/unicommorg/unicchat.enterprise/tree/main/docs)
@@ -573,22 +572,6 @@ db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'htt
 
 Раздел в разработке.
 
-<!-- TOC --><a name="-8-dlp"></a>
-### Шаг 8. Настройка DLP
-
-1. Предварительно загрузите на рабочее место с административным доступом к чату модуль DLP, и создаём канал, доступный
- ответственному за мониторинг DLP пользователю.
- ![DLP Module](https://github.com/unicommorg/unicchat.free/blob/main/8a30dc27-0cfe-4639-8e30-c7efb60c17f4.zip)
-2. Главная -> Левая боковая панель, нажимаем на три точки в правой верхней части -> Приложения (установленные)
-3. В разделе Установленные приложения -> правая верхняя часть экрана кнопка "Установить приложение" -> Установить из
- файла -> выбрать ранее загруженный zip файл, содержащий DL модуль.
-4. Подтверждаем установку приложения модуля.
-5. После установки на странице приложения переходим на вкладку Настройки:
-
-- в поле ввода «Moderator Channel" обязательно указываем название канала в который будут отправляться сообщения на
- проверку
-- В окне редактирования можно добавить regExp паттерны для проверок (сейчас проверяются банковские карты, номера
- телефонов, ip адреса)
 
 <!-- TOC --><a name="--7"></a>
 ### Быстрый старт. Запуск на одном сервере
@@ -600,8 +583,8 @@ db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'htt
 
 Раздел в разработке.
 
-<!-- TOC --><a name="-9-"></a>
-### Шаг 9. Установка локального медиа сервера для ВКС
+<!-- TOC --><a name="-8-"></a>
+### Шаг 8. Установка локального медиа сервера для ВКС
 <!-- TOC --><a name="--9"></a>
 #### Порядок установки сервера
 Перейдите в директорию vcs.unic.chat.template.
@@ -623,17 +606,17 @@ token: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzUzNzgxOTEsImlzcyI6IkF
 COMMAND    PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
 livekit-s 5780 root    8u  IPv6  69483      0t0  TCP *:7881 (LISTEN)
 livekit-s 5780 root    9u  IPv4  69493      0t0  TCP *:5349 (LISTEN)
-livekit-s 5780 root   10u  IPv4  69494      0t0  UDP *:3478
+livekit-s 5780 root   9u  IPv4  69494      0t0  UDP *:3478
 livekit-s 5780 root   11u  IPv6  70260      0t0  TCP *:7880 (LISTEN)
 ```
 ``` shell
 telnet `internal_IP` 7880 # 7880 7881 5349
 ```
-<!-- TOC --><a name="10-unicchat"></a>
-### Шаг.10  Развертывание базы знаний для UNICCHAT
+<!-- TOC --><a name="9-unicchat"></a>
+### Шаг.9  Развертывание базы знаний для UNICCHAT
 Перейдите в директорию knowledgebase
-<!-- TOC --><a name="101-"></a>
-#### 10.1 Подготовка сервера
+<!-- TOC --><a name="91-"></a>
+#### 9.1 Подготовка сервера
 Получите DNS имена для сервисов 
 * unicchat.solid 
 * minio 
@@ -643,8 +626,8 @@ telnet `internal_IP` 7880 # 7880 7881 5349
 Проверьте наличие директорий:
 * knowledgebase
 
-<!-- TOC --><a name="102-nginx"></a>
-#### 10.2 Настройка nginx 
+<!-- TOC --><a name="92-nginx"></a>
+#### 9.2 Настройка nginx 
 Создайте conf файлы для nginx. 
 Вы можете разместить nginx на отдельном сервере. 
 
@@ -658,8 +641,8 @@ telnet `internal_IP` 7880 # 7880 7881 5349
 * onlyoffice - 8880
 * unicchat - 8080
 
-<!-- TOC --><a name="103-"></a>
-#### 10.3 Размещение в локальной сети 
+<!-- TOC --><a name="93-"></a>
+#### 9.3 Размещение в локальной сети 
 В случае необходимости размещение сервисов в локальной сети, настройте локальный DNS или файл /etc/hosts. 
 На машины с docker container ваших сервисов: 
  
@@ -675,51 +658,51 @@ telnet `internal_IP` 7880 # 7880 7881 5349
  10.0.XX.XX mysolid.unic.chat
  10.0.XX.XX unic.chat
  ```
-<!-- TOC --><a name="104-minio-s3"></a>
-#### 10.4 Развертывание MinIO S3
-<!-- TOC --><a name="1041-knowledgebaseminio"></a>
-##### 10.4.1 Перейдите в директорию knowledgebase/minio.
+<!-- TOC --><a name="94-minio-s3"></a>
+#### 9.4 Развертывание MinIO S3
+<!-- TOC --><a name="941-knowledgebaseminio"></a>
+##### 9.4.1 Перейдите в директорию knowledgebase/minio.
 Измените в файле docker-compose.yml значения переменных окружения:
 ``` yml
 MINIO_ROOT_USER:
 MINIO_ROOT_PASSWORD:
 ```
-<!-- TOC --><a name="1042-minio"></a>
-##### 10.4.2 Запустите MinIO:
+<!-- TOC --><a name="942-minio"></a>
+##### 9.4.2 Запустите MinIO:
 ``` bash
 docker-compose up -d
 ```
-<!-- TOC --><a name="1043-minio"></a>
-##### 10.4.3 Доступ к MinIO:
+<!-- TOC --><a name="943-minio"></a>
+##### 9.4.3 Доступ к MinIO:
 Консоль: http://ваш_сервер:9002
 логин и пароль указан в `yml` файле
 ``` yml
 MINIO_ROOT_USER:
 MINIO_ROOT_PASSWORD:
 ```
-<!-- TOC --><a name="1044-bucket"></a>
-##### 10.4.4 Создание bucket
+<!-- TOC --><a name="944-bucket"></a>
+##### 9.4.4 Создание bucket
 Создайте bucket `uc.onlyoffice.docs` и настройках bucket назначьте Access Policy:public.
 
 S3 Endpoint: http://ваш_сервер:9000
 
-<!-- TOC --><a name="105-onlyoffice"></a>
-#### 10.5 Развертывание OnlyOffice
-<!-- TOC --><a name="1051-onlyoffice"></a>
-##### 10.5.1 Запуск OnlyOffice
+<!-- TOC --><a name="95-onlyoffice"></a>
+#### 9.5 Развертывание OnlyOffice
+<!-- TOC --><a name="951-onlyoffice"></a>
+##### 9.5.1 Запуск OnlyOffice
 Перейдите в директорию knowledgebase/Docker-DocumentServer.
 Запустите docker-compose.yml
 ``` shell
 docker-compose up -d
 ```
-<!-- TOC --><a name="1052-onlyoffice"></a>
-##### 10.5.2 Доступ к OnlyOffice:
+<!-- TOC --><a name="952-onlyoffice"></a>
+##### 9.5.2 Доступ к OnlyOffice:
 Адрес: http://ваш_сервер:8880
 
-<!-- TOC --><a name="106-c-unicchatsolid"></a>
-#### 10.6 Редактироваие сервиcа unic.chat.solid
-<!-- TOC --><a name="1061-env-"></a>
-##### 10.6.1 Редактироваие env файла
+<!-- TOC --><a name="96-c-unicchatsolid"></a>
+#### 9.6 Редактироваие сервиcа unic.chat.solid
+<!-- TOC --><a name="961-env-"></a>
+##### 9.6.1 Редактироваие env файла
 Перейдите в директорию multi_server_install/app/.
 Отредактируйте файл environment.env. 
 Добавьте значения переменных окружения minio 
@@ -729,26 +712,26 @@ MINIO_ROOT_PASSWORD
 ```
 И dns имя Minio без https.
 
-<!-- TOC --><a name="1062-unicchatsolid"></a>
-##### 10.6.2 Пересоздание сервиса unic.chat.solid
+<!-- TOC --><a name="962-unicchatsolid"></a>
+##### 9.6.2 Пересоздание сервиса unic.chat.solid
 Пересоздайте container для unic.chat.solid:
 ```bash
  docker-compose -f unic.chat.solid.yml down && docker-compose -f unic.chat.solid.yml up -d
 ```
 Доступ: http://ваш_сервер:8881/swagger/index.html 
 
-<!-- TOC --><a name="107-c-unicchatappserver"></a>
-#### 10.7 Редактироваие сервиcа unic.chat.appserver
-<!-- TOC --><a name="1071-onlyoffice_host"></a>
-##### 10.7.1 Добавление переменной окружения ONLYOFFICE_HOST 
+<!-- TOC --><a name="97-c-unicchatappserver"></a>
+#### 9.7 Редактироваие сервиcа unic.chat.appserver
+<!-- TOC --><a name="971-onlyoffice_host"></a>
+##### 9.7.1 Добавление переменной окружения ONLYOFFICE_HOST 
 Перейдите в директорию multi_server_install.
 Отредактируйте ввш unic.chat.appserver.yml.
 Добавьте в переменные окружения:
 ``` yml
  - ONLYOFFICE_HOST=https://адрес_в_формате dns
 ```
-<!-- TOC --><a name="1072-unicchatappserver"></a>
-##### 10.7.2 Пересоздание сервиса unic.chat.appserver
+<!-- TOC --><a name="972-unicchatappserver"></a>
+##### 9.7.2 Пересоздание сервиса unic.chat.appserver
 Запустите:
 ``` shell
 docker-compose -f unic.chat.appserver.yml down && docker-compose -f unic.chat.appserver.yml up -d
