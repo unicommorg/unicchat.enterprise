@@ -27,3 +27,7 @@ networks:
   unicchat-frontend:
     driver: bridge
     external: true
+volumes:
+  chat_data:
+    driver: local
+
