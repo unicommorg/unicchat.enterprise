@@ -260,7 +260,7 @@ docker-compose -f mongodb.yml up -d
  docker контейнер c базой, выполните
 
 ```shell
-docker exec -it unic.chat.free.db.mongo /bin/bash
+docker exec -it   unic.chat.db.mongo.4.4 /bin/bash
 ```
 
 где `unic.chat.free.db.mongo` - имя нашего контейнера, указанного в `mongodb.yml`, в инструкции `container_name`.
