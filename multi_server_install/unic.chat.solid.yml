@@ -3,7 +3,7 @@
 version: "3"
 services:
   uc.media.score:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid/prod:prod250310
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid/prod:prod250421
     container_name: unic.chat.solid
     restart: unless-stopped
     ports:
