@@ -213,6 +213,13 @@ RAM 8 Gb;
 2. Установить `nginx`.
 3. Установить `certbot` и плагин `python3-certbot-nginx`.
 4. Установить `git`. **Не является обязательным условием.**
+5. Авторизоваться в yandex container registry для скачивания образов
+``` bash
+ sudo docker login \
+  --username oauth \
+  --password y0_AgAAAAB3muX6AATuwQAAAAEawLLRAAB9TQHeGyxGPZXkjVDHF1ZNJcV8UQ \
+  cr.yandex
+```
 
 <!-- TOC --><a name="14-"></a>
 #### 1.4. Клонирование репозитория
