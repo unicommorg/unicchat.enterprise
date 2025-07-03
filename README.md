@@ -345,13 +345,25 @@ show users
 ####  2.4 Запуск сервера UnicChat
 
 1. Отредактируйте параметры ниже в `unicchat.yml файле.
- * `{uc_port}` - порт, на котором будет запущен сервер UnicChat;
- * `{db_name}` - название базы данных;
- * `{ucusername}` - пользователь, под которым будет подключаться сервер UnicChat к БД;
- * `{ucpassword}` - пароль пользователя;
+ * `{uc_port}` - порт, на котором будет запущен сервер UnicChat,  по умолчанию 8080;
+   
  * `{mongodb}` - укажите адрес вашего сервера БД. Если вы запускаете сервер UnicChat и БД на одном сервере, оставьте
  текущее значение без изменений.
- * `{ucserver}` - укажите имя или IP адрес вашего сервера UnicChat, например, публичный адрес вашего сервера для пользователей.
+
+``` yaml
+environment:
+  - MONGO_URL=mongodb://<username>:<password>@mongodb:27017/<database>?replicaSet=rs0
+  - MONGO_OPLOG_URL=mongodb://<username>:<password>@mongodb:27017/local
+```
+Где необходимо заменить:
+
+<username> - имя пользователя MongoDB
+
+<password> - пароль пользователя
+
+<database> - название вашей базы данных
+
+ * `UNIC_SOLID_HOST` - укажите имя или IP адрес вашего сервера с solid.
 
 2. Запустить контейнер, например, командой `docker-compose -f unicchat.yml up -d`
 
