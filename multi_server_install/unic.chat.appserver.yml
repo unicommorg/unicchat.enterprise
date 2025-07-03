@@ -5,11 +5,11 @@ services:
     image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.1.69
     restart: on-failure
     environment:
-      - MONGO_URL=mongodb://setyouusername:setyoupassword@mongodb:27017/setyoudatabasename?replicaSet=rs0
-      - MONGO_OPLOG_URL=mongodb://setyouusername:setyoupassword@mongodb:27017/local
+      - MONGO_URL=mongodb://<username>:<password>@mongodb:27017/<database>?replicaSet=rs0
+      - MONGO_OPLOG_URL=mongodb://<username>:<password>@mongodb:27017/local
       - ROOT_URL=http://localhost:3000
       # ваш адрес solid
-      - UNIC_SOLID_HOST=http://адрес_solid:8081
+      - UNIC_SOLID_HOST=http://"<ваш адрес unic.chat.solid>":8081
       - PORT=3000
       - DEPLOY_METHOD=docker
       # dns onlyoffice
@@ -19,7 +19,7 @@ services:
       - chat_data:/app/uploads
      # свой порт на котором будет доступен сервер UnicChat
     ports:
-      - "8080:3000"
+      - "8080:3000"   # uc_port
     networks:
       - unicchat-frontend
 
