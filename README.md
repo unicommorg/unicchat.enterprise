@@ -383,7 +383,7 @@ show users
 <!-- TOC --><a name="321-nginx"></a>
 ##### 3.2.1 Установить nginx
 
-Для Установки воспользоваться данной инструкцией: https://help.reg.ru/support/servery-vps/oblachnyye-servery/ustanovka-programmnogo-obespecheniya/kak-ustanovit-linux-nginx-mysql-php-lemp-v-ubuntu-18-04-20-04#2
+Установка nginx  выполняется за пределами данной инструкции.
 
 
 <!-- TOC --><a name="322-unicchat"></a>
@@ -470,7 +470,7 @@ nginx: configuration file /etc/nginx/nginx.conf test is successful
 <!-- TOC --><a name="324-"></a>
 ##### 3.2.4 Проверка работы 
 
-Провести настойку для обхода работы CORS в приложение, для этого вы базе выполнить:
+Провести настойку для обхода работы CORS в приложение, для этого на базе выполнить:
 
 ```
 db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"value":'http://app.unic.chat'}})
