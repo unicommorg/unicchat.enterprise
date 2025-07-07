@@ -1,4 +1,4 @@
-<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
+<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) --> 
 
 - [Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat](#-unicchat)
    * [Оглавление](#)
