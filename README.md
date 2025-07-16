@@ -233,7 +233,7 @@ RAM 8 Gb;
 
 2. Перейти в каталог ./multi_server_install. Проверить наличие `.yml` файлов 
 * mongodb.yml
-* unicchat.score.yml
+* : unic.chat.solid.yml
 * unicchat.yml 
 и директории `./app` .
 
@@ -337,8 +337,8 @@ show users
  Запустите 
  ```shell 
  
- docker-compose -f unicchat.score.yml up -d
- docker-compose -f unicchat.score.yml logs -ft
+ docker-compose -f : unic.chat.solid.yml up -d
+ docker-compose -f : unic.chat.solid.yml logs -ft
  ```
 
 <!-- TOC --><a name="24-unicchat"></a>
