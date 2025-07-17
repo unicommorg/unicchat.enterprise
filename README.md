@@ -1,12 +1,42 @@
 # Руководство по установке UnicChat Enterprise
 
-Это руководство описывает, как настроить UnicChat Enterprise, включая приложение для чата, видеоконференции (VCS) и базу знаний (MinIO и OnlyOffice). Следуйте этим шагам, чтобы запустить все на сервере с Ubuntu 20+.
+Это руководство описывает процесс установки UnicChat Enterprise, включая приложение для чата, видеоконференции (VCS) и базу знаний (MinIO и OnlyOffice) на сервере с Ubuntu 20+.
+
+## Содержание
+1. [Обзор](#обзор)
+2. [Предварительные требования](#предварительные-требования)
+3. [Структура директорий](#структура-директорий)
+4. [Шаг 1: Регистрация DNS-имен](#шаг-1-регистрация-dns-имен)
+5. [Шаг 2: Настройка окружения и конфигурации](#шаг-2-настройка-окружения-и-конфигурации)
+   - [2.1 Установка необходимых инструментов](#21-установка-необходимых-инструментов)
+   - [2.2 Создание файлов окружения](#22-создание-файлов-окружения)
+   - [2.3 Настройка файлов сервисов](#23-настройка-файлов-сервисов)
+6. [Шаг 3: Установка и запуск сервисов](#шаг-3-установка-и-запуск-сервисов)
+   - [3.1 Клонирование репозитория](#31-клонирование-репозитория)
+   - [3.2 Создание Docker-сетей](#32-создание-docker-сетей)
+   - [3.3 Запуск MongoDB](#33-запуск-mongodb)
+   - [3.4 Настройка базы данных MongoDB](#34-настройка-базы-данных-mongodb)
+   - [3.5 Запуск unic.chat.solid](#35-запуск-unicchatsolid)
+   - [3.6 Запуск сервера UnicChat](#36-запуск-сервера-unicchat)
+   - [3.7 Настройка NGINX для UnicChat](#37-настройка-nginx-для-unicchat)
+   - [3.8 Настройка HTTPS](#38-настройка-https)
+   - [3.9 Настройка видеоконференций (VCS)](#39-настройка-видеоконференций-vcs)
+   - [3.10 Настройка базы знаний](#310-настройка-базы-знаний)
+7. [Шаг 4: Создание администратора](#шаг-4-создание-администратора)
+8. [Шаг 5: Открытие сетевых портов](#шаг-5-открытие-сетевых-портов)
+9. [Быстрый старт: Один сервер](#быстрый-старт-один-сервер)
+10. [Быстрый старт: Два сервера](#быстрый-старт-два-сервера)
+11. [Устранение неполадок](#устранение-неполадок)
+12. [Клиентские приложения](#клиентские-приложения)
+13. [Дополнительные ресурсы](#дополнительные-ресурсы)
 
 ## Обзор
 - **UnicChat**: Безопасная платформа для обмена сообщениями с мобильными и настольными приложениями.
 - **VCS**: Видео- и аудиоконференции с использованием LiveKit.
 - **База знаний**: Хранилище файлов (MinIO) и редактирование документов (OnlyOffice).
-- **Архитектура**: Смотрите `assets/1vm-unicchat-install-scheme.jpg` для установки на одном сервере или `assets/2vm-unicchat-install-scheme.jpg` для установки на двух серверах.
+- **Архитектура**:
+  - Для установки на одном сервере см. схему: `assets/1vm-unicchat-install-scheme.jpg`
+  - Для установки на двух серверах см. схему: `assets/2vm-unicchat-install-scheme.jpg`
 
 ## Предварительные требования
 - Сервер с Ubuntu 20+ и доступом в интернет.
@@ -14,16 +44,21 @@
 - Лицензионный ключ от support@unicomm.pro.
 - Базовые знания команд терминала.
 
+## Структура директорий
+Ниже представлена структура директорий проекта `unicchat.enterprise/`:
+
+unicchat.enterprise/ ├── README.md ├── env_files/ │ ├── appserver.env │ ├── common.env │ ├── minio.env │ ├── mongodb.env │ ├── onlyoffice.env │ ├── solid.env │ ├── vcs.env ├── knowledgebase/ │ ├── Docker-DocumentServer/ │ │ ├── docker-compose.yml │ ├── minio/ │ │ ├── docker-compose.yml ├── multi_server_install/ │ ├── mongodb.yml │ ├── unic.chat.appserver.yml │ ├── unic.chat.solid.yml ├── vcs.unic.chat.template/ │ ├── .env │ ├── example.sites.nginx.md │ ├── install_docker.sh │ ├── install_server.sh │ ├── readme.first.md │ ├── update_ip.sh │ ├── unicomm-vcs/ │ │ ├── caddy.yaml │ │ ├── docker-compose.yaml │ │ ├── egress.yaml │ │ ├── redis.conf │ │ ├── update_ip.sh │ │ ├── vcs.yaml
+
 ## Шаг 1: Регистрация DNS-имен
 Настройте DNS-имена для всех сервисов, чтобы они были доступны. Обратитесь к администратору DNS для публичной регистрации или отредактируйте `/etc/hosts` для локального тестирования:
 ```shell
-10.0.XX.XX app.unic.chat www.app.unic.chat
+10.0.XX.XX myapp.unic.chat
 10.0.XX.XX mysolid.unic.chat
 10.0.XX.XX myminio.unic.chat
 10.0.XX.XX myonlyoffice.unic.chat
-10.0.XX.XX lk-yc.unic.chat
-10.0.XX.XX turn.lk-yc.unic.chat
-10.0.XX.XX whip.lk-yc.unic.chat
+10.0.XX.XX mylk-yc.unic.chat
+10.0.XX.XX turn.mylk-yc.unic.chat
+10.0.XX.XX whip.mylk-yc.unic.chat
 
 Замените 10.0.XX.XX на IP-адрес вашего сервера.
 Шаг 2: Настройка окружения и конфигурации
@@ -34,7 +69,7 @@ sudo apt install -y docker.io docker-compose nginx certbot python3-certbot-nginx
 sudo systemctl start docker nginx
 sudo systemctl enable docker nginx
 
-Опционально: Используйте vcs.unic.chat.template/install_docker.sh для установки Docker:
+Опционально: Используйте скрипт vcs.unic.chat.template/install_docker.sh для установки Docker:
 chmod +x vcs.unic.chat.template/install_docker.sh
 sudo ./vcs.unic.chat.template/install_docker.sh
 
@@ -71,7 +106,7 @@ UNIC_SOLID_HOST=http://mysolid.unic.chat:8881
 PORT=3000
 DEPLOY_METHOD=docker
 ONLYOFFICE_HOST=https://myonlyoffice.unic.chat
-LIVEKIT_HOST=wss://lk-yc.unic.chat
+LIVEKIT_HOST=wss://mylk-yc.unic.chat
 
 
 env_files/solid.env:
@@ -108,9 +143,9 @@ POSTGRES_HOST_AUTH_METHOD=trust
 
 env_files/vcs.env:
 
-VCS_URL=lk-yc.unic.chat
-VCS_TURN_URL=turn.lk-yc.unic.chat
-VCS_WHIP_URL=whip.lk-yc.unic.chat
+VCS_URL=mylk-yc.unic.chat
+VCS_TURN_URL=turn.mylk-yc.unic.chat
+VCS_WHIP_URL=whip.mylk-yc.unic.chat
 
 
 env_files/common.env:
@@ -120,7 +155,7 @@ Plugins:Attach=KnowledgeBase Minio UniAct Mongo Logger UniVault Tasker
 UnicLicense=<YourLicenseCodeHere>
 
 2.3 Настройка файлов сервисов
-Конфигурационные файлы (YAML) уже настроены в репозитории для использования директории env_files/. Убедитесь, что они находятся в multi_server_install/ и knowledgebase/. Изменения не требуются, если вы не хотите настроить порты или пути.
+Конфигурационные файлы (YAML) уже настроены в директориях multi_server_install/ и knowledgebase/ для использования файлов из env_files/. Изменения не требуются, если вы не хотите настроить порты или пути вручную.
 Шаг 3: Установка и запуск сервисов
 3.1 Клонирование репозитория
 Скачайте код UnicChat Enterprise:
@@ -165,18 +200,18 @@ docker-compose -f multi_server_install/unic.chat.solid.yml up -d
 docker-compose -f multi_server_install/unic.chat.appserver.yml up -d
 
 Проверьте, работает ли он:
-curl -I http://app.unic.chat:8080
+curl -I http://myapp.unic.chat:8080
 
 3.7 Настройка NGINX для UnicChat
-Создайте файл /etc/nginx/sites-available/app.unic.chat:
+Создайте файл /etc/nginx/sites-available/myapp.unic.chat:
 upstream internal {
     server 127.0.0.1:8080;
 }
 server {
-    server_name app.unic.chat www.app.unic.chat;
+    server_name myapp.unic.chat;
     client_max_body_size 200M;
-    error_log /var/log/nginx/app.unicchat.error.log;
-    access_log /var/log/nginx/app.unicchat.access.log;
+    error_log /var/log/nginx/myapp.unicchat.error.log;
+    access_log /var/log/nginx/myapp.unicchat.access.log;
     add_header Access-Control-Allow-Origin $cors_origin_header always;
     add_header Access-Control-Allow-Credentials $cors_cred;
     add_header "Access-Control-Allow-Methods" "GET, POST, OPTIONS, HEAD";
@@ -197,26 +232,26 @@ server {
         proxy_redirect off;
     }
     listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/live/app.unic.chat/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/app.unic.chat/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/myapp.unic.chat/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/myapp.unic.chat/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 }
 server {
-    server_name app.unic.chat www.app.unic.chat;
+    server_name myapp.unic.chat;
     listen 80;
     return 301 https://$host$request_uri;
 }
 
 Активируйте его:
-sudo ln -s /etc/nginx/sites-available/app.unic.chat /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/myapp.unic.chat /etc/nginx/sites-enabled/
 sudo rm /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
 
 3.8 Настройка HTTPS
 Получите SSL-сертификаты:
-sudo certbot certonly --standalone -d app.unic.chat -d www.app.unic.chat
+sudo certbot certonly --standalone -d myapp.unic.chat
 
 Настройте автоматическое обновление сертификатов:
 echo "00 7 * * * certbot renew --post-hook 'systemctl reload nginx'" | sudo tee /etc/cron.daily/certbot
@@ -224,10 +259,10 @@ echo "00 7 * * * certbot renew --post-hook 'systemctl reload nginx'" | sudo tee 
 Обновите MongoDB для использования HTTPS:
 docker exec -it unic.chat.db.mongo mongosh -u root -p "<your_root_password>"
 use unicchat_db
-db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"value":"https://app.unic.chat"}})
-db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":"https://app.unic.chat"}})
+db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"value":"https://myapp.unic.chat"}})
+db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":"https://myapp.unic.chat"}})
 
-Протестируйте UnicChat по адресу https://app.unic.chat.
+Протестируйте UnicChat по адресу https://myapp.unic.chat.
 3.9 Настройка видеоконференций (VCS)
 Перейдите в директорию VCS:
 cd vcs.unic.chat.template
@@ -249,9 +284,9 @@ server {
     listen [::]:80;
     listen 443 ssl;
     listen [::]:443 ssl;
-    server_name lk-yc.unic.chat;
-    ssl_certificate /etc/letsencrypt/live/lk-yc.unic.chat/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/lk-yc.unic.chat/privkey.pem;
+    server_name mylk-yc.unic.chat;
+    ssl_certificate /etc/letsencrypt/live/mylk-yc.unic.chat/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mylk-yc.unic.chat/privkey.pem;
     ssl_session_timeout 1440m;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
@@ -268,7 +303,7 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "Upgrade";
         proxy_read_timeout 90;
-        proxy_redirect https://vcsserver http://lk-yc.unic.chat;
+        proxy_redirect https://vcsserver http://mylk-yc.unic.chat;
     }
 }
 upstream turnserver {
@@ -279,9 +314,9 @@ server {
     listen [::]:80;
     listen 443 ssl;
     listen [::]:443 ssl;
-    server_name turn.lk-yc.unic.chat;
-    ssl_certificate /etc/letsencrypt/live/turn.lk-yc.unic.chat/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/turn.lk-yc.unic.chat/privkey.pem;
+    server_name turn.mylk-yc.unic.chat;
+    ssl_certificate /etc/letsencrypt/live/turn.mylk-yc.unic.chat/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/turn.mylk-yc.unic.chat/privkey.pem;
     ssl_session_timeout 1440m;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
@@ -298,7 +333,7 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "Upgrade";
         proxy_read_timeout 90;
-        proxy_redirect https://turnserver http://turn.lk-yc.unic.chat;
+        proxy_redirect https://turnserver http://turn.mylk-yc.unic.chat;
     }
 }
 
@@ -354,7 +389,7 @@ docker-compose -f multi_server_install/unic.chat.appserver.yml up -d
 
 Шаг 4: Создание администратора
 
-Откройте https://app.unic.chat в браузере.
+Откройте https://myapp.unic.chat в браузере.
 Зарегистрируйте администратора:
 Имя: Ваше отображаемое имя.
 Имя пользователя: Имя для входа.
@@ -373,12 +408,16 @@ ID организации: Получите от support@unicomm.pro.
 UnicChat: 8080/TCP, 443/TCP, 8881/TCP, 4443/TCP.
 VCS: 7880/TCP, 7881/TCP, 5349/TCP, 3478/UDP, 50000-60000/UDP.
 MinIO: 9000/TCP, 9002/TCP.
-OnlyOffice: 8880/TCP, 8443/TCP.Разрешите исходящие соединения к:
+OnlyOffice: 8880/TCP, 8443/TCP. წ
+
+System: Разрешите исходящие соединения к:
+
 push1.unic.chat:443
-lk-yc.unic.chat:443, 7881/TCP, 7882/UDP, 50000-60000/UDP
+mylk-yc.unic.chat:443, 7881/TCP, 7882/UDP, 50000-60000/UDP
 
 Быстрый старт: Один сервер
 Запустите все сервисы на одном сервере:
+cd unicchat.enterprise
 docker network create unicchat-backend
 docker network create unicchat-frontend
 docker-compose -f multi_server_install/mongodb.yml up -d
@@ -418,7 +457,7 @@ docker-compose -f docker-compose.yaml up -d
 MongoDB не запускается: Проверьте поддержку AVX (grep avx /proc/cpuinfo). Используйте MONGODB_VERSION=4.4, если не поддерживается.
 Ошибки NGINX: Проверьте конфигурацию (sudo nginx -t) и логи (/var/log/nginx/).
 VCS не работает: Проверьте порты (sudo lsof -i:7880 -i:7881 -i:5349 -i:3478) и сертификаты.
-MinIO/OnlyOffice недоступны: Убедитесь, что DNS-имена (myminio.unic.chat, myonlyoffice.unic.chat) настроены.
+MinIO/OnlyOffice недоступны: Убедитесь, что DNS-имена (myminio.unic.chat, myonlyoffice.unic.chat) настроены в /etc/hosts или DNS.
 
 Клиентские приложения
 
@@ -427,11 +466,11 @@ iOS: https://apps.apple.com/ru/app/unicchat/id1665533885
 Desktop: https://github.com/unicommorg/unic.chat.desktop.releases/releases
 
 Дополнительные ресурсы
-Смотрите docs/ для подробных руководств:
+Инструкции для UnicChat находятся в репозитории docs:
 
-Руководство пользователя
-Руководство администратора
-Руководство по лицензированию
-Описание архитектуры
+Инструкция пользователя UnicChat.pdf
+Инструкция по администрированию UnicChat.pdf
+Инструкция по лицензированию UnicChat.pdf
+Описание архитектуры UnicChat.pdf
 
 
