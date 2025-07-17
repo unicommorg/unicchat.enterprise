@@ -228,7 +228,7 @@ RAM 8 Gb;
  Выполнить на сервере
 
 ```shell 
- git https://github.com/unicommorg/unicchat.enterprise.git
+ git clone https://github.com/unicommorg/unicchat.enterprise.git
 ```
 
 2. Перейти в каталог ./multi_server_install. Проверить наличие `.yml` файлов 
