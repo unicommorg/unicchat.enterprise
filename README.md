@@ -62,10 +62,10 @@
       + [9.5 Развертывание OnlyOffice](#95-onlyoffice)
          - [9.5.1 Запуск OnlyOffice](#951-onlyoffice)
          - [9.5.2 Доступ к OnlyOffice:](#952-onlyoffice)
-      + [9.6 Редактироваие сервиcа unic.chat.solid](#96-c-unicchatsolid)
-         - [9.6.1 Редактироваие env файла](#961-env-)
+      + [9.6 Редактирование сервиса unic.chat.solid](#96-c-unicchatsolid)
+         - [9.6.1 Редактирование env файла](#961-env-)
          - [9.6.2 Пересоздание сервиса unic.chat.solid](#962-unicchatsolid)
-      + [9.7 Редактироваие сервиcа unic.chat.appserver](#97-c-unicchatappserver)
+      + [9.7 Редактирование сервиса unic.chat.appserver](#97-c-unicchatappserver)
          - [9.7.1 Добавление переменной окружения ONLYOFFICE_HOST ](#971-onlyoffice_host)
          - [9.7.2 Пересоздание сервиса unic.chat.appserver](#972-unicchatappserver)
       + [Частые проблемы при установке](#--11)
@@ -257,7 +257,7 @@ RAM 8 Gb;
 4. Запустить mongodb командой
 
 ``` yml
-docker-compose -f mongodb.yml up -d 
+docker-compose -f multi_server_install/mongodb.yml up -d 
 ```
 
 <!-- TOC --><a name="22-"></a>
@@ -276,7 +276,7 @@ docker exec -it   unic.chat.db.mongo /bin/bash
  Теперь в командной строке внутри контейнера выполним подключение с помощью `mongosh`
 
 ```shell
-mongosh -u root -p password
+mongosh -u root -p "rootpassword"
 ```
 
 где `password` - это указанный вами пароль в файле `mongodb.yml` в параметре `MONGODB_ROOT_PASSWORD`
@@ -365,7 +365,7 @@ environment:
 
  * `UNIC_SOLID_HOST` - укажите имя или IP адрес вашего сервера с solid.
 
-2. Запустить контейнер, например, командой `docker-compose -f unic.chat.appserver.yml up -d`
+2. Запустить контейнер, например, командой `docker-compose -f multi_server_install/unic.chat.appserver.yml up -d`
 
 3. После запуска приложения, вы можете открыть веб-интерфейс приложения по адресу `http://unicchat_server_ip:port`,
  где `unicchat_server_ip` - имя или IP адрес сервера,
@@ -738,9 +738,9 @@ docker-compose up -d
 Адрес: http://ваш_сервер:8880
 
 <!-- TOC --><a name="96-c-unicchatsolid"></a>
-#### 9.6 Редактироваие сервиcа unic.chat.solid
+#### 9.6 Редактирование сервиса unic.chat.solid
 <!-- TOC --><a name="961-env-"></a>
-##### 9.6.1 Редактироваие env файла
+##### 9.6.1 Редактирование env файла
 Перейдите в директорию multi_server_install/app/.
 Отредактируйте файл environment.env. 
 Добавьте значения переменных окружения minio 
@@ -754,12 +754,12 @@ MINIO_ROOT_PASSWORD
 ##### 9.6.2 Пересоздание сервиса unic.chat.solid
 Пересоздайте container для unic.chat.solid:
 ```bash
- docker-compose -f unic.chat.solid.yml down && docker-compose -f unic.chat.solid.yml up -d
+ docker-compose -f  multi_server_install/unic.chat.solid.yml down && docker-compose -f  multi_server_install/unic.chat.solid.yml up -d
 ```
 Доступ: http://ваш_сервер:8881/swagger/index.html 
 
 <!-- TOC --><a name="97-c-unicchatappserver"></a>
-#### 9.7 Редактироваие сервиcа unic.chat.appserver
+#### 9.7 Редактирование сервиса unic.chat.appserver
 <!-- TOC --><a name="971-onlyoffice_host"></a>
 ##### 9.7.1 Добавление переменной окружения ONLYOFFICE_HOST 
 Перейдите в директорию multi_server_install.
@@ -772,7 +772,7 @@ MINIO_ROOT_PASSWORD
 ##### 9.7.2 Пересоздание сервиса unic.chat.appserver
 Запустите:
 ``` shell
-docker-compose -f unic.chat.appserver.yml down && docker-compose -f unic.chat.appserver.yml up -d
+docker-compose -f  multi_server_install/unic.chat.appserver.yml down && docker-compose -f multi_server_install/unic.chat.appserver.yml up -d
 ```
 
  
