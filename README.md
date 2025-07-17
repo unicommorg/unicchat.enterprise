@@ -233,9 +233,9 @@ RAM 8 Gb;
 
 2. Перейти в каталог ./multi_server_install. Проверить наличие `.yml` файлов 
 * mongodb.yml
-* : unic.chat.solid.yml
+* unic.chat.solid.yml
 * unic.chat.appserver.yml
-и директории `./app` .
+* директории `./app` .
 
 
 <!-- TOC --><a name="-2-unicchat"></a>
@@ -267,10 +267,10 @@ docker-compose -f mongodb.yml up -d
  docker контейнер c базой, выполните
 
 ```shell
-docker exec -it   unic.chat.db.mongo.4.4 /bin/bash
+docker exec -it   unic.chat.db.mongo /bin/bash
 ```
 
-где `unic.chat.free.db.mongo` - имя нашего контейнера, указанного в `mongodb.yml`, в инструкции `container_name`.
+где `unic.chat.db.mongo` - имя нашего контейнера, указанного в `mongodb.yml`, в инструкции `container_name`.
 
 
  Теперь в командной строке внутри контейнера выполним подключение с помощью `mongosh`
@@ -279,7 +279,7 @@ docker exec -it   unic.chat.db.mongo.4.4 /bin/bash
 mongosh -u root -p password
 ```
 
-где `password` - это указанный вами пароль в файле `mongosh.yml` в параметре `MONGODB_ROOT_PASSWORD`
+где `password` - это указанный вами пароль в файле `mongodb.yml` в параметре `MONGODB_ROOT_PASSWORD`
 Если авторизация выполнена успешно, вы увидите приглашение `mongosh` и текст успешной авторизации, как на примере ниже.
 
 ```
@@ -748,7 +748,7 @@ docker-compose up -d
 MINIO_ROOT_USER
 MINIO_ROOT_PASSWORD
 ```
-И dns имя Minio без https.
+И dns имя Minio.
 
 <!-- TOC --><a name="962-unicchatsolid"></a>
 ##### 9.6.2 Пересоздание сервиса unic.chat.solid
