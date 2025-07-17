@@ -234,7 +234,7 @@ RAM 8 Gb;
 2. Перейти в каталог ./multi_server_install. Проверить наличие `.yml` файлов 
 * mongodb.yml
 * : unic.chat.solid.yml
-* unicchat.yml 
+* unic.chat.appserver.yml
 и директории `./app` .
 
 
@@ -337,14 +337,14 @@ show users
  Запустите 
  ```shell 
  
- docker-compose -f : unic.chat.solid.yml up -d
- docker-compose -f : unic.chat.solid.yml logs -ft
+ docker-compose -f  unic.chat.solid.yml up -d
+ docker-compose -f  unic.chat.solid.yml logs -ft
  ```
 
 <!-- TOC --><a name="24-unicchat"></a>
 ####  2.4 Запуск сервера UnicChat
 
-1. Отредактируйте параметры ниже в `unicchat.yml файле.
+1. Отредактируйте параметры ниже в `unic.chat.appserver.yml'.
  * `{uc_port}` - порт, на котором будет запущен сервер UnicChat,  по умолчанию 8080;
    
  * `{mongodb}` - укажите адрес вашего сервера БД. Если вы запускаете сервер UnicChat и БД на одном сервере, оставьте
@@ -365,7 +365,7 @@ environment:
 
  * `UNIC_SOLID_HOST` - укажите имя или IP адрес вашего сервера с solid.
 
-2. Запустить контейнер, например, командой `docker-compose -f unicchat.yml up -d`
+2. Запустить контейнер, например, командой `docker-compose -f unic.chat.appserver.yml up -d`
 
 3. После запуска приложения, вы можете открыть веб-интерфейс приложения по адресу `http://unicchat_server_ip:port`,
  где `unicchat_server_ip` - имя или IP адрес сервера,
@@ -377,7 +377,7 @@ environment:
  ```
  А также посмотрите на логи 
 ```shell
- docker-compose -f unicchat.yml logs -ft`
+ docker-compose -f unic.chat.appserver.yml logs -ft`
 ```
 
 
@@ -677,7 +677,7 @@ telnet `internal_IP` 7880 # 7880 7881 5349
 * unicchat.solid - 8881
 * minio - 9000 (unicchat использует порт api Minio)
 * onlyoffice - 8880
-* unicchat - 8080
+* unic.chat.appserver  - 8080
 
 <!-- TOC --><a name="93-"></a>
 #### 9.3 Размещение в локальной сети 
