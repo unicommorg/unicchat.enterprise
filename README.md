@@ -1,4 +1,4 @@
-<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) --> 
+<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
 
 - [Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat](#-unicchat)
    * [Оглавление](#)
@@ -62,10 +62,10 @@
       + [9.5 Развертывание OnlyOffice](#95-onlyoffice)
          - [9.5.1 Запуск OnlyOffice](#951-onlyoffice)
          - [9.5.2 Доступ к OnlyOffice:](#952-onlyoffice)
-      + [9.6 Редактирование сервиса unic.chat.solid](#96-c-unicchatsolid)
+      + [9.6 Редактирование сервиса unic.chat.solid](#96-unicchatsolid)
          - [9.6.1 Редактирование env файла](#961-env-)
          - [9.6.2 Пересоздание сервиса unic.chat.solid](#962-unicchatsolid)
-      + [9.7 Редактирование сервиса unic.chat.appserver](#97-c-unicchatappserver)
+      + [9.7 Редактирование сервиса unic.chat.appserver](#97-unicchatappserver)
          - [9.7.1 Добавление переменной окружения ONLYOFFICE_HOST ](#971-onlyoffice_host)
          - [9.7.2 Пересоздание сервиса unic.chat.appserver](#972-unicchatappserver)
       + [Частые проблемы при установке](#--11)
@@ -737,7 +737,7 @@ docker-compose up -d
 ##### 9.5.2 Доступ к OnlyOffice:
 Адрес: http://ваш_сервер:8880
 
-<!-- TOC --><a name="96-c-unicchatsolid"></a>
+<!-- TOC --><a name="96-unicchatsolid"></a>
 #### 9.6 Редактирование сервиса unic.chat.solid
 <!-- TOC --><a name="961-env-"></a>
 ##### 9.6.1 Редактирование env файла
@@ -758,7 +758,7 @@ MINIO_ROOT_PASSWORD
 ```
 Доступ: http://ваш_сервер:8881/swagger/index.html 
 
-<!-- TOC --><a name="97-c-unicchatappserver"></a>
+<!-- TOC --><a name="97-unicchatappserver"></a>
 #### 9.7 Редактирование сервиса unic.chat.appserver
 <!-- TOC --><a name="971-onlyoffice_host"></a>
 ##### 9.7.1 Добавление переменной окружения ONLYOFFICE_HOST 
