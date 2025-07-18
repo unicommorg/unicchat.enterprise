@@ -1,19 +1,21 @@
-# unicomm media server egress
-# support@unicomm.pro
-version: "3"
+version: '3.7'
 services:
-  uc.media.score:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid/prod:prod250421
+  solid:
+    image: cr.yandex/yc/unicchat/solid:${SOLID_IMAGE_VERSION}
     container_name: unic.chat.solid
-    restart: unless-stopped
-    ports:
-      - 8881:8080
-      - 4443:443
-    env_file:
-      - ./app/environment.env
+    environment:
+      - UnInit.0=${UnInit.0}
+      - UnInit.1=${UnInit.1}
+      - InitConfig:Names=${InitConfig:Names}
+      - Plugins:Attach=${Plugins:Attach}
+      - UnicLicense=${UnicLicense}
     networks:
       - unicchat-backend
+      - unicchat-frontend
+    ports:
+      - "8881:8881"
 networks:
   unicchat-backend:
-    driver: bridge
+    external: true
+  unicchat-frontend:
     external: true
