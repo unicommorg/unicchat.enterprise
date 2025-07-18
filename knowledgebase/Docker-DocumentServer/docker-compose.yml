@@ -1,57 +1,53 @@
-version: '3'
+```yaml
+version: '3.7'
 services:
-  onlyoffice-documentserver:
-    image: onlyoffice/documentserver
-    container_name: onlyoffice-documentserver
-    depends_on:
-      - onlyoffice-postgresql
-      - onlyoffice-rabbitmq
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: unic.chat.onlyoffice
     environment:
-      - DB_TYPE=postgres
-      - DB_HOST=onlyoffice-postgresql
-      - DB_PORT=5432
-      - DB_NAME=dbname
-      - DB_USER=dbuser
-      - WOPI_ENABLED=true
-      - AMQP_URI=amqp://guest:guest@onlyoffice-rabbitmq
-      # Uncomment strings below to enable the JSON Web Token validation.
-      - JWT_ENABLED=false
-      - ALLOW_PRIVATE_IP_ADDRESS=true
-      - ALLOW_META_IP_ADDRESS=true
-      - USE_UNAUTHORIZED_STORAGE=true
-
+      - DB_TYPE=${DB_TYPE}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - WOPI_ENABLED=${WOPI_ENABLED}
+      - AMQP_URI=${AMQP_URI}
+      - JWT_ENABLED=${JWT_ENABLED}
+      - ALLOW_PRIVATE_IP_ADDRESS=${ALLOW_PRIVATE_IP_ADDRESS}
+      - ALLOW_META_IP_ADDRESS=${ALLOW_META_IP_ADDRESS}
+      - USE_UNAUTHORIZED_STORAGE=${USE_UNAUTHORIZED_STORAGE}
+    volumes:
+      - onlyoffice_data:/var/www/onlyoffice/Data
+      - onlyoffice_logs:/var/log/onlyoffice
+    networks:
+      - unicchat-backend
+      - unicchat-frontend
     ports:
-      - '8880:80'
-      - '8443:443'
-    stdin_open: true
-    restart: always
-    stop_grace_period: 60s
-    volumes:
-       - /var/www/onlyoffice/Data
-       - /var/log/onlyoffice
-       - /var/lib/onlyoffice/documentserver/App_Data/cache/files
-       - /var/www/onlyoffice/documentserver-example/public/files
-       - /usr/share/fonts
-
-  onlyoffice-rabbitmq:
-    container_name: onlyoffice-rabbitmq
-    image: rabbitmq
-    restart: always
-    expose:
-      - '5672'
-
+      - "8880:80"
   onlyoffice-postgresql:
-    container_name: onlyoffice-postgresql
-    image: postgres:12
+    image: postgres:latest
     environment:
-      - POSTGRES_DB=dbname
-      - POSTGRES_USER=dbuser
-      - POSTGRES_HOST_AUTH_METHOD=trust
-    restart: always
-    expose:
-      - '5432'
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD}
     volumes:
-      - postgresql_data:/var/lib/postgresql
-
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - unicchat-backend
+  onlyoffice-rabbitmq:
+    image: rabbitmq:3-management
+    networks:
+      - unicchat-backend
+networks:
+  unicchat-backend:
+    external: true
+  unicchat-frontend:
+    external: true
 volumes:
-  postgresql_data:
+  onlyoffice_data:
+    driver: local
+  onlyoffice_logs:
+    driver: local
+  postgres_data:
+    driver: local
+```
