@@ -169,7 +169,7 @@
 
 ```bash
 sudo apt update
-sudo apt install -y docker.io docker-compose nginx certbot python3-certbot-nginx git
+sudo apt install -y docker.io docker compose nginx certbot python3-certbot-nginx git
 sudo systemctl enable docker nginx
 sudo systemctl start docker nginx
 
@@ -225,7 +225,7 @@ docker network create unicchat-frontend
 
 Запустите MongoDB:
 
-docker-compose -f multi_server_install/mongodb.yml up -d
+docker compose -f multi_server_install/mongodb.yml up -d
 
 
 2.2 Создание базы данных и пользователя
@@ -261,8 +261,8 @@ UnInit.1="'Minio': { 'Type': 'NamedServiceAuth', 'IpOrHost': 'myminio.unic.chat'
 
 Запустите сервис:
 
-docker-compose -f multi_server_install/unic.chat.solid.yml up -d
-docker-compose -f multi_server_install/unic.chat.solid.yml logs -f
+docker compose -f multi_server_install/unic.chat.solid.yml up -d
+docker compose -f multi_server_install/unic.chat.solid.yml logs -f
 
 
 2.4 Запуск сервера UnicChat
@@ -282,13 +282,13 @@ LIVEKIT_HOST=wss://mylk-yc.unic.chat
 
 Запустите сервер:
 
-docker-compose -f multi_server_install/unic.chat.appserver.yml up -d
+docker compose -f multi_server_install/unic.chat.appserver.yml up -d
 
 
 Проверьте доступ:
 
 curl -I http://myapp.unic.chat:8080
-docker-compose -f multi_server_install/unic.chat.appserver.yml logs -f
+docker compose -f multi_server_install/unic.chat.appserver.yml logs -f
 
 
 Шаг 3. Настройка NGINX
@@ -475,7 +475,7 @@ sudo ./install_server.sh
 Запустите медиа-сервер:
 
 cd unicomm-vcs
-docker-compose -f docker-compose.yaml up -d
+docker compose -f docker compose.yaml up -d
 
 
 Настройте NGINX (вместо Caddy, см. example.sites.nginx.md):
@@ -599,7 +599,7 @@ myapp.unic.chat:8080
 9.4 Развертывание MinIO S3
 
 9.4.1 Настройка MinIO
-В knowledgebase/minio/docker-compose.yml установите:
+В knowledgebase/minio/docker compose.yml установите:
 MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=rootpassword
 MINIO_IP_OR_HOST=myminio.unic.chat
@@ -607,7 +607,7 @@ MINIO_IP_OR_HOST=myminio.unic.chat
 
 9.4.2 Запуск MinIO
 cd knowledgebase/minio
-docker-compose up -d
+docker compose up -d
 
 
 9.4.3 Доступ к MinIO
@@ -625,7 +625,7 @@ S3 Endpoint: http://myminio.unic.chat:9000
 
 9.5.1 Запуск OnlyOffice
 cd knowledgebase/Docker-DocumentServer
-docker-compose up -d
+docker compose up -d
 
 
 9.5.2 Доступ к OnlyOffice
@@ -639,8 +639,8 @@ docker-compose up -d
 Обновите env_files/solid.env (см. шаг 2.3).
 
 9.6.2 Перезапуск unic.chat.solid
-docker-compose -f multi_server_install/unic.chat.solid.yml down
-docker-compose -f multi_server_install/unic.chat.solid.yml up -d
+docker compose -f multi_server_install/unic.chat.solid.yml down
+docker compose -f multi_server_install/unic.chat.solid.yml up -d
 
 Проверьте: http://mysolid.unic.chat:8881/swagger/index.html
 
@@ -650,8 +650,8 @@ docker-compose -f multi_server_install/unic.chat.solid.yml up -d
 Обновите env_files/appserver.env (см. шаг 2.4).
 
 9.7.2 Перезапуск unic.chat.appserver
-docker-compose -f multi_server_install/unic.chat.appserver.yml down
-docker-compose -f multi_server_install/unic.chat.appserver.yml up -d
+docker compose -f multi_server_install/unic.chat.appserver.yml down
+docker compose -f multi_server_install/unic.chat.appserver.yml up -d
 
 
 Частые проблемы при установке
