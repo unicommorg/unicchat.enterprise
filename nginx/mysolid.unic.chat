@@ -1,0 +1,37 @@
+upstream mysolid {
+    server 10.0.XX.XX:8881;
+}
+
+# HTTPS Server
+server {
+    server_name mysolid.unic.chat;
+    client_max_body_size 200M;
+
+    error_log /var/log/nginx/mysolid.unic.chat.error.log;
+    access_log /var/log/nginx/mysolid.unic.chat.access.log;
+
+    location / {
+        proxy_pass http://mysolid;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Nginx-Proxy true;
+        proxy_redirect off;
+    }
+
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/mysolid.unic.chat/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/mysolid.unic.chat/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+
+server {
+    server_name mysolid.unic.chat;
+    listen 80;
+    return 301 https://$host$request_uri; # managed by Certbot
+}
