@@ -1,27 +1,23 @@
-version: '3.7'
+version: "3"
 services:
-  appserver:
-    image: cr.yandex/yc/unicchat/appserver:${APPSERVER_IMAGE_VERSION}
+  unic.chat.free:
     container_name: unic.chat.appserver
-    environment:
-      - MONGO_URL=${MONGO_URL}
-      - MONGO_OPLOG_URL=${MONGO_OPLOG_URL}
-      - ROOT_URL=${ROOT_URL}
-      - UNIC_SOLID_HOST=${UNIC_SOLID_HOST}
-      - PORT=${PORT}
-      - DEPLOY_METHOD=${DEPLOY_METHOD}
-      - ONLYOFFICE_HOST=${ONLYOFFICE_HOST}
-      - LIVEKIT_HOST=${LIVEKIT_HOST}
-      - InitConfig:Names=${InitConfig:Names}
-      - Plugins:Attach=${Plugins:Attach}
-      - UnicLicense=${UnicLicense}
-    networks:
-      - unicchat-backend
-      - unicchat-frontend
+    image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.1.69
+    restart: on-failure
+    env_file:
+      - ./common_env.env
+      - ./appserver_env.env
+    volumes:
+      - chat_data:/app/uploads
     ports:
       - "8080:3000"
+    networks:
+      - unicchat-frontend
+
 networks:
-  unicchat-backend:
-    external: true
   unicchat-frontend:
+    driver: bridge
     external: true
+volumes:
+  chat_data:
+    driver: local
