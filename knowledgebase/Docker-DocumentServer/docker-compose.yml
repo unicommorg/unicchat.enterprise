@@ -1,53 +1,45 @@
-```yaml
-version: '3.7'
+version: '3'
 services:
-  onlyoffice:
-    image: onlyoffice/documentserver:latest
-    container_name: unic.chat.onlyoffice
-    environment:
-      - DB_TYPE=${DB_TYPE}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - WOPI_ENABLED=${WOPI_ENABLED}
-      - AMQP_URI=${AMQP_URI}
-      - JWT_ENABLED=${JWT_ENABLED}
-      - ALLOW_PRIVATE_IP_ADDRESS=${ALLOW_PRIVATE_IP_ADDRESS}
-      - ALLOW_META_IP_ADDRESS=${ALLOW_META_IP_ADDRESS}
-      - USE_UNAUTHORIZED_STORAGE=${USE_UNAUTHORIZED_STORAGE}
-    volumes:
-      - onlyoffice_data:/var/www/onlyoffice/Data
-      - onlyoffice_logs:/var/log/onlyoffice
-    networks:
-      - unicchat-backend
-      - unicchat-frontend
+  onlyoffice-documentserver:
+    image: onlyoffice/documentserver
+    container_name: onlyoffice-documentserver
+    depends_on:
+      - onlyoffice-postgresql
+      - onlyoffice-rabbitmq
+    env_file:
+      - ./onlyoffice_env.env
     ports:
-      - "8880:80"
-  onlyoffice-postgresql:
-    image: postgres:latest
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD}
+      - '8880:80'
+      - '8443:443'
+    stdin_open: true
+    restart: always
+    stop_grace_period: 60s
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - unicchat-backend
+      - /var/www/onlyoffice/Data
+      - /var/log/onlyoffice
+      - /var/lib/onlyoffice/documentserver/App_Data/cache/files
+      - /var/www/onlyoffice/documentserver-example/public/files
+      - /usr/share/fonts
+
   onlyoffice-rabbitmq:
-    image: rabbitmq:3-management
-    networks:
-      - unicchat-backend
-networks:
-  unicchat-backend:
-    external: true
-  unicchat-frontend:
-    external: true
+    container_name: onlyoffice-rabbitmq
+    image: rabbitmq
+    restart: always
+    expose:
+      - '5672'
+
+  onlyoffice-postgresql:
+    container_name: onlyoffice-postgresql
+    image: postgres:12
+    environment:
+      - POSTGRES_DB=dbname
+      - POSTGRES_USER=dbuser
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    restart: always
+    expose:
+      - '5432'
+    volumes:
+      - postgresql_data:/var/lib/postgresql
+
 volumes:
-  onlyoffice_data:
-    driver: local
-  onlyoffice_logs:
-    driver: local
-  postgres_data:
-    driver: local
-```
+  postgresql_data:
