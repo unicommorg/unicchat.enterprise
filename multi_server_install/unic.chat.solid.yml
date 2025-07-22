@@ -1,21 +1,17 @@
-version: '3.7'
+version: "3"
 services:
-  solid:
-    image: cr.yandex/yc/unicchat/solid:${SOLID_IMAGE_VERSION}
+  uc.media.score:
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid/prod:prod250421
     container_name: unic.chat.solid
-    environment:
-      - UnInit.0=${UnInit.0}
-      - UnInit.1=${UnInit.1}
-      - InitConfig:Names=${InitConfig:Names}
-      - Plugins:Attach=${Plugins:Attach}
-      - UnicLicense=${UnicLicense}
+    restart: unless-stopped
+    ports:
+      - 8881:8080
+      - 4443:443
+    env_file:
+      - ./app/environment.env
     networks:
       - unicchat-backend
-      - unicchat-frontend
-    ports:
-      - "8881:8881"
 networks:
   unicchat-backend:
-    external: true
-  unicchat-frontend:
+    driver: bridge
     external: true
