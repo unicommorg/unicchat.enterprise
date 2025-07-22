@@ -1,30 +1,28 @@
-
-version: '3.7'
+version: "3"
 services:
   mongodb:
-    image: bitnami/mongodb:${MONGODB_VERSION}
+    image: docker.io/bitnami/mongodb:${MONGODB_VERSION:-4.4}
     container_name: unic.chat.db.mongo
-    environment:
-      - MONGODB_REPLICA_SET_MODE=${MONGODB_REPLICA_SET_MODE}
-      - MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME}
-      - MONGODB_REPLICA_SET_KEY=${MONGODB_REPLICA_SET_KEY}
-      - MONGODB_PORT_NUMBER=${MONGODB_PORT_NUMBER}
-      - MONGODB_INITIAL_PRIMARY_HOST=${MONGODB_INITIAL_PRIMARY_HOST}
-      - MONGODB_ADVERTISED_HOSTNAME=${MONGODB_ADVERTISED_HOSTNAME}
-      - MONGODB_ENABLE_JOURNAL=${MONGODB_ENABLE_JOURNAL}
-      - MONGODB_ROOT_PASSWORD=${MONGODB_ROOT_PASSWORD}
-      - MONGODB_USERNAME=${MONGODB_USERNAME}
-      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
-      - MONGODB_DATABASE=${MONGODB_DATABASE}
+    restart: on-failure
     volumes:
       - mongodb_data:/bitnami/mongodb
-    networks:
-      - unicchat-backend
+    env_file:
+      - ./common_env.env
+      - ./mongodb_env.env
     ports:
       - "27017:27017"
+    networks:
+      - unicchat-backend
+      - unicchat-frontend
+
 networks:
-  unicchat-backend:
+  unicchat-frontend:
+    driver: bridge
     external: true
+  unicchat-backend:
+    driver: bridge
+    external: true
+
 volumes:
   mongodb_data:
     driver: local
