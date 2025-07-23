@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Директория, где находятся файлы .env
-BASE_DIR="multi_server_install"
+BASE_DIR=$PWD
 
 # Загрузка переменных из multi_server_env.env
 ENV_FILE="$BASE_DIR/env/multi_server_env.env"
