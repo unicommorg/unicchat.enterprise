@@ -4,13 +4,17 @@
 BASE_DIR=$PWD
 
 # Загрузка переменных из multi_server_env.env
-ENV_FILE="$BASE_DIR/env/multi_server_env.env"
+ENV_FILE="$BASE_DIR/multi_server_env.env"
 if [ ! -f "$ENV_FILE" ]; then
     echo "Ошибка: Файл $ENV_FILE не найден"
     exit 1
 fi
 
 source "$ENV_FILE"
+
+# Динамическое построение MONGO_URL и MONGO_OPLOG_URL
+MONGO_URL="mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_INITIAL_PRIMARY_HOST}:27017/${MONGODB_DATABASE}?replicaSet=rs0"
+MONGO_OPLOG_URL="mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_INITIAL_PRIMARY_HOST}:27017/local"
 
 # Функция для экранирования специальных символов для sed
 escape_sed() {
