@@ -3,24 +3,14 @@
 # Директория, где находятся файлы .env
 BASE_DIR="multi_server_install"
 
-# Определите новые значения для переменных окружения здесь
-# Замените эти значения-заполнители на ваши реальные значения
-NEW_UNIC_SOLID_HOST="http://new.unic.chat.solid:8881"
-NEW_ONLYOFFICE_HOST="https://new.dns.name.onlyoffice"
-NEW_MONGODB_USERNAME="new_unicchat_admin"
-NEW_MONGODB_PASSWORD="new_secure_password_456"
-NEW_MONGODB_DATABASE="new_unicchat_db"
-NEW_MINIO_IP_OR_HOST="new.minio.dns.name"
-NEW_MINIO_ROOT_USER="new_minioadmin"
-NEW_MINIO_ROOT_PASSWORD="new_minio_password_789"
-NEW_MONGODB_ROOT_PASSWORD="new_mongodb_root_password"
-NEW_MONGODB_INITIAL_PRIMARY_HOST="new_mongodb_host"
-NEW_MONGODB_ADVERTISED_HOSTNAME="new_mongodb_advertised_host"
-NEW_UNIC_LICENSE="new_license_code"
+# Загрузка переменных из multi_server_env.env
+ENV_FILE="$BASE_DIR/env/multi_server_env.env"
+if [ ! -f "$ENV_FILE" ]; then
+    echo "Ошибка: Файл $ENV_FILE не найден"
+    exit 1
+fi
 
-# Динамическое построение MONGO_URL и MONGO_OPLOG_URL
-NEW_MONGO_URL="mongodb://${NEW_MONGODB_USERNAME}:${NEW_MONGODB_PASSWORD}@${NEW_MONGODB_INITIAL_PRIMARY_HOST}:27017/${NEW_MONGODB_DATABASE}?replicaSet=rs0"
-NEW_MONGO_OPLOG_URL="mongodb://${NEW_MONGODB_USERNAME}:${NEW_MONGODB_PASSWORD}@${NEW_MONGODB_INITIAL_PRIMARY_HOST}:27017/local"
+source "$ENV_FILE"
 
 # Функция для экранирования специальных символов для sed
 escape_sed() {
@@ -29,20 +19,20 @@ escape_sed() {
 
 # Массив файлов и переменных для замены
 declare -A FILES=(
-    ["appserver_env.env"]="UNIC_SOLID_HOST=$NEW_UNIC_SOLID_HOST
-ONLYOFFICE_HOST=$NEW_ONLYOFFICE_HOST"
-    ["common_env.env"]="MONGODB_USERNAME=$NEW_MONGODB_USERNAME
-MONGODB_PASSWORD=$NEW_MONGODB_PASSWORD
-MONGODB_DATABASE=$NEW_MONGODB_DATABASE
-MONGO_URL=$NEW_MONGO_URL
-MONGO_OPLOG_URL=$NEW_MONGO_OPLOG_URL
-MINIO_IP_OR_HOST=$NEW_MINIO_IP_OR_HOST
-MINIO_ROOT_USER=$NEW_MINIO_ROOT_USER
-MINIO_ROOT_PASSWORD=$NEW_MINIO_ROOT_PASSWORD"
-    ["mongodb_env.env"]="MONGODB_ROOT_PASSWORD=$NEW_MONGODB_ROOT_PASSWORD
-MONGODB_INITIAL_PRIMARY_HOST=$NEW_MONGODB_INITIAL_PRIMARY_HOST
-MONGODB_ADVERTISED_HOSTNAME=$NEW_MONGODB_ADVERTISED_HOSTNAME"
-    ["app/solid_env.env"]="UnicLicense=$NEW_UNIC_LICENSE"
+    ["appserver_env.env"]="UNIC_SOLID_HOST=$UNIC_SOLID_HOST
+ONLYOFFICE_HOST=$ONLYOFFICE_HOST"
+    ["common_env.env"]="MONGODB_USERNAME=$MONGODB_USERNAME
+MONGODB_PASSWORD=$MONGODB_PASSWORD
+MONGODB_DATABASE=$MONGODB_DATABASE
+MONGO_URL=$MONGO_URL
+MONGO_OPLOG_URL=$MONGO_OPLOG_URL
+MINIO_IP_OR_HOST=$MINIO_IP_OR_HOST
+MINIO_ROOT_USER=$MINIO_ROOT_USER
+MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD"
+    ["mongodb_env.env"]="MONGODB_ROOT_PASSWORD=$MONGODB_ROOT_PASSWORD
+MONGODB_INITIAL_PRIMARY_HOST=$MONGODB_INITIAL_PRIMARY_HOST
+MONGODB_ADVERTISED_HOSTNAME=$MONGODB_ADVERTISED_HOSTNAME"
+    ["app/solid_env.env"]="UnicLicense=$UNIC_LICENSE"
 )
 
 # Проверка существования базовой директории
