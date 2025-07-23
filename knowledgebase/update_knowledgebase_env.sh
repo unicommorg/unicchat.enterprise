@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Директория, где находятся файлы .env
-BASE_DIR="knowledgebase"
+BASE_DIR=$PWD
 
 # Загрузка переменных из knowledgebase.env
 ENV_FILE="$BASE_DIR/knowledgebase.env"
