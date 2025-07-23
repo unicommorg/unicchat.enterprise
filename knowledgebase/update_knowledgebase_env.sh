@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Директория, где находятся файлы .env
-BASE_DIR="multi_server_install"
+BASE_DIR="knowledgebase"
 
-# Загрузка переменных из multi_server_env.env
-ENV_FILE="$BASE_DIR/env/multi_server_env.env"
+# Загрузка переменных из knowledgebase.env
+ENV_FILE="$BASE_DIR/knowledgebase.env"
 if [ ! -f "$ENV_FILE" ]; then
     echo "Ошибка: Файл $ENV_FILE не найден"
     exit 1
@@ -19,20 +19,19 @@ escape_sed() {
 
 # Массив файлов и переменных для замены
 declare -A FILES=(
-    ["appserver_env.env"]="UNIC_SOLID_HOST=$UNIC_SOLID_HOST
-ONLYOFFICE_HOST=$ONLYOFFICE_HOST"
-    ["common_env.env"]="MONGODB_USERNAME=$MONGODB_USERNAME
-MONGODB_PASSWORD=$MONGODB_PASSWORD
-MONGODB_DATABASE=$MONGODB_DATABASE
-MONGO_URL=$MONGO_URL
-MONGO_OPLOG_URL=$MONGO_OPLOG_URL
-MINIO_IP_OR_HOST=$MINIO_IP_OR_HOST
-MINIO_ROOT_USER=$MINIO_ROOT_USER
+    ["minio/minio_env.env"]="MINIO_ROOT_USER=$MINIO_ROOT_USER
 MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD"
-    ["mongodb_env.env"]="MONGODB_ROOT_PASSWORD=$MONGODB_ROOT_PASSWORD
-MONGODB_INITIAL_PRIMARY_HOST=$MONGODB_INITIAL_PRIMARY_HOST
-MONGODB_ADVERTISED_HOSTNAME=$MONGODB_ADVERTISED_HOSTNAME"
-    ["app/solid_env.env"]="UnicLicense=$UNIC_LICENSE"
+    ["Docker-DocumentServer/onlyoffice_env.env"]="DB_TYPE=$DB_TYPE
+DB_HOST=$DB_HOST
+DB_PORT=$DB_PORT
+DB_NAME=$DB_NAME
+DB_USER=$DB_USER
+WOPI_ENABLED=$WOPI_ENABLED
+AMQP_URI=$AMQP_URI
+JWT_ENABLED=$JWT_ENABLED
+ALLOW_PRIVATE_IP_ADDRESS=$ALLOW_PRIVATE_IP_ADDRESS
+ALLOW_META_IP_ADDRESS=$ALLOW_META_IP_ADDRESS
+USE_UNAUTHORIZED_STORAGE=$USE_UNAUTHORIZED_STORAGE"
 )
 
 # Проверка существования базовой директории
