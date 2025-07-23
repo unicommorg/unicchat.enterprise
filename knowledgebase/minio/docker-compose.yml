@@ -3,10 +3,8 @@ services:
   minio:
     image: minio/minio:latest
     container_name: unic.chat.minio
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-      - MINIO_IP_OR_HOST=${MINIO_IP_OR_HOST}
+    env_file:
+      - minio_env.env  # Подключаем файл с переменными окружения
     volumes:
       - minio_data:/data
     networks:
