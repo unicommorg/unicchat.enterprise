@@ -387,7 +387,6 @@ telnet `internal_IP` 7880 # 7880 7881 5349
 <!-- TOC --><a name="-4-unicchat"></a>
 ### Шаг 4. Развертывание базы знаний для UNICCHAT
 
-Перейдите в директорию knowledgebase
 
 <!-- TOC --><a name="44-minio-s3"></a>
 #### 4.4 Развертывание MinIO S3
@@ -420,7 +419,7 @@ cd ..
 ##### 4.4.2 Запустите Базу Знаний
 
 ```bash
-docker -f minio/docker-compose up -d && docker -f Docker-DocumentServer/docker-compose up -d  
+docker compose -f knowledgebase/minio/docker-compose up -d && docker compose -f knowledgebase/Docker-DocumentServer/docker-compose up -d  
 ```
 
 <!-- TOC --><a name="443-minio"></a>
