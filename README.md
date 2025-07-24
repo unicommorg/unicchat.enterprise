@@ -556,7 +556,7 @@ db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'htt
 Приложение Unicchat работает с внешним push сервером для доставки push-уведомлений в приложение Unicchat на мобильные устройства.
 
 <!-- TOC --><a name="--7"></a>
-#### Клиентские приложения
+### Клиентские приложения
 
 * [Репозитории клиентских приложений]
 * Android: (https://play.google.com/store/apps/details?id=pro.unicomm.unic.chat&pcampaignid=web_share)
