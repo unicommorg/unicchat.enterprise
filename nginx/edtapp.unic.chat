@@ -4,11 +4,11 @@ upstream edtapp {
 
 # HTTPS Server
 server {
-    server_name myonlyoffice.unic.chat;
+    server_name myedt.unic.chat;
     client_max_body_size 200M;
 
-    error_log /var/log/nginx/myonlyoffice.unic.chat.error.log;
-    access_log /var/log/nginx/myonlyoffice.unic.chat.access.log;
+    error_log /var/log/nginx/myedt.unic.chat.error.log;
+    access_log /var/log/nginx/myedt.unic.chat.access.log;
 
     location / {
         proxy_pass http://edtapp;
@@ -24,14 +24,14 @@ server {
     }
 
     listen 443 ssl; # managed by Certbot
-    ssl_certificate /etc/letsencrypt/live/edtapp.unic.chat/fullchain.pem; # managed by Certbot
-    ssl_certificate_key /etc/letsencrypt/live/edtapp.unic.chat/privkey.pem; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/myedt.unic.chat/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/myedt.unic.chat/privkey.pem; # managed by Certbot
     include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
 }
 
 server {
-    server_name edtapp.unic.chat;
+    server_name myedt.unic.chat;
     listen 80;
     return 301 https://$host$request_uri; # managed by Certbot
 }
