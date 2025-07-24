@@ -2,17 +2,17 @@
 
 - [Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat](#-unicchat)
    * [Оглавление](#)
-   * [Скачать инструкции в PDF](#-pdf)
+   * [Скачать инструкции в PDF ](#-pdf)
    * [Архитектура установки](#-)
       + [Установка на 1-м сервере](#-1-)
       + [Установка на 2-х серверах (рекомендуется для промышленного использования)](#-2-)
    * [Обязательные компоненты](#--1)
-      - [Push шлюз](#push-)
-      - [ВКС шлюз](#--2)
-      - [Приложения UnicChat](#-unicchat-1)
+         - [Push шлюз](#push-)
+         - [ВКС шлюз](#--2)
+         - [Приложения UnicChat](#-unicchat-1)
    * [Опциональные компоненты](#--3)
-      - [SMTP сервер](#smtp-)
-      - [LDAP сервер](#ldap-)
+         - [SMTP сервер](#smtp-)
+         - [LDAP сервер](#ldap-)
    * [Шаг 1. Подготовка окружения](#-1--1)
       + [1.1 Требования к конфигурации](#11-)
          - [Требования к конфигурации на 20 пользователей. Приложение и БД устанавливаются на 1-й виртуальной машине](#-20-1-)
@@ -24,53 +24,33 @@
       + [1.3. Установка сторонних зависимостей](#13-)
       + [1.4. Клонирование репозитория](#14-)
    * [Шаг 2. Настройка NGINX](#-2-nginx)
-      + [2.1 Зарегистрировать DNS запись](#21-dns-)
+      + [2.1 Зарегистрировать DNS имена](#21-dns-)
       + [2.2 Провести настройку Nginx](#22-nginx)
          - [2.2.1 Установить nginx](#221-nginx)
-         - [2.2.2 Настроить сайт для Unicchat](#222-unicchat)
-         - [2.2.3 Подготовка сайта nginx](#223-nginx)
-         - [2.2.4 Проверка работы](#224-)
+         - [2.2.2 Настроить nginx конфигурацию для Unicchat и Базы знаний](#222-nginx-unicchat-)
          - [2.2.5 Установка certbot и получение сертификата](#225-certbot-)
+         - [2.2.3 Подготовка сайта nginx](#223-nginx)
          - [2.2.6 Настройка автоматической проверки сертификата certbot](#226-certbot)
-         - [2.2.7 Настройка Unicchat для работы с HTTPS](#227-unicchat-https)
       + [2.3 Открыть доступы до внутренних ресурсов](#23-)
          - [Входящие соединения на стороне сервера UnicChat:](#-unicchat-2)
-         - [Исходящие соединения на стороне сервера UnicChat:](#-unicchat-3)
+         - [Исходящие соединения на стороне сервера UnicChat на push:](#-unicchat-push)
+         - [Исходящие соединения на стороне сервера UnicChat на ВКС:](#-unicchat-)
    * [Шаг 3. Установка локального медиа сервера для ВКС](#-3-)
       + [3.1 Порядок установки сервера](#31-)
       + [3.2 Проверка открытия портов](#32-)
    * [Шаг 4. Развертывание базы знаний для UNICCHAT](#-4-unicchat)
-      + [4.1 Подготовка сервера](#41-)
-      + [4.2 Настройка nginx](#42-nginx)
-      + [4.3 Размещение в локальной сети](#43-)
       + [4.4 Развертывание MinIO S3](#44-minio-s3)
-         - [4.4.1 Перейдите в директорию knowledgebase/minio.](#441-knowledgebaseminio)
-         - [4.4.2 Запустите MinIO:](#442-minio)
+         - [4.4.1 Перейдите в директорию knowledgebase/](#441-knowledgebase)
+         - [4.4.2 Запустите Базу Знаний](#442-)
          - [4.4.3 Доступ к MinIO:](#443-minio)
          - [4.4.4 Создание bucket](#444-bucket)
-      + [4.5 Развертывание OnlyOffice](#45-onlyoffice)
-         - [4.5.1 Запуск OnlyOffice](#451-onlyoffice)
-         - [4.5.2 Доступ к OnlyOffice:](#452-onlyoffice)
-      + [4.6 Редактирование сервиса unic.chat.solid](#46-unicchatsolid)
-         - [4.6.1 Редактирование env файла](#461-env-)
-         - [4.6.2 Пересоздание сервиса unic.chat.solid](#462-unicchatsolid)
-      + [4.7 Редактирование сервиса unic.chat.appserver](#47-unicchatappserver)
-         - [4.7.1 Добавление переменной окружения ONLYOFFICE_HOST](#471-onlyoffice_host)
-         - [4.7.2 Пересоздание сервиса unic.chat.appserver](#472-unicchatappserver)
-      + [Частые проблемы при установке](#--11)
-      + [Клиентские приложения](#--12)
-      + [Частые проблемы при установке](#--13)
    * [Шаг 5. Установка UnicChat](#-5-unicchat)
-      + [5.1 Настройка БД - mongodb](#51-mongodb)
-      + [5.2 Создать базу и пользователя для подключения к базе](#52-)
-      + [5.3 Настройка unicchat.solid.core](#53-unicchatsolidcore)
-      + [5.4 Запуск сервера UnicChat](#54-unicchat)
+      + [5.1 Настройка Unic.Chat](#51-unicchat)
+      + [5.2 Раздать права пользователю для подключения к базе](#52-)
+      + [5.3 Настройка Unicchat для работы с HTTPS](#53-unicchat-https)
    * [Шаг 6. Создание пользователя администратора](#-6-)
    * [Шаг 7. Настройка push-уведомлений](#-7-push-)
-   * [Шаг 8. Настройка подключения к SMTP серверу для отправки уведомлений в почту](#-8-smtp-)
-   * [Шаг 9. Настройка подключения к LDAP серверу](#-9-ldap-)
-   * [Быстрый старт. Запуск на одном сервере](#--7)
-   * [Быстрый старт. Запуск на двух серверах](#--8)
+      + [Клиентские приложения](#--7)
 
 <!-- TOC end -->
 
@@ -201,7 +181,7 @@ RAM 8 Gb;
 1. Установить `docker` и `docker-compose`
 2. Установить `nginx`.
 3. Установить `certbot` и плагин `python3-certbot-nginx`.
-4. Установить `git`.
+4. Установить `git`. 
 5. Авторизоваться в yandex container registry для скачивания образов
 ```bash
 sudo docker login \
@@ -220,65 +200,60 @@ sudo docker login \
 git clone https://github.com/unicommorg/unicchat.enterprise.git
 ```
 
-
 <!-- TOC --><a name="-2-nginx"></a>
 ### Шаг 2. Настройка NGINX
 
 <!-- TOC --><a name="21-dns-"></a>
-#### 2.1 Зарегистрировать DNS адреса
-Перед началом работы запросите DNS-имена.Ниже приведены DNS-имена для примера. Вы можете изменить их под свои нужды.
+#### 2.1 Зарегистрировать DNS имена
+
+Перед началом работы запросите DNS-имена. Ниже приведены DNS-имена для примера. Вы можете изменить их под свои нужды.
 
 * myapp.unic.chat
 * myminio.unic.chat (требуется настройка в /etc/hosts на сервере с NGINX)
-* myonlyoffice.unic.chat (требуется настройка в /etc/hosts на сервере с NGINX)
+* myedt.unic.chat (требуется настройка в /etc/hosts на сервере с NGINX)
 * mylk-yc.unic.chat
 * turn.mylk-yc.unic.chat
 * whip.mylk-yc.unic.chat
 
+1. **myapp.unic.chat**
 
-1. myapp.unic.chat
+   **Назначение**: Основной адрес сервера приложений UnicChat, через который пользователи получают доступ к веб-интерфейсу мессенджера.  
+   **Использование**: Обеспечивает доступ к клиентскому интерфейсу UnicChat, включая чаты, настройки и администрирование. Используется для HTTPS-соединений и проверки работоспособности сервиса.
 
-Назначение: Основной адрес сервера приложений UnicChat, через который пользователи получают доступ к веб-интерфейсу мессенджера.
-Использование: Обеспечивает доступ к клиентскому интерфейсу UnicChat, включая чаты, настройки и администрирование. Используется для HTTPS-соединений и проверки работоспособности сервиса.
+2. **myminio.unic.chat**
 
-2. myminio.unic.chat
+   **Назначение**: Адрес сервера MinIO, используемого для хранения файлов (S3-совместимое хранилище).  
+   **Использование**: Хранит файлы, загружаемые пользователями, и документы DocumentServer. Консоль управления доступна через http://<hostname minio>:9002 (логин: minioadmin, пароль: rootpassword). Бакет uc.onlyoffice.docs создаётся для документов.  
+   **Настройка в /etc/hosts**: Требуется. Необходимо добавить запись в /etc/hosts на сервере с NGINX, например: `10.0.XX.XX myminio.unic.chat`, где `10.0.XX.XX` — IP-адрес сервера.
 
-Назначение: Адрес сервера MinIO, используемого для хранения файлов (S3-совместимое хранилище).
-Использование: Хранит файлы, загружаемые пользователями, и документы OnlyOffice. Консоль управления доступна через http://myminio.unic.chat:9002 (логин: minioadmin, пароль: rootpassword). Бакет uc.onlyoffice.docs создаётся для документов.
-Настройка в /etc/hosts: Требуется. Необходимо добавить запись в /etc/hosts на сервере с NGINX, например: 10.0.XX.XX myminio.unic.chat, где 10.0.XX.XX — IP-адрес сервера.
+3. **myedt.unic.chat**
 
-3. myonlyoffice.unic.chat
+   **Назначение**: Адрес сервера DocumentServer, используемого для редактирования документов в UnicChat.  
+   **Использование**: Обеспечивает интеграцию с DocumentServer для совместной работы с документами. Доступен через https://myedt.unic.chat.  
+   **Настройка в /etc/hosts**: Требуется. Необходимо добавить запись в /etc/hosts на сервере с NGINX, например: `10.0.XX.XX myedt.unic.chat`, где `10.0.XX.XX` — IP-адрес сервера.
 
-Назначение: Адрес сервера OnlyOffice, используемого для редактирования документов в UnicChat.
-Использование: Обеспечивает интеграцию с OnlyOffice для совместной работы с документами. Доступен через https://myonlyoffice.unic.chat.
-Настройка в /etc/hosts: Требуется. Необходимо добавить запись в /etc/hosts на сервере с NGINX, например: 10.0.XX.XX myonlyoffice.unic.chat, где 10.0.XX.XX — IP-адрес сервера.
+4. **mylk-yc.unic.chat**
 
-4. mylk-yc.unic.chat
+   **Назначение**: Адрес ВКС-шлюза (видеоконференцсвязи), используемого для аудио- и видеозвонков.  
+   **Использование**: Обеспечивает функциональность видеоконференций в UnicChat. Требует исходящих соединений для клиентских приложений и настройки STUN/TURN для NAT-траверсала.
 
-Назначение: Адрес ВКС-шлюза (видеоконференцсвязи), используемого для аудио- и видеозвонков.
-Использование: Обеспечивает функциональность видеоконференций в UnicChat. Требует исходящих соединений для клиентских приложений и настройки STUN/TURN для NAT-траверсала.
+5. **turn.mylk-yc.unic.chat**
 
-5. turn.mylk-yc.unic.chat
+   **Назначение**: Адрес TURN-сервера, используемого для обхода NAT при видеозвонках.  
+   **Использование**: Обеспечивает стабильное соединение для видеоконференций в сетях с ограничениями (например, за NAT). Работает в связке с ВКС-шлюзом.
 
-Назначение: Адрес TURN-сервера, используемого для обхода NAT при видеозвонках.
-Использование: Обеспечивает стабильное соединение для видеоконференций в сетях с ограничениями (например, за NAT). Работает в связке с ВКС-шлюзом.
+6. **whip.mylk-yc.unic.chat**
 
-6. whip.mylk-yc.unic.chat
+   **Назначение**: Адрес WHIP-сервера (WebRTC-HTTP Ingestion Protocol), используемого для потоковой передачи медиа в видеоконференциях.  
+   **Использование**: Поддерживает передачу медиа-данных в реальном времени для видеозвонков.
 
-Назначение: Адрес WHIP-сервера (WebRTC-HTTP Ingestion Protocol), используемого для потоковой передачи медиа в видеоконференциях.
-Использование: Поддерживает передачу медиа-данных в реальном времени для видеозвонков.
+**Примечания**
 
+DNS адреса `myminio.unic.chat` и `myedt.unic.chat` требуют явной настройки в файле `/etc/hosts` на сервере с NGINX. Пример записи:  
+* `10.0.XX.XX myminio.unic.chat`  
+* `10.0.XX.XX myedt.unic.chat`
 
-
-Примечания
-
-DNS адреса myminio.unic.chat и myonlyoffice.unic.chat требуют явной настройки в файле /etc/hosts на сервере с NGINX. Пример записи:  
-* 10.0.XX.XX myminio.unic.chat
-* 10.0.XX.XX myonlyoffice.unic.chat
-
-Замените 10.0.XX.XX на актуальный IP-адрес вашего  NGINX сервера.
-
-
+Замените `10.0.XX.XX` на актуальный IP-адрес вашего NGINX сервера.
 
 <!-- TOC --><a name="22-nginx"></a>
 #### 2.2 Провести настройку Nginx
@@ -286,81 +261,44 @@ DNS адреса myminio.unic.chat и myonlyoffice.unic.chat требуют яв
 <!-- TOC --><a name="221-nginx"></a>
 ##### 2.2.1 Установить nginx
 
-Установка nginx выполняется за пределами данной инструкции.
-
-<!-- TOC --><a name="222-unicchat"></a>
-##### 2.2.2 Настроить сайт для Unicchat
-
-Создать файл `/etc/nginx/sites-available/app.unic.chat` и добавить туда содержимое:
-
-```nginx configuration
-upstream internal {
-    server 127.0.0.1:8080;
-}
-
-# HTTPS Server
-server {
-    server_name app.unic.chat www.app.unic.chat;
-
-    # You can increase the limit if your need to.
-    client_max_body_size 200M;
-
-    error_log /var/log/nginx/app.unicchat.internal.error.log;
-    access_log /var/log/nginx/app.unicchat.internal.access.log;
-
-    add_header Access-Control-Allow-Origin $cors_origin_header always;
-    add_header Access-Control-Allow-Credentials $cors_cred;
-    add_header "Access-Control-Allow-Methods" "GET, POST, OPTIONS, HEAD";
-    add_header "Access-Control-Allow-Headers" "Authorization, Origin, X-Requested-With, Content-Type, Accept";
-
-    if ($request_method = 'OPTIONS' ) {
-      return 204 no-content;
-    }
-
-    location / {
-        proxy_pass http://internal;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $http_host;
-
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header X-Nginx-Proxy true;
-
-        proxy_redirect off;
-    }
-
-    listen 443 ssl; # managed by Certbot
-    ssl_certificate /etc/letsencrypt/live/app.unic.chat/fullchain.pem; # managed by Certbot
-    ssl_certificate_key /etc/letsencrypt/live/app.unic.chat/privkey.pem; # managed by Certbot
-    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
-}
-
-server {
-    if ($host = www.app.unic.chat) {
-        return 301 https://$host$request_uri;
-    } # managed by Certbot
-
-    if ($host = app.unic.chat) {
-        return 301 https://$host$request_uri;
-    } # managed by Certbot
-
-    server_name app.unic.chat www.app.unic.chat;
-    listen 80;
-    # return 404; # managed by Certbot
-}
+```bash
+sudo apt update
+sudo apt install nginx -y
 ```
+
+<!-- TOC --><a name="222-nginx-unicchat-"></a>
+##### 2.2.2 Настроить nginx конфигурацию для Unicchat и Базы знаний
+
+В директории ./nginx лежат шаблоны для конфигурации для nginx.
+Переделайте значения upstream под свою конфигурацию.
+В upstream укажите адрес и порт на который будет работать контейнер с приложением 
+
+Порты по умолчанию 
+* для myapp.unic.chat - 8080
+* для myedt.unic.chat - 8880
+* для myminio.unic.chat - 9000
+
+<!-- TOC --><a name="225-certbot-"></a>
+##### 2.2.5 Установка certbot и получение сертификата
+
+Установить certbot по этой инструкции: https://certbot.eff.org/instructions?ws=nginx&os=debianbuster
+
+Запросить ssl сертификаты 
+```shell
+sudo certbot certonly --standalone -d myminio.unic.chat  
+sudo certbot certonly --standalone -d myedtapp.unic.chat
+sudo certbot certonly --standalone -d myapp.unic.chat
+``` 
 
 <!-- TOC --><a name="223-nginx"></a>
 ##### 2.2.3 Подготовка сайта nginx
 
 * Активировать конфигурацию 
-`sudo ln -s /etc/nginx/sites-available/app.unic.chat /etc/nginx/sites-enabled/app.unic.chat`
+`sudo ln -s /etc/nginx/sites-available/myapp.unic.chat /etc/nginx/sites-enabled/myapp.unic.chat`
+`sudo ln -s /etc/nginx/sites-available/myedtapp.unic.chat/etc/nginx/sites-enabled/myedtapp.unic.chat`
+`sudo ln -s /etc/nginx/sites-available/myminio.unic.chat t /etc/nginx/sites-enabled/myminio.unic.chat `
 
-* Деактивровать конфигурацию по-умолчанию
+* Деактивировать конфигурацию по-умолчанию
 `sudo rm /etc/nginx/sites-enabled/default`
 
 * Проверить корректность конфигураций 
@@ -375,54 +313,12 @@ nginx: configuration file /etc/nginx/nginx.conf test is successful
 * Перезапустить nginx
 `sudo systemctl restart nginx.service`
 
-<!-- TOC --><a name="224-"></a>
-##### 2.2.4 Проверка работы
-
-Провести настойку для обхода работы CORS в приложение, для этого на базе выполнить:
-
-```
-db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"value":'http://app.unic.chat'}})
-db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'http://app.unic.chat'}})
-```
-
-Сайт открывается http://app.unic.chat 
-Если сайт сразу не открывается, то для сброса кеша использовать очистку кеша и cookie браузера, ctrl+R или использовать безопасный режим браузера.
-
-<!-- TOC --><a name="225-certbot-"></a>
-##### 2.2.5 Установка certbot и получение сертификата
-
-Установить certbot по этой инструкции: https://certbot.eff.org/instructions?ws=nginx&os=debianbuster
-
-Выполнить получение сертфикатов для необходимых доменов: 
-```shell
-sudo certbot certonly --manual --manual-auth-hook /etc/letsencrypt/acme-dns-auth.py --preferred-challenges dns --debug-challenges -d www.app.unic.chat -d app.unic.chat -v
-sudo certbot certonly --manual --manual-auth-hook /etc/letsencrypt/acme-dns-auth.py --preferred-challenges dns --debug-challenges -d www.app-api.unic.chat -d app-api.unic.chat -v
-``` 
-
-либо через standalone
-``` shell
-sudo certbot certonly --standalone -d app.unic.chat -d www.app.unic.chat
-``` 
-
 <!-- TOC --><a name="226-certbot"></a>
 ##### 2.2.6 Настройка автоматической проверки сертификата certbot
 
 Добавить правила проверки сертификата, например, в 7-00 каждый день, в `/etc/cron.daily/certbot`
 
 `00 7 * * * certbot renew --post-hook "systemctl reload nginx"`
-
-<!-- TOC --><a name="227-unicchat-https"></a>
-##### 2.2.7 Настройка Unicchat для работы с HTTPS
-
-Провести настойку для обхода работы CORS в приложение для HTTPS, для этого вы базе выполнить:
-
-```
-db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"value":'https://app.unic.chat'}})
-db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'https://app.unic.chat'}})
-```
-
-Сайт открывается https://app.unic.chat
-Если сайт сразу не открывается, то для сброса кеша использовать очистку кеша и cookie браузера, ctrl+R или использовать безопасный режим браузера.
 
 <!-- TOC --><a name="23-"></a>
 #### 2.3 Открыть доступы до внутренних ресурсов
@@ -435,16 +331,19 @@ db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'htt
 - 8080/TCP - по-умолчанию, сервер запускается на 8080 порту и доступен http://localhost:8080, где localhost - это IP адрес сервера UnicChat;
 - 443/TCP - порт будет нужен, если вы настроили nginx с сертификатом HTTPS;
 
-<!-- TOC --><a name="-unicchat-3"></a>
-##### Исходящие соединения на стороне сервера UnicChat:
+<!-- TOC --><a name="-unicchat-push"></a>
+##### Исходящие соединения на стороне сервера UnicChat на push:
 
 * Открыть доступ для Push-шлюза:
  * 443/TCP, на хост **push1.unic.chat**;
 
+<!-- TOC --><a name="-unicchat-"></a>
+##### Исходящие соединения на стороне сервера UnicChat на ВКС:
+Примечание **lk-yc.unic.chat** адрес внешней ВКС компании `Unicomm`, при развертывание локального медиа сервера используйте свой адрес.
 * Открыть доступ для ВКС сервера:
  * 443/TCP, на хост **lk-yc.unic.chat**;
  * 7881/TCP, 7882/UDP
- * (50000 - 60000)/UDP (диапазон этих портов может быть изменен при развертывании лицензионной версии непосредственно владельцем лицензии)
+ * (50000 - 60000)/UDP (диапазон этих портов может быть изменён при развертывании лицензионной версии непосредственно владельцем лицензии)
 
 * Открыть доступ до внутренних ресурсов: LDAP, SMTP, DNS при необходимости использования этого функционала
 
@@ -492,77 +391,35 @@ telnet `internal_IP` 7880 # 7880 7881 5349
 
 Перейдите в директорию knowledgebase
 
-<!-- TOC --><a name="41-"></a>
-#### 4.1 Подготовка сервера
-
-Получите DNS имена для сервисов 
-* unicchat.solid 
-* minio 
-* onlyoffice 
-* unicchat
-
-Проверьте наличие директорий:
-* knowledgebase
-
-<!-- TOC --><a name="42-nginx"></a>
-#### 4.2 Настройка nginx 
-
-Создайте conf файлы для nginx. 
-Вы можете разместить nginx на отдельном сервере. 
-
-Инструкция для настройк nginx находится в директории nginx.
-
-!!!ВАЖНО!!!
-
-порты по умолчанию для настройки proxy_pass
-* unicchat.solid - 8881
-* minio - 9000 (unicchat использует порт api Minio)
-* onlyoffice - 8880
-* unic.chat.appserver  - 8080
-
-<!-- TOC --><a name="43-"></a>
-#### 4.3 Размещение в локальной сети 
-
-В случае необходимости размещение сервисов в локальной сети, настройте локальный DNS или файл /etc/hosts. 
-На машины с docker container ваших сервисов: 
- 
- * solid 
- * onlyoffice
- * minio
- * unichat
- 
- Пример файла /etc/hosts
-```shell
-10.0.XX.XX myminio.unic.chat
-10.0.XX.XX myonlyoffice.unic.chat
-10.0.XX.XX mysolid.unic.chat
-10.0.XX.XX unic.chat
-```
-
 <!-- TOC --><a name="44-minio-s3"></a>
 #### 4.4 Развертывание MinIO S3
 
-<!-- TOC --><a name="441-knowledgebaseminio"></a>
-##### 4.4.1 Перейдите в директорию knowledgebase/minio.
+<!-- TOC --><a name="441-knowledgebase"></a>
+##### 4.4.1 Перейдите в директорию knowledgebase/
 
-Измените в файле docker-compose.yml значения переменных окружения:
+В файле `knowledgebase.env` 
+По своему желанию вы можете изменить значения переменных, или не менять их.
+Запомните значения MINIO_ROOT_USER и MINIO_ROOT_PASSWORD,  они необходимы для настройки интеграции `Базы Знаний` и `UnicChat`.
+
 ```yml
-MINIO_ROOT_USER:
-MINIO_ROOT_PASSWORD:
+MINIO_ROOT_USER
+MINIO_ROOT_PASSWORD
+DB_NAME
+DB_USER
 ```
 
-<!-- TOC --><a name="442-minio"></a>
-##### 4.4.2 Запустите MinIO:
+<!-- TOC --><a name="442-"></a>
+##### 4.4.2 Запустите Базу Знаний
 
 ```bash
-docker-compose up -d
+docker -f minio/docker-compose up -d && docker -f Docker-DocumentServer/docker-compose up -d  
 ```
 
 <!-- TOC --><a name="443-minio"></a>
 ##### 4.4.3 Доступ к MinIO:
 
 Консоль: http://ваш_сервер:9002
-логин и пароль указан в `yml` файле
+логин и пароль указан в `knowledgebase.env` файле
 ```yml
 MINIO_ROOT_USER:
 MINIO_ROOT_PASSWORD:
@@ -575,36 +432,123 @@ MINIO_ROOT_PASSWORD:
 
 S3 Endpoint: http://ваш_сервер:9000
 
-<!-- TOC --><a name="45-onlyoffice"></a>
-#### 4.5 Развертывание OnlyOffice
+<!-- TOC --><a name="-5-unicchat"></a>
+### Шаг 5. Установка UnicChat
 
-<!-- TOC --><a name="451-onlyoffice"></a>
-##### 4.5.1 Запуск OnlyOffice
+<!-- TOC --><a name="51-unicchat"></a>
+#### 5.1 Настройка Unic.Chat
 
-Перейдите в директорию knowledgebase/Docker-DocumentServer.
-Запустите docker-compose.yml
+1. [Linux] На сервере БД выполните команду `grep avx /proc/cpuinfo`. Если в ответе вы не видите AVX, то вам лучше выбрать версию mongodb < 5.х, например, 4.4
+ если AVX на вашем сервере поддерживается, рекомендуется выбрать версию mongodb > 5.х.
+2. ВАЖНО! Если вы планируете запустить БД и сервер UnicChat на разных виртуальных серверах, то в параметрах `MONGODB_INITIAL_PRIMARY_HOST` и `MONGODB_ADVERTISED_HOSTNAME` вам нужно указать адрес (DNS или IP) вашего сервера, где запускается БД.
+3. Если же установка планируется на одной машине, создайте вначале сети в которые будут подключаться контейнеры приложения и БД
+unicchat-backend для unic.chat.solid и unic.chat.db.mongo
+nicchat-frontend для unic.chat.appserver и unic.chat.db.mongo
 ```shell
-docker-compose up -d
+docker network create unicchat-backend
+docker network create unicchat-frontend
+```
+4. Измените по своему усмотрению значения переменных окружения.
+Обязательно вставьте значения в UNIC_LICENSE=
+```shell
+nano multi_server_install/env/multi_server_env.env
 ```
 
-<!-- TOC --><a name="452-onlyoffice"></a>
-##### 4.5.2 Доступ к OnlyOffice:
-
-Адрес: http://ваш_сервер:8880
-
-<!-- TOC --><a name="46-unicchatsolid"></a>
-#### 4.6 Редактирование сервиса unic.chat.solid
-
-<!-- TOC --><a name="461-env-"></a>
-##### 4.6.1 Редактирование env файла
-
-Перейдите в директорию multi_server_install/app/.
-Отредактируйте файл environment.env. 
-Добавьте значения переменных окружения minio 
-```yml
-MINIO_ROOT_USER
-MINIO_ROOT_PASSWORD
+Запустите скрипт 
+```shell
+chmod +x multi_server_install/update_multi_server_env.sh
+cd multi_server_install
+./update_multi_server_env.sh
+cd ..
 ```
-И dns имя Minio.
 
-<!-- TOC --><a name="462-unicchats
+Запустите контейнеры 
+```shell
+docker compose -f multi_server_install/mongodb.yml up -d && docker compose -f multi_server_install/unic.chat.solid.yml up -d && docker compose multi_server_install/unic.chat.appserver.yml up -d
+```
+
+<!-- TOC --><a name="52-"></a>
+#### 5.2 Раздать права пользователю для подключения к базе
+
+1. После того как база успешно запустилась, подключимся к контейнеру с запущенной БД. Для этого на сервере, где запущен docker контейнер c базой, выполните
+
+```shell
+docker exec -it unic.chat.db.mongo mongosh -u root -p "rootpassword"
+```
+где `unic.chat.db.mongo` - имя нашего контейнера, указанного в `multi_server_install/mongodb.yml`, пароль MONGODB_ROOT_PASSWORD  в `multi_server_install/mongodb_env.env`
+
+```javascript
+// проверьте наличие вашей базы данных
+show databases
+```
+
+```javascript
+// Перейдите на вашу базу данных и проверьте пользователя
+use unicchat_db
+show users
+```
+
+```javascript
+db.updateUser( "unicchat_admin",
+{
+roles: [
+{role: "readWrite", db: "local"},
+{role: "readWrite", db: "unicchat_db"},
+{role: "dbAdmin", db: "unicchat_db"},
+{role: "clusterMonitor", db: "admin"}
+]
+})
+```
+
+```javascript
+// Перейдите на вашу базу данных и проверьте права пользователя
+use unicchat_db
+show users
+```
+
+<!-- TOC --><a name="53-unicchat-https"></a>
+#### 5.3 Настройка Unicchat для работы с HTTPS
+
+Провести настройку для обхода работы CORS в приложение для HTTPS, для этого в базе выполнить c вашим dns именем:
+
+```javascript
+db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"value":'https://myapp.unic.chat'}}) 
+db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'https://myapp.unic.chat'}})
+```
+
+Сайт открывается https://myapp.unic.chat
+Если сайт сразу не открывается, то для сброса кеша использовать очистку кеша и cookie браузера, ctrl+R или использовать безопасный режим браузера.
+
+<!-- TOC --><a name="-6-"></a>
+### Шаг 6. Создание пользователя администратора
+
+* `Name` - Имя пользователя, которое будет отображаться в чате;
+* `Username` - Логин пользователя, который вы будете указывать для авторизации;
+* `Email` - Действующая почта, используется для восстановления
+* `Organization Name` - Краткое название вашей организации латинскими буквами без пробелов и спец. символов, используется для регистрации push уведомлений. Может быть указан позже;
+* `Organization ID` - Идентификатор вашей организации, используется для подключения к push серверу. Может быть указан позже. Для получения ID необходимо написать запрос с указанием значения в Organization Name на почту support@unicomm.pro;
+* `Password` - пароль вашего пользователя;
+* `Confirm your password` - подтверждение пароля;
+
+1. После создания пользователя, авторизоваться в веб-интерфейсе с использованием ранее указанных параметров.
+2. Для включения пушей, перейти в раздел Администрирование - Push. Включить использование шлюза и указать адрес шлюза https://push1.unic.chat
+3. Перейти в раздел Администрирование - Organization, убедиться что поля заполнены в соответствии с вашими данными.
+4. Настройка завершена.
+
+При первом входе может возникнуть информационное предупреждение
+![](./assets/111.jpg "Предупреждение при первом входе")
+
+Нажмите "ДА"
+
+<!-- TOC --><a name="-7-push-"></a>
+### Шаг 7. Настройка push-уведомлений
+
+Приложение Unicchat работает с внешним push сервером для доставки push-уведомлений в приложение Unicchat на мобильные устройства.
+
+<!-- TOC --><a name="--7"></a>
+#### Клиентские приложения
+
+* [Репозитории клиентских приложений]
+* Android: (https://play.google.com/store/apps/details?id=pro.unicomm.unic.chat&pcampaignid=web_share)
+* iOS: (https://apps.apple.com/ru/app/unicchat/id1665533885)
+* Desktop: (https://github.com/unicommorg/unic.chat.desktop.releases/releases)
