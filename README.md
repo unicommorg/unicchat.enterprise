@@ -395,7 +395,7 @@ telnet `internal_IP` 7880 # 7880 7881 5349
 #### 4.4 Развертывание MinIO S3
 
 <!-- TOC --><a name="441-knowledgebase"></a>
-##### 4.4.1 Перейдите в директорию knowledgebase/
+##### 4.4.1 Создание перемееных окружения для Базы Знаний
 
 В файле `knowledgebase.env` 
 По своему желанию вы можете изменить значения переменных, или не менять их.
@@ -407,7 +407,17 @@ MINIO_ROOT_PASSWORD
 DB_NAME
 DB_USER
 ```
+``` shell
+nano knowledgebase/knowledgebase.env
+```
 
+Запустите скрипт update_knowledgebase_env.sh
+``` shell
+cd knowledgebase
+chmod  +x update_knowledgebase_env.sh
+./update_knowledgebase_env.sh
+cd ..
+``` 
 <!-- TOC --><a name="442-"></a>
 ##### 4.4.2 Запустите Базу Знаний
 
