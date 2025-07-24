@@ -419,7 +419,9 @@ cd ..
 ##### 4.4.2 Запустите Базу Знаний
 
 ```bash
-docker compose -f knowledgebase/minio/docker-compose up -d && docker compose -f knowledgebase/Docker-DocumentServer/docker-compose up -d  
+docker network create unicchat-backend
+docker network create unicchat-frontend
+docker compose -f knowledgebase/minio/docker-compose.yml up -d && docker compose -f knowledgebase/Docker-DocumentServer/docker-compose.yml up -d  
 ```
 
 <!-- TOC --><a name="443-minio"></a>
