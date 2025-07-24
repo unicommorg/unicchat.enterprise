@@ -260,12 +260,7 @@ DNS адреса `myminio.unic.chat` и `myedt.unic.chat` требуют явн�
 
 <!-- TOC --><a name="221-nginx"></a>
 ##### 2.2.1 Установить nginx
-
-```bash
-sudo apt update
-sudo apt install nginx -y
-```
-
+Производится за рамками инструкции
 <!-- TOC --><a name="222-nginx-unicchat-"></a>
 ##### 2.2.2 Настроить nginx конфигурацию для Unicchat и Базы знаний
 
@@ -295,7 +290,9 @@ sudo certbot certonly --standalone -d myapp.unic.chat
 
 * Активировать конфигурацию 
 `sudo ln -s /etc/nginx/sites-available/myapp.unic.chat /etc/nginx/sites-enabled/myapp.unic.chat`
+
 `sudo ln -s /etc/nginx/sites-available/myedtapp.unic.chat/etc/nginx/sites-enabled/myedtapp.unic.chat`
+
 `sudo ln -s /etc/nginx/sites-available/myminio.unic.chat t /etc/nginx/sites-enabled/myminio.unic.chat `
 
 * Деактивировать конфигурацию по-умолчанию
