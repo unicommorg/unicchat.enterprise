@@ -281,14 +281,15 @@ DNS адреса `myminio.unic.chat` и `myedt.unic.chat` требуют явн�
 Запросить ssl сертификаты 
 ```shell
 sudo certbot certonly --standalone -d myminio.unic.chat  
-sudo certbot certonly --standalone -d myedtapp.unic.chat
+sudo certbot certonly --standalone -d  myedt.unic.chat
 sudo certbot certonly --standalone -d myapp.unic.chat
 ``` 
 
 <!-- TOC --><a name="223-nginx"></a>
 ##### 2.2.3 Подготовка сайта nginx
 
-* Активировать конфигурацию 
+* Активировать конфигурацию
+
 `sudo ln -s /etc/nginx/sites-available/myapp.unic.chat /etc/nginx/sites-enabled/myapp.unic.chat`
 
 `sudo ln -s /etc/nginx/sites-available/myedtapp.unic.chat/etc/nginx/sites-enabled/myedtapp.unic.chat`
