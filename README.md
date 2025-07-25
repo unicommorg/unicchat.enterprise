@@ -419,8 +419,6 @@ cd ..
 ##### 4.4.2 Запустите Базу Знаний
 
 ```bash
-docker network create unicchat-backend
-docker network create unicchat-frontend
 docker compose -f knowledgebase/minio/docker-compose.yml up -d && docker compose -f knowledgebase/Docker-DocumentServer/docker-compose.yml up -d  
 ```
 
@@ -430,8 +428,8 @@ docker compose -f knowledgebase/minio/docker-compose.yml up -d && docker compose
 Консоль: http://ваш_сервер:9002
 логин и пароль указан в `knowledgebase.env` файле
 ```yml
-MINIO_ROOT_USER:
-MINIO_ROOT_PASSWORD:
+MINIO_ROOT_USER: minioadmin
+MINIO_ROOT_PASSWORD:rootpassword
 ```
 
 <!-- TOC --><a name="444-bucket"></a>
@@ -439,6 +437,17 @@ MINIO_ROOT_PASSWORD:
 
 Создайте bucket `uc.onlyoffice.docs` и настройках bucket назначьте Access Policy:public.
 
+Скачайте mc
+```shell
+wget https://dl.min.io/client/mc/release/linux-amd64/mc
+chmod +x mc
+sudo mv mc /usr/local/bin/
+```
+
+```shell
+mc mb myminio/uc.onlyoffice.docs
+mc anonymous set public myminio/uc.onlyoffice.docs
+```
 S3 Endpoint: http://ваш_сервер:9000
 
 <!-- TOC --><a name="-5-unicchat"></a>
