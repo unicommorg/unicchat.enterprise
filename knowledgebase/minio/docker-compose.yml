@@ -1,24 +1,29 @@
 version: '3.7'
+networks:
+  minio:
+    external: true
 services:
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
+    hostname: minio
     container_name: unic.chat.minio
-    env_file:
-      - minio_env.env  # Подключаем файл с переменными окружения
+    command: server --console-address ":9002" /data
+    ports:
+      - "9000:9000"  # S3 API
+      - "9002:9002"  # Console
     volumes:
       - minio_data:/data
+    env_file:
+      - minio_env.env
     networks:
-      - unicchat-backend
-      - unicchat-frontend
-    ports:
-      - "9000:9000"
-      - "9002:9001"
-    command: server /data --console-address ":9001"
-networks:
-  unicchat-backend:
-    external: true
-  unicchat-frontend:
-    external: true
+      - minio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
 volumes:
   minio_data:
-    driver: local
+
