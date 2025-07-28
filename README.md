@@ -472,7 +472,7 @@ sudo mv mc /usr/local/bin/
 mc mb myminio/uc.onlyoffice.docs
 mc anonymous set public myminio/uc.onlyoffice.docs
 ```
-S3 Endpoint: http://ваш_сервер:9000
+
 
 <!-- TOC --><a name="-5-unicchat"></a>
 ### Шаг 5. Установка UnicChat
