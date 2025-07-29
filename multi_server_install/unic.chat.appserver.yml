@@ -1,23 +1,19 @@
+
+# support@unicomm.pro
 version: "3"
 services:
-  unic.chat.appserver:
-    container_name: unic.chat.appserver
-    image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.1.69
-    restart: on-failure
-    env_file:
-      - appserver.env
-    volumes:
-      - chat_data:/app/uploads
+  uc.media.score:
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid/prod:prod250421
+    container_name: unic.chat.solid
+    restart: unless-stopped
     ports:
-      - "8080:3000"
+      - 8881:8080
+      - 4443:443
+    env_file:
+      - ./solid.env
     networks:
-      - unicchat-frontend
-
+      - unicchat-backend
 networks:
-  unicchat-frontend:
+  unicchat-backend:
     driver: bridge
     external: true
-
-volumes:
-  chat_data:
-    driver: local
