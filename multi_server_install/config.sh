@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# MongoDB Configuration
+MONGODB_REPLICA_SET_MODE="primary"
+MONGODB_REPLICA_SET_NAME="rs0"
+MONGODB_REPLICA_SET_KEY="rs0key"
+MONGODB_PORT_NUMBER="27017"
+MONGODB_INITIAL_PRIMARY_HOST="mongodb"
+MONGODB_INITIAL_PRIMARY_PORT_NUMBER="27017"
+MONGODB_ADVERTISED_HOSTNAME="mongodb"
+MONGODB_ENABLE_JOURNAL="true"
+MONGODB_ROOT_PASSWORD="rootpass"
+MONGODB_USERNAME="unicchat_admin"
+MONGODB_PASSWORD="secure_password_123"
+MONGODB_DATABASE="unicchat_db"
+
+# Appserver Configuration
+ROOT_URL="http://localhost:3000"
+PORT="3000"
+DEPLOY_METHOD="docker"
+ONLYOFFICE_HOST="https://dns_name_onlyoffice"
+UNIC_SOLID_HOST="http://$HOSTNAME:8881"
+
+# Solid Configuration
+MINIO_DNS_NAME="<MINIO_DNS_NAME>"
+MINIO_ROOT_USER="<MINIO_ROOT_USER>"
+MINIO_ROOT_PASSWORD="<MINIO_ROOT_PASSWORD>"
+UNIC_LICENSE="<YourLicenseCodeHere>"
+INIT_CONFIG_NAMES="{Mongo Minio}"
+PLUGINS_ATTACH="'KnowledgeBase Minio UniAct Mongo Logger UniVault Tasker'"
