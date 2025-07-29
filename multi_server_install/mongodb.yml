@@ -7,8 +7,7 @@ services:
     volumes:
       - mongodb_data:/bitnami/mongodb
     env_file:
-      - ./common_env.env
-      - ./mongodb_env.env
+      - mongo.env
     ports:
       - "27017:27017"
     networks:
