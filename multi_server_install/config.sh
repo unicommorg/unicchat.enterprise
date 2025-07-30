@@ -19,7 +19,7 @@ ROOT_URL="http://localhost:3000"
 PORT="3000"
 DEPLOY_METHOD="docker"
 ONLYOFFICE_HOST="https://dns_name_onlyoffice"
-UNIC_SOLID_HOST="http://$HOSTNAME:8881"
+UNIC_SOLID_HOST="http://$(hostname -I | awk '{print $1}'):8881"
 
 # Solid Configuration
 MINIO_DNS_NAME="<MINIO_DNS_NAME>"
