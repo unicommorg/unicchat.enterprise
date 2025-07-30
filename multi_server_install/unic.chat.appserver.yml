@@ -10,7 +10,7 @@ services:
       - 8881:8080
       - 4443:443
     env_file:
-      - ./solid.env
+      - ./appserver.env
     networks:
       - unicchat-backend
 networks:
