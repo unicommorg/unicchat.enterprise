@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# Load configuration from config.sh
-CONFIG_FILE="config.sh"
+# Load configuration from config.txt
+CONFIG_FILE="config.txt"
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Error: $CONFIG_FILE not found!"
     exit 1
 fi
 source "$CONFIG_FILE"
 
-# Default values if not set in config.sh
+# Default values if not set in config.txt
 MONGODB_REPLICA_SET_MODE=${MONGODB_REPLICA_SET_MODE:-primary}
 MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME:-rs0}
 MONGODB_REPLICA_SET_KEY=${MONGODB_REPLICA_SET_KEY:-rs0key}
@@ -24,15 +24,10 @@ MONGODB_DATABASE=${MONGODB_DATABASE:-unicchat_db}
 ROOT_URL=${ROOT_URL:-http://localhost:3000}
 PORT=${PORT:-3000}
 DEPLOY_METHOD=${DEPLOY_METHOD:-docker}
-ONLYOFFICE_HOST=${ONLYOFFICE_HOST:-https://dns_name_onlyoffice}
-LIVEKIT_HOST=${LIVEKIT_HOST:-wss://lk-yc.unic.chat}
-UNIC_SOLID_HOST=${UNIC_SOLID_HOST:-http://\${hostname}}
-MINIO_DNS_NAME=${MINIO_DNS_NAME:-<MINIO_DNS_NAME>}
-MINIO_ROOT_USER=${MINIO_ROOT_USER:-<MINIO_ROOT_USER>}
-MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-<MINIO_ROOT_PASSWORD>}
-UNIC_LICENSE=${UNIC_LICENSE:-<YourLicenseCodeHere>}
-INIT_CONFIG_NAMES=${INIT_CONFIG_NAMES:-"{Mongo Minio}"}
-PLUGINS_ATTACH=${PLUGINS_ATTACH:-"'KnowledgeBase Minio UniAct Mongo Logger UniVault Tasker'"}
+
+UNIC_SOLID_HOST=${UNIC_SOLID_HOST:-http://\${hostname}
+INIT_CONFIG_NAMES=${INIT_CONFIG_NAMES:-"{Mongo}"}
+PLUGINS_ATTACH=${PLUGINS_ATTACH:-"'UniAct Mongo Logger UniVault Tasker'"}
 
 # Generate mongo.env
 cat > mongo.env << EOL
@@ -65,32 +60,21 @@ ROOT_URL=$ROOT_URL
 UNIC_SOLID_HOST=$UNIC_SOLID_HOST
 PORT=$PORT
 DEPLOY_METHOD=$DEPLOY_METHOD
-ONLYOFFICE_HOST=$ONLYOFFICE_HOST
-LIVEKIT_HOST=$LIVEKIT_HOST
 EOL
 echo "Generated appserver.env"
 
 # Generate solid.env
 cat > solid.env << EOL
-# Конфигурация MongoDB: используйте значения из файла multi_server_install/mongodb.yml
-# Источник: https://github.com/unicommorg/unicchat.enterprise/blob/main/multi_server_install/mongodb.yml
+
 # Переменные:
 # - MONGODB_USERNAME: $MONGODB_USERNAME
 # - MONGODB_PASSWORD: $MONGODB_PASSWORD
 # - MONGODB_DATABASE: $MONGODB_DATABASE
 # - MONGODB_INITIAL_PRIMARY_HOST: $MONGODB_INITIAL_PRIMARY_HOST
 UnInit.0="'Mongo': { 'Type': 'DbConStringEntry', 'ConnectionString': '$MONGO_URL', 'DataBase': '$MONGODB_DATABASE' }"
-
-# Конфигурация Minio: используйте значения из файла knowledgebase/minio/docker-compose.yml
-# Переменные:
-# - IpOrHost: $MINIO_DNS_NAME
-# - UserName: $MINIO_ROOT_USER
-# - Password: $MINIO_ROOT_PASSWORD
-UnInit.1="'Minio': { 'Type': 'NamedServiceAuth', 'IpOrHost': '$MINIO_DNS_NAME', 'UserName': '$MINIO_ROOT_USER', 'Password': '$MINIO_ROOT_PASSWORD' }"
-
 InitConfig:Names=$INIT_CONFIG_NAMES
 Plugins:Attach=$PLUGINS_ATTACH
-UnicLicense=$UNIC_LICENSE
+
 EOL
 echo "Generated solid.env"
 
