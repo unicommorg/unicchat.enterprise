@@ -64,6 +64,17 @@ install_deps() {
   echo "✅ Dependencies installed (including docker compose plugin)."
 }
 
+install_minio_client() {
+  echo -e "\n📦 Installing MinIO client (mc)…"
+  if ! command -v mc &> /dev/null; then
+    curl https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
+    chmod +x /usr/local/bin/mc
+    echo "✅ MinIO client installed"
+  else
+    echo "✅ MinIO client already installed"
+  fi
+}
+
 docker_compose() {
   if command -v docker compose >/dev/null 2>&1; then
     docker compose "$@"
@@ -193,9 +204,48 @@ update_site_url() {
   echo "✅ Site_Url updated."
 }
 
+# ===== НОВЫЕ ФУНКЦИИ ДЛЯ БАЗЫ ЗНАНИЙ =====
+
+prepare_knowledgebase() {
+  echo -e "\n📚 Preparing knowledge base deployment…"
+  local kb_dir="unicchat.enterprise/knowledgebase"
+  
+  if [ ! -d "$kb_dir" ]; then
+    echo "❌ Knowledge base directory not found: $kb_dir"
+    return 1
+  fi
+  
+  # Делаем скрипт deploy_knowledgebase.sh исполняемым
+  if [ -f "$kb_dir/deploy_knowledgebase.sh" ]; then
+    chmod +x "$kb_dir/deploy_knowledgebase.sh"
+    echo "✅ Knowledge base deployment script prepared"
+  else
+    echo "⚠️ Knowledge base deployment script not found: $kb_dir/deploy_knowledgebase.sh"
+  fi
+}
+
+deploy_knowledgebase() {
+  echo -e "\n🚀 Deploying knowledge base services…"
+  local kb_dir="unicchat.enterprise/knowledgebase"
+  
+  if [ ! -f "$kb_dir/deploy_knowledgebase.sh" ]; then
+    echo "❌ Knowledge base deployment script not found"
+    return 1
+  fi
+  
+  # Запускаем автоматическое развертывание базы знаний
+  echo "📦 Running knowledge base deployment..."
+  (cd "$kb_dir" && ./deploy_knowledgebase.sh --auto)
+  
+  echo "✅ Knowledge base services deployed"
+}
+
+# ===== КОНЕЦ НОВЫХ ФУНКЦИЙ =====
+
 auto_setup() {
   echo -e "\n⚙️ Running full automatic setup…"
   install_deps
+  install_minio_client
   clone_repo
   check_avx
   setup_domain
@@ -207,7 +257,9 @@ auto_setup() {
   login_yandex
   start_unicchat
   update_site_url
-  echo -e "\n🎉 UnicChat setup complete!"
+  prepare_knowledgebase
+  deploy_knowledgebase
+  echo -e "\n🎉 UnicChat setup complete! (including knowledge base)"
 }
 
 main_menu() {
@@ -216,34 +268,40 @@ main_menu() {
   while true; do
     cat <<MENU
  [1]  Install dependencies
- [2]  Clone repository
- [3]  Check AVX support
- [4]  Setup domain and check DNS
- [5]  Generate Nginx config
- [6]  Deploy Nginx config (with backup)
- [7]  Setup SSL certificate
- [8]  Activate Nginx site
- [9]  Prepare .env files
-[10]  Login to Yandex registry
-[11]  Start UnicChat containers
-[12]  Update MongoDB Site_Url
-[99]  🚀 Full automatic setup
+ [2]  Install MinIO client (mc)
+ [3]  Clone repository
+ [4]  Check AVX support
+ [5]  Setup domain and check DNS
+ [6]  Generate Nginx config
+ [7]  Deploy Nginx config (with backup)
+ [8]  Setup SSL certificate
+ [9]  Activate Nginx site
+[10]  Prepare .env files
+[11]  Login to Yandex registry
+[12]  Start UnicChat containers
+[13]  Update MongoDB Site_Url
+[14]  Prepare knowledge base
+[15]  Deploy knowledge base services
+[99]  🚀 Full automatic setup (with knowledge base)
  [0]  Exit
 MENU
     read -rp "👉 Select an option: " choice
     case $choice in
       1) install_deps ;;
-      2) clone_repo ;;
-      3) check_avx ;;
-      4) setup_domain ;;
-      5) generate_nginx_conf ;;
-      6) deploy_nginx_conf ;;
-      7) setup_ssl ;;
-      8) activate_nginx ;;
-      9) prepare_unicchat ;;
-      10) login_yandex ;;
-      11) start_unicchat ;;
-      12) update_site_url ;;
+      2) install_minio_client ;;
+      3) clone_repo ;;
+      4) check_avx ;;
+      5) setup_domain ;;
+      6) generate_nginx_conf ;;
+      7) deploy_nginx_conf ;;
+      8) setup_ssl ;;
+      9) activate_nginx ;;
+      10) prepare_unicchat ;;
+      11) login_yandex ;;
+      12) start_unicchat ;;
+      13) update_site_url ;;
+      14) prepare_knowledgebase ;;
+      15) deploy_knowledgebase ;;
       99) auto_setup ;;
       0) echo "👋 Goodbye!" && break ;;
       *) echo "❓ Invalid option." ;;
