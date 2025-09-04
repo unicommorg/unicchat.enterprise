@@ -38,6 +38,10 @@ load_config() {
 install_deps() {
   echo -e "\n🔧 Adding Docker APT repository and installing dependencies…"
 
+  # Удаляем конфликтующие пакеты если они есть
+  apt remove -y containerd || true
+  apt autoremove -y
+
   apt update -y
   apt install -y ca-certificates curl gnupg lsb-release software-properties-common
 
@@ -53,7 +57,9 @@ install_deps() {
     tee /etc/apt/sources.list.d/docker.list > /dev/null
 
   apt update -y
-  apt install -y docker.io docker-compose-plugin docker-compose nginx certbot python3-certbot-nginx git dnsutils
+  
+  # Устанавливаем пакеты с принудительным разрешением зависимостей
+  apt install -y -f docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose nginx certbot python3-certbot-nginx git dnsutils
 
   echo "✅ Dependencies installed (including docker compose plugin)."
 }
