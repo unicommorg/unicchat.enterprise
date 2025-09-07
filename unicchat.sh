@@ -336,9 +336,9 @@ activate_nginx() {
   echo "✅ Nginx activated for all sites"
 }
 
-# Функция для обновления solid.env с данными из knowledgebase
+# Функция для обновления solid.env
 update_solid_env() {
-  echo -e "\n🔗 Linking Knowledgebase MinIO with UnicChat solid…"
+  echo -e "\n📝 Updating solid.env with MinIO configuration…"
   
   local solid_env="unicchat.enterprise/multi-server-install/solid.env"
   local kb_config="unicchat.enterprise/knowledgebase/config.txt"
@@ -350,7 +350,6 @@ update_solid_env() {
   
   if [ ! -f "$kb_config" ]; then
     echo "❌ Knowledgebase config not found: $kb_config"
-    echo "⚠️ Please deploy knowledgebase first to get MinIO credentials"
     return 1
   fi
   
@@ -364,27 +363,22 @@ update_solid_env() {
   fi
   source "$DNS_CONFIG"
   
-  # Удаляем старую MinIO конфигурацию если есть
-  sed -i '/# MinIO Configuration/,/MINIO_SECRET_KEY/d' "$solid_env"
-  
-  # Добавляем новую MinIO конфигурацию
+  # Обновляем solid.env
   cat >> "$solid_env" <<EOF
 
-# MinIO Configuration from Knowledgebase
+# MinIO Configuration
 UnInit.1="'Minio': { 'Type': 'NamedServiceAuth', 'IpOrHost': 'https://$MINIO_DNS', 'UserName': '$MINIO_ROOT_USER', 'Password': '$MINIO_ROOT_PASSWORD' }"
 MINIO_HOST="https://$MINIO_DNS"
 MINIO_ACCESS_KEY="$MINIO_ROOT_USER"
 MINIO_SECRET_KEY="$MINIO_ROOT_PASSWORD"
 EOF
   
-  echo "✅ Knowledgebase MinIO linked to UnicChat solid"
-  echo "   MinIO URL: https://$MINIO_DNS"
-  echo "   Username: $MINIO_ROOT_USER"
+  echo "✅ solid.env updated with MinIO configuration"
 }
 
 # Функция для обновления appserver.env
 update_appserver_env() {
-  echo -e "\n🔗 Linking Document Server with UnicChat appserver…"
+  echo -e "\n📝 Updating appserver.env with OnlyOffice configuration…"
   
   local appserver_env="unicchat.enterprise/multi-server-install/appserver.env"
   
@@ -403,15 +397,14 @@ update_appserver_env() {
   # Обновляем ROOT_URL в appserver.env
   sed -i "s|ROOT_URL=.*|ROOT_URL=https://$APP_DNS|" "$appserver_env"
   
-  # Добавляем/обновляем DOCUMENT_SERVER_HOST
-  if ! grep -q "DOCUMENT_SERVER_HOST" "$appserver_env"; then
-    echo "DOCUMENT_SERVER_HOST=https://$EDT_DNS" >> "$appserver_env"
+  # Добавляем ONLYOFFICE_HOST
+  if ! grep -q "ONLYOFFICE_HOST" "$appserver_env"; then
+    echo "ONLYOFFICE_HOST=https://$EDT_DNS" >> "$appserver_env"
   else
-    sed -i "s|DOCUMENT_SERVER_HOST=.*|DOCUMENT_SERVER_HOST=https://$EDT_DNS|" "$appserver_env"
+    sed -i "s|ONLYOFFICE_HOST=.*|ONLYOFFICE_HOST=https://$EDT_DNS|" "$appserver_env"
   fi
   
-  echo "✅ Document Server linked to UnicChat appserver"
-  echo "   Document Server URL: https://$EDT_DNS"
+  echo "✅ appserver.env updated with OnlyOffice configuration"
 }
 
 # Функция для подготовки всех env файлов
@@ -431,10 +424,10 @@ prepare_all_envs() {
 
 # Функция для обновления env файлов
 update_env_files() {
-  echo -e "\n🔗 Linking Knowledgebase services with UnicChat…"
+  echo -e "\n🔄 Updating environment files with service URLs…"
   update_solid_env
   update_appserver_env
-  echo "✅ All services linked successfully"
+  echo "✅ Environment files updated"
 }
 
 prepare_unicchat() {
@@ -591,7 +584,7 @@ main_menu() {
 [13]  Update MongoDB Site_Url
 [14]  Prepare knowledge base
 [15]  Deploy knowledge base services
-[16]  🔗 Link Knowledgebase with UnicChat
+[16]  Update environment files with service URLs
 [99]  🚀 Full automatic setup (with knowledge base)
  [0]  Exit
 MENU
