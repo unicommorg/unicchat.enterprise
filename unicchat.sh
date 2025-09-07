@@ -329,17 +329,117 @@ setup_ssl() {
   
   echo "✅ SSL setup complete."
 }
+
 activate_nginx() {
   echo -e "\n🚀 Activating Nginx sites…"
   nginx -t && systemctl reload nginx
   echo "✅ Nginx activated for all sites"
 }
 
-prepare_unicchat() {
-  echo -e "\n📦 Preparing env files…"
+# Функция для обновления solid.env с данными из knowledgebase
+update_solid_env() {
+  echo -e "\n🔗 Linking Knowledgebase MinIO with UnicChat solid…"
+  
+  local solid_env="unicchat.enterprise/multi-server-install/solid.env"
+  local kb_config="unicchat.enterprise/knowledgebase/config.txt"
+  
+  if [ ! -f "$solid_env" ]; then
+    echo "❌ solid.env file not found: $solid_env"
+    return 1
+  fi
+  
+  if [ ! -f "$kb_config" ]; then
+    echo "❌ Knowledgebase config not found: $kb_config"
+    echo "⚠️ Please deploy knowledgebase first to get MinIO credentials"
+    return 1
+  fi
+  
+  # Загружаем данные из knowledgebase config
+  source "$kb_config"
+  
+  # Загружаем DNS конфигурацию
+  if [ ! -f "$DNS_CONFIG" ]; then
+    echo "❌ DNS configuration not found. Run step 5 first."
+    return 1
+  fi
+  source "$DNS_CONFIG"
+  
+  # Удаляем старую MinIO конфигурацию если есть
+  sed -i '/# MinIO Configuration/,/MINIO_SECRET_KEY/d' "$solid_env"
+  
+  # Добавляем новую MinIO конфигурацию
+  cat >> "$solid_env" <<EOF
+
+# MinIO Configuration from Knowledgebase
+UnInit.1="'Minio': { 'Type': 'NamedServiceAuth', 'IpOrHost': 'https://$MINIO_DNS', 'UserName': '$MINIO_ROOT_USER', 'Password': '$MINIO_ROOT_PASSWORD' }"
+MINIO_HOST="https://$MINIO_DNS"
+MINIO_ACCESS_KEY="$MINIO_ROOT_USER"
+MINIO_SECRET_KEY="$MINIO_ROOT_PASSWORD"
+EOF
+  
+  echo "✅ Knowledgebase MinIO linked to UnicChat solid"
+  echo "   MinIO URL: https://$MINIO_DNS"
+  echo "   Username: $MINIO_ROOT_USER"
+}
+
+# Функция для обновления appserver.env
+update_appserver_env() {
+  echo -e "\n🔗 Linking Document Server with UnicChat appserver…"
+  
+  local appserver_env="unicchat.enterprise/multi-server-install/appserver.env"
+  
+  if [ ! -f "$appserver_env" ]; then
+    echo "❌ appserver.env file not found: $appserver_env"
+    return 1
+  fi
+  
+  # Загружаем DNS конфигурацию
+  if [ ! -f "$DNS_CONFIG" ]; then
+    echo "❌ DNS configuration not found. Run step 5 first."
+    return 1
+  fi
+  source "$DNS_CONFIG"
+  
+  # Обновляем ROOT_URL в appserver.env
+  sed -i "s|ROOT_URL=.*|ROOT_URL=https://$APP_DNS|" "$appserver_env"
+  
+  # Добавляем/обновляем DOCUMENT_SERVER_HOST
+  if ! grep -q "DOCUMENT_SERVER_HOST" "$appserver_env"; then
+    echo "DOCUMENT_SERVER_HOST=https://$EDT_DNS" >> "$appserver_env"
+  else
+    sed -i "s|DOCUMENT_SERVER_HOST=.*|DOCUMENT_SERVER_HOST=https://$EDT_DNS|" "$appserver_env"
+  fi
+  
+  echo "✅ Document Server linked to UnicChat appserver"
+  echo "   Document Server URL: https://$EDT_DNS"
+}
+
+# Функция для подготовки всех env файлов
+prepare_all_envs() {
+  echo -e "\n📦 Preparing all environment files…"
+  
+  # Подготавливаем основные env файлы
   local dir="unicchat.enterprise/multi-server-install"
   (cd "$dir" && chmod +x generate_env_files.sh && ./generate_env_files.sh)
-  echo "✅ Env ready."
+  
+  # Обновляем solid.env и appserver.env
+  update_solid_env
+  update_appserver_env
+  
+  echo "✅ All environment files prepared and updated"
+}
+
+# Функция для обновления env файлов
+update_env_files() {
+  echo -e "\n🔗 Linking Knowledgebase services with UnicChat…"
+  update_solid_env
+  update_appserver_env
+  echo "✅ All services linked successfully"
+}
+
+prepare_unicchat() {
+  echo -e "\n📦 Preparing env files…"
+  prepare_all_envs
 }
 
 login_yandex() {
@@ -371,12 +471,35 @@ update_site_url() {
   fi
   source "$DNS_CONFIG"
   
+  # Проверяем, запущен ли контейнер
+  if ! docker ps --format '{{.Names}}' | grep -q "^${container}$"; then
+    echo "❌ MongoDB container is not running: $container"
+    return 1
+  fi
+  
+  # Проверяем существование файла с паролем
+  if [ ! -f "$env_file" ]; then
+    echo "❌ Environment file not found: $env_file"
+    return 1
+  fi
+  
   local pwd=$(grep -E '^MONGODB_ROOT_PASSWORD=' "$env_file" | cut -d '=' -f2 | tr -d '\r')
+  if [ -z "$pwd" ]; then
+    echo "❌ MongoDB root password not found in $env_file"
+    return 1
+  fi
+  
   local url="https://$APP_DNS"
   
+  echo "🔄 Updating Site_Url to: $url"
+  
+  # Первая команда - обновление value
   docker exec "$container" mongosh -u root -p "$pwd" --quiet --eval "db.getSiblingDB('unicchat_db').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{value:'$url'}})"
-  docker exec "$container" mongosh -u root -p "$pwd" --quiet --eval "db.getSiblingDB('unicchat_db').rocketchat_settings.updateOne({_id:'Site_Url'},{\\$set:{packageValue:'$url'}})"
-  echo "✅ Site_Url updated to: $url"
+  
+  # Вторая команда - обновление packageValue
+  docker exec "$container" mongosh -u root -p "$pwd" --quiet --eval "db.getSiblingDB('unicchat_db').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{packageValue:'$url'}})"
+  
+  echo "✅ Site_Url updated successfully"
 }
 
 # ===== ФУНКЦИИ ДЛЯ БАЗЫ ЗНАНИЙ =====
@@ -428,7 +551,7 @@ auto_setup() {
   deploy_nginx_conf
   setup_ssl
   activate_nginx
-  prepare_unicchat
+  prepare_all_envs
   login_yandex
   start_unicchat
   update_site_url
@@ -468,6 +591,7 @@ main_menu() {
 [13]  Update MongoDB Site_Url
 [14]  Prepare knowledge base
 [15]  Deploy knowledge base services
+[16]  🔗 Link Knowledgebase with UnicChat
 [99]  🚀 Full automatic setup (with knowledge base)
  [0]  Exit
 MENU
@@ -488,6 +612,7 @@ MENU
       13) update_site_url ;;
       14) prepare_knowledgebase ;;
       15) deploy_knowledgebase ;;
+      16) update_env_files ;;
       99) auto_setup ;;
       0) echo "👋 Goodbye!" && break ;;
       *) echo "❓ Invalid option." ;;
