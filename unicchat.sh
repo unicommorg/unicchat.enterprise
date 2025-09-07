@@ -25,7 +25,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Конфигурационные файлы
-CONFIG_FILE="app_config.txt"
+CONFIG_FILE="certbot_mail.txt"
 DNS_CONFIG="dns_config.txt"
 VCS_CONFIG="vcs_config.txt"
 LOG_FILE="unicchat_install.log"
