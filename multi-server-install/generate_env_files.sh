@@ -25,7 +25,7 @@ ROOT_URL=${ROOT_URL:-http://localhost:3000}
 PORT=${PORT:-3000}
 DEPLOY_METHOD=${DEPLOY_METHOD:-docker}
 
-UNIC_SOLID_HOST=${UNIC_SOLID_HOST:-http://\${hostname}
+UNIC_SOLID_HOST=${UNIC_SOLID_HOST:-http://\${hostname}}
 INIT_CONFIG_NAMES=${INIT_CONFIG_NAMES:-"{Mongo}"}
 PLUGINS_ATTACH=${PLUGINS_ATTACH:-"'UniAct Mongo Logger UniVault Tasker'"}
 
@@ -65,16 +65,9 @@ echo "Generated appserver.env"
 
 # Generate solid.env
 cat > solid.env << EOL
-
-# Переменные:
-# - MONGODB_USERNAME: $MONGODB_USERNAME
-# - MONGODB_PASSWORD: $MONGODB_PASSWORD
-# - MONGODB_DATABASE: $MONGODB_DATABASE
-# - MONGODB_INITIAL_PRIMARY_HOST: $MONGODB_INITIAL_PRIMARY_HOST
 UnInit.0="'Mongo': { 'Type': 'DbConStringEntry', 'ConnectionString': '$MONGO_URL', 'DataBase': '$MONGODB_DATABASE' }"
-InitConfig:Names=$INIT_CONFIG_NAMES
-Plugins:Attach=$PLUGINS_ATTACH
-
+InitConfig:Names="{Mongo Minio}"
+Plugins:Attach='UniAct Mongo Logger UniVault Tasker'
 EOL
 echo "Generated solid.env"
 
