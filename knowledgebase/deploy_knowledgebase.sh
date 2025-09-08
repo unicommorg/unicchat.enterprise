@@ -130,7 +130,7 @@ EOF
   docker exec unic.chat.minio mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
   docker exec unic.chat.minio mc mb local/uc.onlyoffice.docs || true
   docker exec unic.chat.minio mc anonymous set public local/uc.onlyoffice.docs || true
-  log "✅ MinIO развернут. Консоль: http://$MINIO_DNS:9002, Bucket: uc.onlyoffice.docs (public)"
+  log "✅ MinIO развернут. Консоль: http://$MINIO_DNS, Bucket: uc.onlyoffice.docs (public)"
 }
 
 # Step 5: Deploy OnlyOffice
