@@ -135,7 +135,7 @@ EOF
 
 # Step 5: Deploy OnlyOffice
 deploy_onlyoffice() {
-  log "Шаг 4: Развертывание OnlyOffice"
+  log "Шаг 4: Развертывание DocumentServer"
   check_docker_compose
   
   # Remove version attribute from docker-compose.yml
