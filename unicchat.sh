@@ -256,6 +256,31 @@ setup_license() {
   fi
 }
 
+copy_ssl_configs() {
+    echo -e "\n📋 Copying SSL configuration files..."
+
+    # Копируем options-ssl-nginx.conf если его нет
+    if [ ! -f /etc/letsencrypt/options-ssl-nginx.conf ]; then
+        if [ -f "unicchat.enterprise/nginx/options-ssl-nginx.conf" ]; then
+            sudo cp "unicchat.enterprise/nginx/options-ssl-nginx.conf" /etc/letsencrypt/
+            echo "✅ options-ssl-nginx.conf copied to /etc/letsencrypt/"
+        else
+            echo "⚠️ options-ssl-nginx.conf not found in unicchat.enterprise/nginx/"
+        fi
+    else
+        echo "✅ options-ssl-nginx.conf already exists in /etc/letsencrypt/"
+    fi
+
+    # Генерируем DH параметры если их нет
+    if [ ! -f /etc/letsencrypt/ssl-dhparams.pem ]; then
+        echo -e "\n⏳ Generating DH parameters..."
+        sudo openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
+        echo "✅ DH parameters generated"
+    else
+        echo "✅ DH parameters already exist"
+    fi
+}
+
 generate_nginx_conf() {
   echo -e "\n🛠️ Generating Nginx configs for UnicChat services…"
   
@@ -381,6 +406,9 @@ setup_ssl() {
   fi
   source "$DNS_CONFIG"
   
+  # Копируем SSL конфигурационные файлы
+  copy_ssl_configs
+  
   # Собираем только домены UnicChat
   local domains=()
   [ -n "$APP_DNS" ] && domains+=("$APP_DNS")
@@ -422,13 +450,6 @@ setup_ssl() {
     fi
   done
   
-  echo -e "\n⏳ Generating DH parameters (if not exist)…"
-  if [ ! -f /etc/letsencrypt/ssl-dhparams.pem ]; then
-    sudo openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
-  else
-    echo "ℹ️ DH parameters already exist, skipping generation."
-  fi
-  
   echo "▶️ Starting nginx..."
   sudo systemctl start nginx
   
@@ -447,6 +468,7 @@ setup_ssl() {
     echo "ℹ️ VCS domains ($VCS_DNS, $VCS_TURN_DNS, $VCS_WHIP_DNS) will use Caddy for SSL"
   fi
 }
+
 activate_nginx() {
   echo -e "\n🚀 Activating Nginx sites…"
   nginx -t && systemctl reload nginx
@@ -922,26 +944,29 @@ EOF
   
   echo "✅ VCS installation completed"
 }
+
 auto_setup() {
   echo -e "\n⚙️ Running full automatic setup…"
-  install_deps
-  install_minio_client
-  clone_repo
-  check_avx
-  setup_dns_names
-  setup_license        # Добавляем настройку лицензии
-  generate_nginx_conf
-  deploy_nginx_conf
-  setup_ssl
-  activate_nginx
-  prepare_all_envs
-  login_yandex
-  start_unicchat
-  update_site_url
-  prepare_knowledgebase
-  deploy_knowledgebase
-  prepare_vcs
-  install_vcs
+	install_deps
+	install_minio_client
+	clone_repo
+	check_avx
+	setup_dns_names
+	setup_license
+	generate_nginx_conf
+	deploy_nginx_conf
+	copy_ssl_configs
+	setup_ssl
+	activate_nginx
+	prepare_unicchat
+	login_yandex
+	start_unicchat
+	update_site_url
+	prepare_knowledgebase
+	deploy_knowledgebase
+	update_env_files
+	prepare_vcs
+	install_vcs
   echo -e "\n🎉 UnicChat setup complete! (including knowledge base and VCS)"
 }
 
@@ -980,17 +1005,18 @@ main_menu() {
  [6]  Setup License Key
  [7]  Generate Nginx configs
  [8]  Deploy Nginx configs
- [9]  Setup SSL certificates (all domains)
-[10]  Activate Nginx sites
-[11]  Prepare .env files
-[12]  Login to Yandex registry
-[13]  Start UnicChat containers
-[14]  Update MongoDB Site_Url
-[15]  Prepare knowledge base
-[16]  Deploy knowledge base services
-[17]  🔗 Link Knowledgebase with UnicChat
-[18]  📹 Prepare VCS
-[19]  📹 Install VCS
+ [9]  Copy SSL configs and generate DH params
+[10]  Setup SSL certificates (all domains)
+[11]  Activate Nginx sites
+[12]  Prepare .env files
+[13]  Login to Yandex registry
+[14]  Start UnicChat containers
+[15]  Update MongoDB Site_Url
+[16]  Prepare knowledge base
+[17]  Deploy knowledge base services
+[18]  🔗 Link Knowledgebase with UnicChat
+[19]  📹 Prepare VCS
+[20]  📹 Install VCS
 [99]  🚀 Full automatic setup (with knowledge base and VCS)
  [0]  Exit
 MENU
@@ -1004,18 +1030,19 @@ MENU
       6) setup_license ;;
       7) generate_nginx_conf ;;
       8) deploy_nginx_conf ;;
-      9) setup_ssl ;;
-      10) activate_nginx ;;
-      11) prepare_unicchat ;;
-      12) login_yandex ;;
-      13) start_unicchat ;;
-      14) update_site_url ;;
-      15) prepare_knowledgebase ;;
-      16) deploy_knowledgebase ;;
-      17) update_env_files ;;
-      18) prepare_vcs ;;
-      19) install_vcs ;;
-      99) auto_setup ;;
+      9) copy_ssl_configs ;;
+     10) setup_ssl ;;
+     11) activate_nginx ;;
+     12) prepare_unicchat ;;
+     13) login_yandex ;;
+     14) start_unicchat ;;
+     15) update_site_url ;;
+     16) prepare_knowledgebase ;;
+     17) deploy_knowledgebase ;;
+     18) update_env_files ;;
+     19) prepare_vcs ;;
+     20) install_vcs ;;
+     99) auto_setup ;;
       0) echo "👋 Goodbye!" && break ;;
       *) echo "❓ Invalid option." ;;
     esac
