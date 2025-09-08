@@ -158,7 +158,7 @@ EOF
   
   cd "$BASE_DIR/Docker-DocumentServer"
   docker compose up -d
-  log "✅ OnlyOffice развернут. Доступ: http://$ONLYOFFICE_DNS:8880"
+  log "✅ DocumentServer развернут. Доступ: http://$ONLYOFFICE_DNS"
 }
 
 # Main function for automatic deployment
