@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# UnicChat installation helper with VCS support (обновлено 2025-08-05)
+# UnicChat installation helper with VCS support (обновлено 2025-09-10)
 #
 
 set -euo pipefail
@@ -29,6 +29,8 @@ CONFIG_FILE="app_config.txt"
 DNS_CONFIG="dns_config.txt"
 VCS_CONFIG="vcs_config.txt"
 LICENSE_FILE="license.txt"
+MONGO_CONFIG_FILE="mongo_config.txt"
+MINIO_CONFIG_FILE="minio_config.txt"
 LOG_FILE="unicchat_install.log"
 
 # Переменные
@@ -154,8 +156,8 @@ clone_repo() {
   else
     echo "📁 Repository already exists."
   fi
-  (cd unicchat.enterprise && git fetch --all && git switch main)
-  echo "✅ Repo ready on branch main."
+  (cd unicchat.enterprise && git fetch --all && git switch skonstantinov-patch-2 )
+  echo "✅ Repo ready on branch skonstantinov-patch-2."
 }
 
 check_avx() {
@@ -256,29 +258,205 @@ setup_license() {
   fi
 }
 
+update_mongo_config() {
+  echo -e "\n🔧 Updating MongoDB configuration..."
+
+  # Определяем пути к файлам конфигурации
+  local mongo_config_file="$MONGO_CONFIG_FILE"
+  local config_file="unicchat.enterprise/multi-server-install/config.txt"
+
+  # Проверка существования файлов, создание если отсутствуют
+  if [ ! -f "$mongo_config_file" ]; then
+    log_info "Файл $mongo_config_file не найден, создаем новый."
+    touch "$mongo_config_file"
+  fi
+
+  if [ ! -f "$config_file" ]; then
+    log_info "Файл $config_file не найден, создаем новый."
+    mkdir -p "$(dirname "$config_file")"
+    touch "$config_file"
+  fi
+
+  # Функция для обновления или добавления значения переменной в указанном файле
+  update_config() {
+    local key=$1
+    local value=$2
+    local file=$3
+    # Проверяем, существует ли строка с ключом
+    if grep -q "^$key=" "$file"; then
+      # Заменяем существующую строку
+      sed -i "s|^$key=.*|$key=\"$value\"|" "$file"
+    else
+      # Добавляем новую строку в конец файла
+      echo "$key=\"$value\"" >> "$file"
+    fi
+    if [ $? -eq 0 ]; then
+      log_success "Успешно обновлено: $key=\"$value\" в $file"
+    else
+      log_error "Ошибка при обновлении $key в $file"
+      exit 1
+    fi
+  }
+
+  # Функция для получения значения из mongo_config.txt
+  get_value_from_mongo_config() {
+    local key=$1
+    local value
+    if grep -q "^$key=" "$mongo_config_file"; then
+      value=$(grep "^$key=" "$mongo_config_file" | cut -d'=' -f2 | tr -d '"')
+      echo "$value"
+    else
+      echo ""
+    fi
+  }
+
+  # Функция для запроса значения у пользователя и обновления обоих файлов
+  prompt_value() {
+    local key=$1
+    local prompt=$2
+    read -p "$prompt: " value
+    if [ -z "$value" ]; then
+      log_error "Значение для $key не может быть пустым."
+      exit 1
+    fi
+    update_config "$key" "$value" "$mongo_config_file"
+    update_config "$key" "$value" "$config_file"
+  }
+
+  # Переменные для обработки
+  local keys=(
+    "MONGODB_ROOT_PASSWORD"
+    "MONGODB_USERNAME"
+    "MONGODB_PASSWORD"
+    "MONGODB_DATABASE"
+  )
+
+  # Обработка каждой переменной
+  for key in "${keys[@]}"; do
+    value=$(get_value_from_mongo_config "$key")
+    if [ -n "$value" ]; then
+      # Если значение найдено в mongo_config.txt, обновляем только config.txt
+      update_config "$key" "$value" "$config_file"
+    else
+      # Если значение не найдено, запрашиваем у пользователя и обновляем оба файла
+      prompt_value "$key" "Введите $key"
+    fi
+  done
+
+  log_success "MongoDB configuration updated in $mongo_config_file and $config_file."
+}
+
+update_minio_config() {
+  echo -e "\n🔧 Updating MinIO configuration..."
+
+  # Определяем пути к файлам конфигурации
+  local minio_config_file="$MINIO_CONFIG_FILE"
+  local config_file="unicchat.enterprise/knowledgebase/config.txt"
+
+  # Проверка существования файлов, создание если отсутствуют
+  if [ ! -f "$minio_config_file" ]; then
+    log_info "Файл $minio_config_file не найден, создаем новый."
+    touch "$minio_config_file"
+  fi
+
+  if [ ! -f "$config_file" ]; then
+    log_info "Файл $config_file не найден, создаем новый."
+    mkdir -p "$(dirname "$config_file")"
+    touch "$config_file"
+  fi
+
+  # Функция для обновления или добавления значения переменной в указанном файле
+  update_config() {
+    local key=$1
+    local value=$2
+    local file=$3
+    # Проверяем, существует ли строка с ключом
+    if grep -q "^$key=" "$file"; then
+      # Заменяем существующую строку
+      sed -i "s|^$key=.*|$key=\"$value\"|" "$file"
+    else
+      # Добавляем новую строку в конец файла
+      echo "$key=\"$value\"" >> "$file"
+    fi
+    if [ $? -eq 0 ]; then
+      log_success "Успешно обновлено: $key=\"$value\" в $file"
+    else
+      log_error "Ошибка при обновлении $key в $file"
+      exit 1
+    fi
+  }
+
+  # Функция для получения значения из minio_config.txt
+  get_value_from_minio_config() {
+    local key=$1
+    local value
+    if grep -q "^$key=" "$minio_config_file"; then
+      value=$(grep "^$key=" "$minio_config_file" | cut -d'=' -f2 | tr -d '"')
+      echo "$value"
+    else
+      echo ""
+    fi
+  }
+
+  # Функция для запроса значения у пользователя и обновления обоих файлов
+  prompt_value() {
+    local key=$1
+    local prompt=$2
+    read -p "$prompt: " value
+    if [ -z "$value" ]; then
+      log_error "Значение для $key не может быть пустым."
+      exit 1
+    fi
+    update_config "$key" "$value" "$minio_config_file"
+    update_config "$key" "$value" "$config_file"
+  }
+
+  # Переменные для обработки
+  local keys=(
+    "DB_NAME"
+    "DB_USER"
+    "MINIO_ROOT_USER"
+    "MINIO_ROOT_PASSWORD"
+  )
+
+  # Обработка каждой переменной
+  for key in "${keys[@]}"; do
+    value=$(get_value_from_minio_config "$key")
+    if [ -n "$value" ]; then
+      # Если значение найдено в minio_config.txt, обновляем только config.txt
+      update_config "$key" "$value" "$config_file"
+    else
+      # Если значение не найдено, запрашиваем у пользователя и обновляем оба файла
+      prompt_value "$key" "Введите $key"
+    fi
+  done
+
+  log_success "MinIO configuration updated in $minio_config_file and $config_file."
+}
+
 copy_ssl_configs() {
-    echo -e "\n📋 Copying SSL configuration files..."
+  echo -e "\n📋 Copying SSL configuration files..."
 
-    # Копируем options-ssl-nginx.conf если его нет
-    if [ ! -f /etc/letsencrypt/options-ssl-nginx.conf ]; then
-        if [ -f "unicchat.enterprise/nginx/options-ssl-nginx.conf" ]; then
-            sudo cp "unicchat.enterprise/nginx/options-ssl-nginx.conf" /etc/letsencrypt/
-            echo "✅ options-ssl-nginx.conf copied to /etc/letsencrypt/"
-        else
-            echo "⚠️ options-ssl-nginx.conf not found in unicchat.enterprise/nginx/"
-        fi
+  # Копируем options-ssl-nginx.conf если его нет
+  if [ ! -f /etc/letsencrypt/options-ssl-nginx.conf ]; then
+    if [ -f "unicchat.enterprise/nginx/options-ssl-nginx.conf" ]; then
+      sudo cp "unicchat.enterprise/nginx/options-ssl-nginx.conf" /etc/letsencrypt/
+      echo "✅ options-ssl-nginx.conf copied to /etc/letsencrypt/"
     else
-        echo "✅ options-ssl-nginx.conf already exists in /etc/letsencrypt/"
+      echo "⚠️ options-ssl-nginx.conf not found in unicchat.enterprise/nginx/"
     fi
+  else
+    echo "✅ options-ssl-nginx.conf already exists in /etc/letsencrypt/"
+  fi
 
-    # Генерируем DH параметры если их нет
-    if [ ! -f /etc/letsencrypt/ssl-dhparams.pem ]; then
-        echo -e "\n⏳ Generating DH parameters..."
-        sudo openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
-        echo "✅ DH parameters generated"
-    else
-        echo "✅ DH parameters already exist"
-    fi
+  # Генерируем DH параметры если их нет
+  if [ ! -f /etc/letsencrypt/ssl-dhparams.pem ]; then
+    echo -e "\n⏳ Generating DH parameters..."
+    sudo openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
+    echo "✅ DH parameters generated"
+  else
+    echo "✅ DH parameters already exist"
+  fi
 }
 
 generate_nginx_conf() {
@@ -599,8 +777,6 @@ start_unicchat() {
 
 update_site_url() {
   echo -e "\n📝 Updating Site_Url in MongoDB…"
-  local dir="unicchat.enterprise/multi-server-install"
-  local env_file="$dir/mongo.env"
   local container="unic.chat.db.mongo"
   
   if [ ! -f "$DNS_CONFIG" ]; then
@@ -609,37 +785,34 @@ update_site_url() {
   fi
   source "$DNS_CONFIG"
   
+  # Проверяем существование конфигурационного файла MongoDB
+  if [ ! -f "mongo_config.txt" ]; then
+    echo "❌ MongoDB configuration not found. Run 'Update MongoDB configuration' first."
+    return 1
+  fi
+  
+  # Загружаем настройки MongoDB из конфигурационного файла
+  source "mongo_config.txt"
+  
   # Проверяем, запущен ли контейнер
   if ! docker ps --format '{{.Names}}' | grep -q "^${container}$"; then
     echo "❌ MongoDB container is not running: $container"
     return 1
   fi
   
-  # Проверяем существование файла с паролем
-  if [ ! -f "$env_file" ]; then
-    echo "❌ Environment file not found: $env_file"
-    return 1
-  fi
-  
-  local pwd=$(grep -E '^MONGODB_ROOT_PASSWORD=' "$env_file" | cut -d '=' -f2 | tr -d '\r')
-  if [ -z "$pwd" ]; then
-    echo "❌ MongoDB root password not found in $env_file"
-    return 1
-  fi
-  
   local url="https://$APP_DNS"
   
   echo "🔄 Updating Site_Url to: $url"
+  echo "📊 Using database: $MONGODB_DATABASE"
   
   # Первая команда - обновление value
-  docker exec "$container" mongosh -u root -p "$pwd" --quiet --eval "db.getSiblingDB('unicchat_db').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{value:'$url'}})"
+  docker exec "$container" mongosh -u root -p "$MONGODB_ROOT_PASSWORD" --quiet --eval "db.getSiblingDB('$MONGODB_DATABASE').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{value:'$url'}})"
   
   # Вторая команда - обновление packageValue
-  docker exec "$container" mongosh -u root -p "$pwd" --quiet --eval "db.getSiblingDB('unicchat_db').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{packageValue:'$url'}})"
+  docker exec "$container" mongosh -u root -p "$MONGODB_ROOT_PASSWORD" --quiet --eval "db.getSiblingDB('$MONGODB_DATABASE').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{packageValue:'$url'}})"
   
-  echo "✅ Site_Url updated successfully"
+  echo "✅ Site_Url updated successfully in database: $MONGODB_DATABASE"
 }
-
 prepare_knowledgebase() {
   echo -e "\n📚 Preparing knowledge base deployment…"
   local kb_dir="unicchat.enterprise/knowledgebase"
@@ -947,26 +1120,28 @@ EOF
 
 auto_setup() {
   echo -e "\n⚙️ Running full automatic setup…"
-	install_deps
-	install_minio_client
-	clone_repo
-	check_avx
-	setup_dns_names
-	setup_license
-	generate_nginx_conf
-	deploy_nginx_conf
-	copy_ssl_configs
-	setup_ssl
-	activate_nginx
-	prepare_unicchat
-	login_yandex
-	start_unicchat
-	update_site_url
-	prepare_knowledgebase
-	deploy_knowledgebase
-	update_env_files
-	prepare_vcs
-	install_vcs
+  install_deps
+  install_minio_client
+  clone_repo
+  check_avx
+  setup_dns_names
+  setup_license
+  update_mongo_config
+  update_minio_config
+  generate_nginx_conf
+  deploy_nginx_conf
+  copy_ssl_configs
+  setup_ssl
+  activate_nginx
+  prepare_unicchat
+  login_yandex
+  start_unicchat
+  update_site_url
+  prepare_knowledgebase
+  deploy_knowledgebase
+  update_env_files
+  prepare_vcs
+  install_vcs
   echo -e "\n🎉 UnicChat setup complete! (including knowledge base and VCS)"
 }
 
@@ -1003,20 +1178,22 @@ main_menu() {
  [4]  Check AVX support
  [5]  Setup DNS names for all services (including VCS)
  [6]  Setup License Key
- [7]  Generate Nginx configs
- [8]  Deploy Nginx configs
- [9]  Copy SSL configs and generate DH params
-[10]  Setup SSL certificates (all domains)
-[11]  Activate Nginx sites
-[12]  Prepare .env files
-[13]  Login to Yandex registry
-[14]  Start UnicChat containers
-[15]  Update MongoDB Site_Url
-[16]  Prepare knowledge base
-[17]  Deploy knowledge base services
-[18]  🔗 Link Knowledgebase with UnicChat
-[19]  📹 Prepare VCS
-[20]  📹 Install VCS
+ [7]  Update MongoDB configuration
+ [8]  Update MinIO configuration
+ [9]  Generate Nginx configs
+[10]  Deploy Nginx configs
+[11]  Copy SSL configs and generate DH params
+[12]  Setup SSL certificates (all domains)
+[13]  Activate Nginx sites
+[14]  Prepare .env files
+[15]  Login to Yandex registry
+[16]  Start UnicChat containers
+[17]  Update MongoDB Site_Url
+[18]  Prepare knowledge base
+[19]  Deploy knowledge base services
+[20]  🔗 Link Knowledgebase with UnicChat
+[21]  📹 Prepare VCS
+[22]  📹 Install VCS
 [99]  🚀 Full automatic setup (with knowledge base and VCS)
  [0]  Exit
 MENU
@@ -1028,20 +1205,22 @@ MENU
       4) check_avx ;;
       5) setup_dns_names ;;
       6) setup_license ;;
-      7) generate_nginx_conf ;;
-      8) deploy_nginx_conf ;;
-      9) copy_ssl_configs ;;
-     10) setup_ssl ;;
-     11) activate_nginx ;;
-     12) prepare_unicchat ;;
-     13) login_yandex ;;
-     14) start_unicchat ;;
-     15) update_site_url ;;
-     16) prepare_knowledgebase ;;
-     17) deploy_knowledgebase ;;
-     18) update_env_files ;;
-     19) prepare_vcs ;;
-     20) install_vcs ;;
+      7) update_mongo_config ;;
+      8) update_minio_config ;;
+      9) generate_nginx_conf ;;
+     10) deploy_nginx_conf ;;
+     11) copy_ssl_configs ;;
+     12) setup_ssl ;;
+     13) activate_nginx ;;
+     14) prepare_unicchat ;;
+     15) login_yandex ;;
+     16) start_unicchat ;;
+     17) update_site_url ;;
+     18) prepare_knowledgebase ;;
+     19) deploy_knowledgebase ;;
+     20) update_env_files ;;
+     21) prepare_vcs ;;
+     22) install_vcs ;;
      99) auto_setup ;;
       0) echo "👋 Goodbye!" && break ;;
       *) echo "❓ Invalid option." ;;
