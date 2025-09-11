@@ -98,8 +98,8 @@ load_config() {
   fi
 }
 
-install_deps() {
-  echo -e "\n🔧 Adding Docker APT repository and installing dependencies…"
+install_docker() {
+  echo -e "\n🐳 Installing Docker and related components…"
 
   # Удаляем конфликтующие пакеты если они есть
   apt remove -y containerd || true
@@ -121,10 +121,43 @@ install_deps() {
 
   apt update -y
   
-  # Устанавливаем пакеты с принудительным разрешением зависимостей
-  apt install -y -f docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose nginx certbot python3-certbot-nginx git dnsutils
+  # Устанавливаем Docker пакеты с принудительным разрешением зависимостей
+  apt install -y -f docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose
 
-  echo "✅ Dependencies installed (including docker compose plugin)."
+  echo "✅ Docker and related components installed:"
+  echo "   - docker-ce, docker-ce-cli, containerd.io"
+  echo "   - docker-compose-plugin, docker-compose"
+  echo "   - ca-certificates, curl, gnupg, lsb-release, software-properties-common"
+}
+
+install_nginx_ssl() {
+  echo -e "\n🌐 Installing Nginx and SSL components…"
+
+  apt update -y
+  apt install -y nginx certbot python3-certbot-nginx
+
+  echo "✅ Nginx and SSL components installed:"
+  echo "   - nginx"
+  echo "   - certbot, python3-certbot-nginx"
+}
+
+install_git() {
+  echo -e "\n📦 Installing Git…"
+
+  apt update -y
+  apt install -y git
+
+  echo "✅ Git installed"
+}
+
+install_dns_utils() {
+  echo -e "\n🔍 Installing DNS utilities…"
+
+  apt update -y
+  apt install -y dnsutils
+
+  echo "✅ DNS utilities installed:"
+  echo "   - dnsutils (nslookup, dig, etc.)"
 }
 
 install_minio_client() {
@@ -813,6 +846,7 @@ update_site_url() {
   
   echo "✅ Site_Url updated successfully in database: $MONGODB_DATABASE"
 }
+
 prepare_knowledgebase() {
   echo -e "\n📚 Preparing knowledge base deployment…"
   local kb_dir="unicchat.enterprise/knowledgebase"
@@ -1120,7 +1154,10 @@ EOF
 
 auto_setup() {
   echo -e "\n⚙️ Running full automatic setup…"
-  install_deps
+  install_docker
+  install_nginx_ssl
+  install_git
+  install_dns_utils
   install_minio_client
   clone_repo
   check_avx
@@ -1172,55 +1209,61 @@ main_menu() {
   
   while true; do
     cat <<MENU
- [1]  Install dependencies
- [2]  Install MinIO client (mc)
- [3]  Clone repository
- [4]  Check AVX support
- [5]  Setup DNS names for all services (including VCS)
- [6]  Setup License Key
- [7]  Update MongoDB configuration
- [8]  Update MinIO configuration
- [9]  Generate Nginx configs
-[10]  Deploy Nginx configs
-[11]  Copy SSL configs and generate DH params
-[12]  Setup SSL certificates (all domains)
-[13]  Activate Nginx sites
-[14]  Prepare .env files
-[15]  Login to Yandex registry
-[16]  Start UnicChat containers
-[17]  Update MongoDB Site_Url
-[18]  Prepare knowledge base
-[19]  Deploy knowledge base services
-[20]  🔗 Link Knowledgebase with UnicChat
-[21]  📹 Prepare VCS
-[22]  📹 Install VCS
+ [1]  Install Docker
+ [2]  Install Nginx and Certbot
+ [3]  Install Git
+ [4]  Install DNS utilities
+ [5]  Install MinIO client (mc)
+ [6]  Clone repository
+ [7]  Check AVX support
+ [8]  Setup DNS names for all services (including VCS)
+ [9]  Setup License Key
+[10]  Update MongoDB configuration
+[11]  Update MinIO configuration
+[12]  Generate Nginx configs
+[13]  Deploy Nginx configs
+[14]  Copy SSL configs and generate DH params
+[15]  Setup SSL certificates (all domains)
+[16]  Activate Nginx sites
+[17]  Prepare .env files
+[18]  Login to Yandex registry
+[19]  Start UnicChat containers
+[20]  Update MongoDB Site_Url
+[21]  Prepare knowledge base
+[22]  Deploy knowledge base services
+[23]  🔗 Link Knowledgebase with UnicChat
+[24]  📹 Prepare VCS
+[25]  📹 Install VCS
 [99]  🚀 Full automatic setup (with knowledge base and VCS)
  [0]  Exit
 MENU
     read -rp "👉 Select an option: " choice
     case $choice in
-      1) install_deps ;;
-      2) install_minio_client ;;
-      3) clone_repo ;;
-      4) check_avx ;;
-      5) setup_dns_names ;;
-      6) setup_license ;;
-      7) update_mongo_config ;;
-      8) update_minio_config ;;
-      9) generate_nginx_conf ;;
-     10) deploy_nginx_conf ;;
-     11) copy_ssl_configs ;;
-     12) setup_ssl ;;
-     13) activate_nginx ;;
-     14) prepare_unicchat ;;
-     15) login_yandex ;;
-     16) start_unicchat ;;
-     17) update_site_url ;;
-     18) prepare_knowledgebase ;;
-     19) deploy_knowledgebase ;;
-     20) update_env_files ;;
-     21) prepare_vcs ;;
-     22) install_vcs ;;
+      1) install_docker ;;
+      2) install_nginx_ssl ;;
+      3) install_git ;;
+      4) install_dns_utils ;;
+      5) install_minio_client ;;
+      6) clone_repo ;;
+      7) check_avx ;;
+      8) setup_dns_names ;;
+      9) setup_license ;;
+     10) update_mongo_config ;;
+     11) update_minio_config ;;
+     12) generate_nginx_conf ;;
+     13) deploy_nginx_conf ;;
+     14) copy_ssl_configs ;;
+     15) setup_ssl ;;
+     16) activate_nginx ;;
+     17) prepare_unicchat ;;
+     18) login_yandex ;;
+     19) start_unicchat ;;
+     20) update_site_url ;;
+     21) prepare_knowledgebase ;;
+     22) deploy_knowledgebase ;;
+     23) update_env_files ;;
+     24) prepare_vcs ;;
+     25) install_vcs ;;
      99) auto_setup ;;
       0) echo "👋 Goodbye!" && break ;;
       *) echo "❓ Invalid option." ;;
