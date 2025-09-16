@@ -383,8 +383,8 @@ update_minio_config() {
   }
 
   local keys=(
-    "DB_NAME"
-    "DB_USER"
+#    "DB_NAME"
+  #  "DB_USER"
     "MINIO_ROOT_USER"
     "MINIO_ROOT_PASSWORD"
   )
