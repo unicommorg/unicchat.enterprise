@@ -15,7 +15,6 @@ fi
 # Paths and variables
 BASE_DIR="$(pwd)"
 CONFIG_FILE="$BASE_DIR/config.txt"
-HOSTS_FILE="/etc/hosts"
 LOG_FILE="$BASE_DIR/deploy.log"
 MINIO_COMPOSE="$BASE_DIR/minio/docker-compose.yml"
 ONLYOFFICE_COMPOSE="$BASE_DIR/Docker-DocumentServer/docker-compose.yml"
@@ -89,22 +88,9 @@ load_config() {
   fi
 }
 
-# Step 3: Local network placement
-setup_local_network() {
-  log "Шаг 2: Размещение в локальной сети"
-  # Check for duplicates in /etc/hosts
-  if ! grep -q "$MINIO_DNS" "$HOSTS_FILE"; then
-    echo "$LOCAL_IP $MINIO_DNS" >> "$HOSTS_FILE"
-  fi
-  if ! grep -q "$ONLYOFFICE_DNS" "$HOSTS_FILE"; then
-    echo "$LOCAL_IP $ONLYOFFICE_DNS" >> "$HOSTS_FILE"
-  fi
-  log "✅ /etc/hosts обновлен"
-}
-
 # Step 4: Deploy MinIO
 deploy_minio() {
-  log "Шаг 3: Развертывание MinIO"
+  log "Шаг 2: Развертывание MinIO"
   check_docker_compose
   
   # Remove version attribute from docker-compose.yml
@@ -135,7 +121,7 @@ EOF
 
 # Step 5: Deploy OnlyOffice
 deploy_onlyoffice() {
-  log "Шаг 4: Развертывание DocumentServer"
+  log "Шаг 3: Развертывание DocumentServer"
   check_docker_compose
   
   # Remove version attribute from docker-compose.yml
@@ -166,7 +152,6 @@ auto_deploy() {
   log "Начало автоматического развертывания базы знаний"
   check_deps
   load_config
-  setup_local_network
   deploy_minio
   deploy_onlyoffice
   log "✅ Развертывание базы знаний завершено!"
