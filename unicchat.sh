@@ -38,6 +38,8 @@ APP_DNS=""
 EDT_DNS=""
 MINIO_DNS=""
 UNIC_LICENSE=""
+HOSTS_FILE="/etc/hosts"
+LOCAL_IP=$(hostname -I | awk '{print $1}')
 
 # Initialize logging
 exec > >(tee -a "$LOG_FILE") 2>&1
@@ -85,6 +87,18 @@ load_config() {
       log_warning "License file exists but is empty"
     fi
   fi
+}
+
+setup_local_network() {
+  log_info "Setting up local network..."
+  # Check for duplicates in /etc/hosts
+  if ! grep -q "$MINIO_DNS" "$HOSTS_FILE"; then
+    echo "$LOCAL_IP $MINIO_DNS" >> "$HOSTS_FILE"
+  fi
+  if ! grep -q "$EDT_DNS" "$HOSTS_FILE"; then
+    echo "$LOCAL_IP $EDT_DNS" >> "$HOSTS_FILE"
+  fi
+  log_success "/etc/hosts updated"
 }
 
 install_docker() {
@@ -383,8 +397,6 @@ update_minio_config() {
   }
 
   local keys=(
-#    "DB_NAME"
-  #  "DB_USER"
     "MINIO_ROOT_USER"
     "MINIO_ROOT_PASSWORD"
   )
@@ -657,7 +669,8 @@ update_appserver_env() {
   fi
   source "$DNS_CONFIG"
   
-  sed -i "s|ROOT_URL=.*|ROOT_URL=https://$APP_DNS|" "$appserver_env"
+  # Removed ROOT_URL modification as requested
+  # sed -i "s|ROOT_URL=.*|ROOT_URL=https://$APP_DNS|" "$appserver_env"
   
   if ! grep -q "DOCUMENT_SERVER_HOST" "$appserver_env"; then
     echo "DOCUMENT_SERVER_HOST=https://$EDT_DNS" >> "$appserver_env"
@@ -782,6 +795,7 @@ auto_setup() {
   setup_license
   update_mongo_config
   update_minio_config
+  setup_local_network
   generate_nginx_conf
   deploy_nginx_conf
   copy_ssl_configs
@@ -828,18 +842,18 @@ main_menu() {
  [9]  Setup License Key
 [10]  Update MongoDB configuration
 [11]  Update MinIO configuration
-[12]  Generate Nginx configs
-[13]  Deploy Nginx configs
-[14]  Copy SSL configs and generate DH params
-[15]  Setup SSL certificates
-[16]  Activate Nginx sites
-[17]  Prepare .env files
-[18]  Login to Yandex registry
-[19]  Start UnicChat containers
-[20]  Update MongoDB Site_Url
-[21]  Prepare knowledge base
-[22]  Deploy knowledge base services
-[23]  🔗 Link Knowledgebase with UnicChat
+[12]  Setup local network (/etc/hosts)
+[13]  Generate Nginx configs
+[14]  Deploy Nginx configs
+[15]  Copy SSL configs and generate DH params
+[16]  Setup SSL certificates
+[17]  Activate Nginx sites
+[18]  Prepare .env files
+[19]  Login to Yandex registry
+[20]  Start UnicChat containers
+[21]  Update MongoDB Site_Url
+[22]  Prepare knowledge base
+[23]  Deploy knowledge base services
 [99]  🚀 Full automatic setup (with knowledge base)
  [0]  Exit
 MENU
@@ -856,17 +870,18 @@ MENU
       9) setup_license ;;
      10) update_mongo_config ;;
      11) update_minio_config ;;
-     12) generate_nginx_conf ;;
-     13) deploy_nginx_conf ;;
-     14) copy_ssl_configs ;;
-     15) setup_ssl ;;
-     16) activate_nginx ;;
-     17) prepare_unicchat ;;
-     18) login_yandex ;;
-     19) start_unicchat ;;
-     20) update_site_url ;;
-     21) prepare_knowledgebase ;;
-     22) deploy_knowledgebase ;;
+     12) setup_local_network ;;
+     13) generate_nginx_conf ;;
+     14) deploy_nginx_conf ;;
+     15) copy_ssl_configs ;;
+     16) setup_ssl ;;
+     17) activate_nginx ;;
+     18) prepare_unicchat ;;
+     19) login_yandex ;;
+     20) start_unicchat ;;
+     21) update_site_url ;;
+     22) prepare_knowledgebase ;;
+     23) deploy_knowledgebase ;;
      99) auto_setup ;;
       0) echo "👋 Goodbye!" && break ;;
       *) echo "❓ Invalid option." ;;
