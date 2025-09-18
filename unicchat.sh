@@ -768,6 +768,97 @@ deploy_knowledgebase() {
   echo "✅ Knowledge base services deployed"
 }
 
+
+cleanup_docker() {
+    echo -e "\n🐳 Removing Docker completely...\n"
+    
+    # Удалить все Docker ресурсы
+    if command -v docker &>/dev/null; then
+        echo "🗑️ Cleaning up Docker resources..."
+        docker rm -f $(docker ps -aq) 2>/dev/null || true
+        docker rmi -f $(docker images -q) 2>/dev/null || true
+        docker volume rm -f $(docker volume ls -q) 2>/dev/null || true
+        docker network rm $(docker network ls -q) 2>/dev/null || true
+        docker system prune -af --volumes --force 2>/dev/null || true
+    fi
+    
+    # Удалить Docker пакеты
+    echo "📦 Removing Docker packages..."
+    apt remove -y --purge docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose 2>/dev/null || true
+    
+    # Удалить конфиги
+    echo "🗂️ Removing Docker configuration..."
+    rm -rf /var/lib/docker /etc/docker 2>/dev/null || true
+    rm -f /etc/apt/sources.list.d/docker.list 2>/dev/null || true
+    rm -f /etc/apt/keyrings/docker.gpg 2>/dev/null || true
+    
+    # Очистка
+    apt autoremove -y 2>/dev/null || true
+    apt clean 2>/dev/null || true
+    
+    echo -e "\n✅ Docker completely removed from system!"
+}
+
+cleanup_nginx() {
+    echo -e "\n🗑️ Removing Nginx...\n"
+    systemctl stop nginx 2>/dev/null || true
+    apt remove -y --purge nginx* 2>/dev/null || true
+    rm -rf /etc/nginx /var/log/nginx 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+    echo "✅ Nginx removed!"
+}
+
+cleanup_ssl() {
+    echo "Removing SSL certificates and Certbot..."
+    apt remove -y --purge certbot 2>/dev/null || true
+    rm -rf /etc/letsencrypt 2>/dev/null || true
+    echo "✅ SSL removed!"
+}
+
+cleanup_git() {
+    echo -e "\n📦 Removing Git...\n"
+    apt remove -y --purge git 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+    echo "✅ Git completely removed!"
+}
+
+cleanup_dns_utils() {
+    echo -e "\n🔍 Removing DNS utilities...\n"
+    apt remove -y --purge dnsutils 2>/dev/null || true
+    apt autoremove -y 2>/dev/null || true
+    echo "✅ DNS utilities completely removed!"
+}
+
+cleanup_minio_client() {
+    echo -e "\n📦 Removing MinIO client...\n"
+    rm -f /usr/local/bin/mc 2>/dev/null || true
+    echo "✅ MinIO client completely removed!"
+}
+
+cleanup_utilities() {
+    echo -e "\n🗑️ Removing all installed utilities...\n"
+    
+    # Временно отключаем set -e для этой функции
+    set +e
+    
+    # Вызов всех отдельных функций очистки
+    cleanup_docker
+    cleanup_nginx
+    cleanup_ssl
+    cleanup_git
+    cleanup_dns_utils
+    cleanup_minio_client
+    
+    # Дополнительно: удалить сгенерированные конфиги
+    echo "🗑️ Removing unicchat.enterprise"
+    rm -rf "unicchat.enterprise/" 2>/dev/null || true
+    
+    # Восстанавливаем set -e
+    set -e
+    
+    echo -e "\n✅ All utilities completely removed!"
+}
+
 auto_setup() {
   echo -e "\n⚙️ Running full automatic setup…"
   install_docker
@@ -839,6 +930,7 @@ main_menu() {
 [21]  Update MongoDB Site_Url
 [22]  Deploy knowledge base services
 [99]  🚀 Full automatic setup (with knowledge base)
+[100] Remove all
  [0]  Exit
 MENU
     read -rp "👉 Select an option: " choice
@@ -866,6 +958,7 @@ MENU
      21) update_site_url ;;
      22) deploy_knowledgebase ;;
      99) auto_setup ;;
+    100) cleanup_utilities ;;
       0) echo "👋 Goodbye!" && break ;;
       *) echo "❓ Invalid option." ;;
     esac
