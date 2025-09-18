@@ -738,6 +738,26 @@ update_site_url() {
     return 1
   fi
   
+  # Проверка готовности через while
+  echo "⏳ Waiting for MongoDB to be ready (max 60 seconds)..."
+  local wait_time=0
+  
+  while [ $wait_time -lt 60 ]; do
+    if docker exec "$container" mongosh -u root -p "$MONGODB_ROOT_PASSWORD" --quiet --eval "db.adminCommand('ping')" 2>/dev/null | grep -q '"ok" : 1'; then
+      echo "✅ MongoDB is ready!"
+      break
+    fi
+    
+    sleep 2
+    wait_time=$((wait_time + 2))
+    echo "⏳ Elapsed time: ${wait_time}s"
+  done
+  
+  if [ $wait_time -ge 60 ]; then
+    echo "❌ MongoDB did not become ready after 60 seconds"
+    return 1
+  fi
+  
   local url="https://$APP_DNS"
   
   echo "🔄 Updating Site_Url to: $url"
@@ -749,7 +769,6 @@ update_site_url() {
   
   echo "✅ Site_Url updated successfully in database: $MONGODB_DATABASE"
 }
-
 prepare_knowledgebase() {
   echo -e "\n📚 Preparing knowledge base deployment…"
   local kb_dir="unicchat.enterprise/knowledgebase"
