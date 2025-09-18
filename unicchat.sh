@@ -712,7 +712,7 @@ start_unicchat() {
   local dir="unicchat.enterprise/multi-server-install"
   docker network inspect unicchat-backend >/dev/null 2>&1 || docker network create unicchat-backend
   docker network inspect unicchat-frontend >/dev/null 2>&1 || docker network create unicchat-frontend
-  (cd "$dir" && docker_compose -f mongodb.yml -f unic.chat.appserver.yml -f unic.chat.solid.yml  up -d)
+  (cd "$dir" && docker_compose -f mongodb.yml -f unic.chat.appserver.yml -f unic.chat.solid.yml up -d --wait)
   echo "✅ Services started."
 }
 
