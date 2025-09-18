@@ -109,7 +109,7 @@ MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD
 EOF
   
   cd "$BASE_DIR/minio"
-  docker compose up -d
+  docker compose up -d --wait
   
   # Create bucket
   sleep 10
@@ -143,7 +143,7 @@ USE_UNAUTHORIZED_STORAGE=$USE_UNAUTHORIZED_STORAGE
 EOF
   
   cd "$BASE_DIR/Docker-DocumentServer"
-  docker compose up -d
+  docker compose up -d --wait
   log "✅ DocumentServer развернут. Доступ: http://$ONLYOFFICE_DNS"
 }
 
