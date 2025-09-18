@@ -759,6 +759,9 @@ deploy_knowledgebase() {
     return 1
   fi
   
+  # Делаем скрипт исполняемым
+  chmod +x "$kb_dir/deploy_knowledgebase.sh"
+  
   echo "📦 Running knowledge base deployment..."
   (cd "$kb_dir" && ./deploy_knowledgebase.sh --auto)
   
@@ -788,7 +791,6 @@ auto_setup() {
   login_yandex
   start_unicchat
   update_site_url
-  prepare_knowledgebase
   deploy_knowledgebase
   echo -e "\n🎉 UnicChat setup complete! (including knowledge base)"
 }
@@ -835,8 +837,7 @@ main_menu() {
 [19]  Login to Yandex registry
 [20]  Start UnicChat containers
 [21]  Update MongoDB Site_Url
-[22]  Prepare knowledge base
-[23]  Deploy knowledge base services
+[22]  Deploy knowledge base services
 [99]  🚀 Full automatic setup (with knowledge base)
  [0]  Exit
 MENU
@@ -863,8 +864,7 @@ MENU
      19) login_yandex ;;
      20) start_unicchat ;;
      21) update_site_url ;;
-     22) prepare_knowledgebase ;;
-     23) deploy_knowledgebase ;;
+     22) deploy_knowledgebase ;;
      99) auto_setup ;;
       0) echo "👋 Goodbye!" && break ;;
       *) echo "❓ Invalid option." ;;
