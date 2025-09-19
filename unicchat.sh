@@ -670,7 +670,7 @@ update_appserver_env() {
   source "$DNS_CONFIG"
   
   # Removed ROOT_URL modification as requested
-  # sed -i "s|ROOT_URL=.*|ROOT_URL=https://$APP_DNS|" "$appserver_env"
+  sed -i "s|ROOT_URL=.*|ROOT_URL=https://$APP_DNS|" "$appserver_env"
   
   if ! grep -q "DOCUMENT_SERVER_HOST" "$appserver_env"; then
     echo "DOCUMENT_SERVER_HOST=https://$EDT_DNS" >> "$appserver_env"
@@ -951,7 +951,7 @@ auto_setup() {
   prepare_unicchat
   login_yandex
   start_unicchat
-  update_site_url
+#  update_site_url
   deploy_knowledgebase
   echo -e "\n🎉 UnicChat setup complete! (including knowledge base)"
 }
@@ -997,7 +997,7 @@ main_menu() {
 [18]  Prepare .env files
 [19]  Login to Yandex registry
 [20]  Start UnicChat containers
-[21]  Update MongoDB Site_Url
+
 [22]  Deploy knowledge base services
 [99]  🚀 Full automatic setup (with knowledge base)
 [100] Remove all
@@ -1025,7 +1025,7 @@ MENU
      18) prepare_unicchat ;;
      19) login_yandex ;;
      20) start_unicchat ;;
-     21) update_site_url ;;
+ #    21) update_site_url ;;
      22) deploy_knowledgebase ;;
      99) auto_setup ;;
     100) cleanup_utilities ;;
