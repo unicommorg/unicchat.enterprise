@@ -750,7 +750,7 @@ update_site_url() {
   check_current_value() {
     local field=$1
     docker exec "$container" mongosh -u root -p "$MONGODB_ROOT_PASSWORD" --quiet --eval "
-      db.getSiblingDB('$MONGODB_DATABASE').rocketchat_settings.findOne(
+      db.getSiblingDB('$MONGODB_DATABASE').unicchat_settings.findOne(
         {_id: 'Site_Url'}, 
         {'$field': 1}
       ).$field
@@ -791,14 +791,14 @@ update_site_url() {
   
   # Обновляем value поле
   attempt=1
-  update_command_value="db.getSiblingDB('$MONGODB_DATABASE').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{value:'$url'}})"
+  update_command_value="db.getSiblingDB('$MONGODB_DATABASE').unicchat_settings.updateOne({_id:'Site_Url'},{\$set:{value:'$url'}})"
   if ! update_with_retry "value" "$update_command_value"; then
     return 1
   fi
   
   # Обновляем packageValue поле
   attempt=1
-  update_command_package="db.getSiblingDB('$MONGODB_DATABASE').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{packageValue:'$url'}})"
+  update_command_package="db.getSiblingDB('$MONGODB_DATABASE').unicchat_settings.updateOne({_id:'Site_Url'},{\$set:{packageValue:'$url'}})"
   if ! update_with_retry "packageValue" "$update_command_package"; then
     return 1
   fi
