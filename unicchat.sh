@@ -719,6 +719,9 @@ start_unicchat() {
 update_site_url() {
   echo -e "\n📝 Updating Site_Url in MongoDB…"
   local container="unic.chat.db.mongo"
+  local max_attempts=5
+  local attempt=1
+  local delay=2
   
   if [ ! -f "$DNS_CONFIG" ]; then
     echo "❌ DNS configuration not found. Run step 5 first."
@@ -743,13 +746,80 @@ update_site_url() {
   echo "🔄 Updating Site_Url to: $url"
   echo "📊 Using database: $MONGODB_DATABASE"
   
-  docker exec "$container" mongosh -u root -p "$MONGODB_ROOT_PASSWORD" --quiet --eval "db.getSiblingDB('$MONGODB_DATABASE').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{value:'$url'}})"
+  # Функция для проверки текущего значения
+  check_current_value() {
+    local field=$1
+    docker exec "$container" mongosh -u root -p "$MONGODB_ROOT_PASSWORD" --quiet --eval "
+      db.getSiblingDB('$MONGODB_DATABASE').rocketchat_settings.findOne(
+        {_id: 'Site_Url'}, 
+        {'$field': 1}
+      ).$field
+    " 2>/dev/null
+  }
   
-  docker exec "$container" mongosh -u root -p "$MONGODB_ROOT_PASSWORD" --quiet --eval "db.getSiblingDB('$MONGODB_DATABASE').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{packageValue:'$url'}})"
+  # Функция для обновления значения с проверкой
+  update_with_retry() {
+    local field=$1
+    local update_command=$2
+    local current_value=""
+    
+    while [ $attempt -le $max_attempts ]; do
+      echo "🔄 Attempt $attempt/$max_attempts to update $field..."
+      
+      # Выполняем обновление
+      docker exec "$container" mongosh -u root -p "$MONGODB_ROOT_PASSWORD" --quiet --eval "$update_command" >/dev/null 2>&1
+      
+      # Даем время на применение изменений
+      sleep $delay
+      
+      # Проверяем текущее значение
+      current_value=$(check_current_value "$field")
+      
+      if [ "$current_value" = "$url" ]; then
+        echo "✅ $field successfully updated to: $url"
+        return 0
+      else
+        echo "⚠️  $field not updated yet. Current value: '$current_value', Expected: '$url'"
+        attempt=$((attempt + 1))
+        sleep $delay
+      fi
+    done
+    
+    echo "❌ Failed to update $field after $max_attempts attempts"
+    return 1
+  }
   
-  echo "✅ Site_Url updated successfully in database: $MONGODB_DATABASE"
+  # Обновляем value поле
+  attempt=1
+  update_command_value="db.getSiblingDB('$MONGODB_DATABASE').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{value:'$url'}})"
+  if ! update_with_retry "value" "$update_command_value"; then
+    return 1
+  fi
+  
+  # Обновляем packageValue поле
+  attempt=1
+  update_command_package="db.getSiblingDB('$MONGODB_DATABASE').rocketchat_settings.updateOne({_id:'Site_Url'},{\$set:{packageValue:'$url'}})"
+  if ! update_with_retry "packageValue" "$update_command_package"; then
+    return 1
+  fi
+  
+  # Финальная проверка обоих полей
+  echo "🔍 Final verification..."
+  final_value=$(check_current_value "value")
+  final_package=$(check_current_value "packageValue")
+  
+  if [ "$final_value" = "$url" ] && [ "$final_package" = "$url" ]; then
+    echo "✅ Site_Url updated successfully in database: $MONGODB_DATABASE"
+    echo "   value: $final_value"
+    echo "   packageValue: $final_package"
+    return 0
+  else
+    echo "❌ Final verification failed:"
+    echo "   value: '$final_value' (expected: '$url')"
+    echo "   packageValue: '$final_package' (expected: '$url')"
+    return 1
+  fi
 }
-
 deploy_knowledgebase() {
   echo -e "\n🚀 Deploying knowledge base services…"
   local kb_dir="unicchat.enterprise/knowledgebase"
