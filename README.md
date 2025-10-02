@@ -312,8 +312,8 @@ show users
 version: "3"
 services:
   unic.chat.free:
-    container_name: unic.chat.appserver.free
-    image: index.docker.io/unicommhub/unicchat_free:prod.6-1.4.2
+    container_name: unic.chat.appserver
+    image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.1.76
     restart: on-failure
     environment:
       - MONGO_URL=mongodb://ucusername:ucpassword@mongodb:27017/db_name?replicaSet=rs0
@@ -321,26 +321,21 @@ services:
       - ROOT_URL=http://localhost:8080
       - PORT=8080
       - DEPLOY_METHOD=docker
-      - UNIC_SOLID_HOST=http://ucserver:8881
     ports:
-      # указать свой порт, на котором будет доступен сервер UnicChat
-      - "port:8080"
+      # указать свой порт на котором будет доступен сервер UnicChat
+      - "8080:8080"
     networks:
       - unic-chat-free
 
   uc.media.score:
-    image: unicommhub/unicchat_free:sc-1.4.1
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid:1.4.2
     container_name: uc.score
     restart: unless-stopped
+    network_mode: "host"
     environment:
       - UniComm.Config=/app/sc.config.json
-    ports:
-      - "8881:80"
-      - "4443:443"
     volumes:
       - ./config/sc.config.json:/app/sc.config.json
-    networks:
-      - unic-chat-free
 
 networks:
   unic-chat-free:
@@ -606,7 +601,7 @@ cookie браузера, ctrl+R или использовать безопасн
     * 443/TCP, на хост **push1.unic.chat**;
 
 * Открыть доступ для ВКС сервера:
-    * 443/TCP, на хост **live.unic.chat**;
+    * 443/TCP, на хост **lk-yc.unic.chat**;
     * 7881/TCP, 7882/UDP
     * (50000 - 60000)/UDP (диапазон этих портов может быть измененён при развертывании лицензионной версии
       непосредственно владельцем лицензии)
