@@ -2,7 +2,7 @@ version: "3"
 services:
   unic.chat.free:
     container_name: unic.chat.appserver
-    image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.1.76
+    image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.1.76-4
     restart: on-failure
     environment:
       - MONGO_URL=mongodb://<username>:<password>@mongodb:27017/<database>?replicaSet=rs0
@@ -30,5 +30,6 @@ networks:
 volumes:
   chat_data:
     driver: local
+
 
 
