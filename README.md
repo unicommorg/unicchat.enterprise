@@ -775,7 +775,65 @@ MINIO_ROOT_PASSWORD
 docker-compose -f  multi_server_install/unic.chat.appserver.yml down && docker-compose -f multi_server_install/unic.chat.appserver.yml up -d
 ```
 
- 
+#### Шаг 10. Настройка vault
+
+##### 10.1 Создание базы данных для Vault
+Перед установкой Vault необходимо создать базу данных в MongoDB:
+
+ Подключитесь к вашему серверу MongoDB  через root
+ Создайте базу данных для Vault:
+```javascript
+use vault_db
+```
+Создайте пользователя с правами на базу данных:
+```javascript
+db.createUser({
+  user: "vault_user",
+  pwd: "your_secure_password",
+  roles: [
+    { role: "readWrite", db: "vault_db" },
+    { role: "readWrite", db: "admin" }  // или другая база для аутентификации
+  ]
+})
+```
+##### 10.2 Создание переменной для  Vault
+Перейдите в  директорию vault
+``` shell
+cd ../vault
+```
+Создайте файл `.env` с переменными окружения:
+
+```bash
+# Замените значения на ваши реальные данные:
+# username - имя пользователя MongoDB
+# password - пароль пользователя
+# 192.X.X.X - IP-адрес сервера MongoDB
+# dbname - имя базы данных для Vault
+# authdbname - база данных для аутентификации
+
+MongoCS="mongodb://username:password@192.X.X.X/dbname?directConnection=true&authSource=authdbname&authMechanism=SCRAM-SHA-1"
+```
+##### 10.3 Запуск vault
+``` shell
+docker compose -f  vault.yml up -d
+```
+Для проверки откройте в браузере  http://localhost:8200/swagger/index.html
+#### 11 Нвстройка бота для Redmine
+Перейдите в директорию unicchatbotredmine
+``` shell
+cd ../unicchatbotredmine
+```
+В redminebot.yml  замените vault на внутренний адрес вашего сервера.
+ ``` 
+  - Vault__Host=http://vault:8200
+```
+Запустите бота
+
+``` shell
+docker compose -f  redminebot.yml up -d
+```
+
+
 <!-- TOC --><a name="--11"></a>
 #### Частые проблемы при установке
 
