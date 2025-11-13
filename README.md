@@ -66,8 +66,13 @@
          - [9.6.1 Редактирование env файла](#961-env-)
          - [9.6.2 Пересоздание сервиса unic.chat.solid](#962-unicchatsolid)
       + [9.7 Редактирование сервиса unic.chat.appserver](#97-unicchatappserver)
-         - [9.7.1 Добавление переменной окружения DOCUMENT_SERVER_HOST](#971-onlyoffice_host)
+         - [9.7.1 Добавление переменной окружения ONLYOFFICE_HOST ](#971-onlyoffice_host)
          - [9.7.2 Пересоздание сервиса unic.chat.appserver](#972-unicchatappserver)
+      + [Шаг 10. Настройка vault](#-10-vault)
+         - [10.1 Создание базы данных для Vault](#101-vault)
+         - [10.2 Создание переменной для  Vault](#102-vault)
+         - [10.3 Запуск vault](#103-vault)
+      + [11 Нвстройка бота для Redmine](#11-redmine)
       + [Частые проблемы при установке](#--11)
       + [Клиентские приложения](#--12)
       + [Частые проблемы при установке](#--13)
@@ -775,8 +780,10 @@ MINIO_ROOT_PASSWORD
 docker-compose -f  multi_server_install/unic.chat.appserver.yml down && docker-compose -f multi_server_install/unic.chat.appserver.yml up -d
 ```
 
+<!-- TOC --><a name="-10-vault"></a>
 #### Шаг 10. Настройка vault
 
+<!-- TOC --><a name="101-vault"></a>
 ##### 10.1 Создание базы данных для Vault
 Перед установкой Vault необходимо создать базу данных в MongoDB:
 
@@ -796,6 +803,7 @@ db.createUser({
   ]
 })
 ```
+<!-- TOC --><a name="102-vault"></a>
 ##### 10.2 Создание переменной для  Vault
 Перейдите в  директорию vault
 ``` shell
@@ -813,11 +821,13 @@ cd ../vault
 
 MongoCS="mongodb://username:password@192.X.X.X/dbname?directConnection=true&authSource=authdbname&authMechanism=SCRAM-SHA-1"
 ```
+<!-- TOC --><a name="103-vault"></a>
 ##### 10.3 Запуск vault
 ``` shell
 docker compose -f  vault.yml up -d
 ```
 Для проверки откройте в браузере  http://localhost:8200/swagger/index.html
+<!-- TOC --><a name="11-redmine"></a>
 #### 11 Нвстройка бота для Redmine
 Перейдите в директорию unicchatbotredmine
 ``` shell
