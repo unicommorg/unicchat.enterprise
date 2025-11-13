@@ -1,0 +1,19 @@
+
+version: "3.7"
+
+networks:
+  unicchat-frontend:  # Замените на сеть, которую использует контейнер cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver
+    driver: bridge
+    external: true
+
+services:
+  ucredminebot:
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatbotredmine:latest
+    container_name: ucredminebot
+    ports:
+      - 8201:8080
+    environment:
+      - Vault__Host=http://vault:8200  # Замените vault на IP вашего сервера Vault
+    restart: always
+    networks:
+      - unicchat-frontend  # Замените на сеть frontend приложения
