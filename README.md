@@ -66,7 +66,7 @@
          - [9.6.1 Редактирование env файла](#961-env-)
          - [9.6.2 Пересоздание сервиса unic.chat.solid](#962-unicchatsolid)
       + [9.7 Редактирование сервиса unic.chat.appserver](#97-unicchatappserver)
-         - [9.7.1 Добавление переменной окружения ONLYOFFICE_HOST ](#971-onlyoffice_host)
+         - [9.7.1 Добавление переменной окружения DOCUMENT_SERVER_HOST](#971-onlyoffice_host)
          - [9.7.2 Пересоздание сервиса unic.chat.appserver](#972-unicchatappserver)
       + [Частые проблемы при установке](#--11)
       + [Клиентские приложения](#--12)
