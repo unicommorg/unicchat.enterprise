@@ -836,14 +836,24 @@ cd ../multi-server-install/
 nano unic.chat.appserver.yml
 ```
 
-Добавьте  переменные окружения 
+Добавьте  переменные окружения в envirioment
 ``` yml
-unic.chat.appserver
-#---
-environment:
-#---
-- VAULT__HOST=http://internal_IP:8200
-- REDMINE_BOT_HOST=http://internal_IP:8201
+version: "3"
+services:
+  unic.chat.appserver:
+    container_name: unic.chat.appserver
+    image: 
+    restart: 
+    volumes:
+      - chat_data:/app/uploads
+    ports:
+      - "8080:3000"
+    envirioment:
+	# ---
+      - VAULT__HOST=http://internal_IP:8200
+      - REDMINE_BOT_HOST=http://internal_IP:8201
+    networks:
+      - unicchat-frontend
 ```
 Перехапустите unic.chat.appserver
 ```
