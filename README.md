@@ -812,11 +812,37 @@ docker compose -f vault.yml up -d
 cd ../redminebot
 ```
 
+Обратите внимание на переменную окружения Vault__Host
+Возможные способы подключения
+ 
+* Vault__Host=http://vault:80  # по иени сервиса и внуреннему порту vault. В случае если они на одном сервере
+* Vault__Host=http://internal_IP:8200 # по внутреннему адресу сервера на котором крутиться vault. пример 10.0.X.X 192.1.X.X
+* Vault__Host=http://domainname:8200 # по  доменному имени и порту. Если 
+ 
+  
+
+
 Запустите redminebot.yml
 ```bash
 docker compose  -f redminebot.yml  up -d
 ```
 
+10. Подключение к unicchat к redminebot и vault
+Перейдите в директорию с unicchat
+```
+cd ../multi-server-install/
+```
+```
+nano unic.chat.appserver.yml
+```
+
+Добавьте  переменные окружения 
+unic.chat.appserver
+#---
+environment:
+#---
+- VAULT__HOST=http://internal_IP:8200
+- REDMINE_BOT_HOST=http://internal_IP:8201
 <!-- TOC --><a name="--19"></a>
 ### Важные замечания
 
