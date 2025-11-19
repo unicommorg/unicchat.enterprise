@@ -843,6 +843,11 @@ environment:
 #---
 - VAULT__HOST=http://internal_IP:8200
 - REDMINE_BOT_HOST=http://internal_IP:8201
+
+Перехапустите unic.chat.appserver
+```
+docker compose -f unic.chat.appserver.yml up -d
+```
 <!-- TOC --><a name="--19"></a>
 ### Важные замечания
 
