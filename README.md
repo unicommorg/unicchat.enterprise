@@ -837,13 +837,14 @@ nano unic.chat.appserver.yml
 ```
 
 Добавьте  переменные окружения 
+``` yml
 unic.chat.appserver
 #---
 environment:
 #---
 - VAULT__HOST=http://internal_IP:8200
 - REDMINE_BOT_HOST=http://internal_IP:8201
-
+```
 Перехапустите unic.chat.appserver
 ```
 docker compose -f unic.chat.appserver.yml up -d
