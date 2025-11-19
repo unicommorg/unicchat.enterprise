@@ -6,20 +6,8 @@ services:
     depends_on:
       - onlyoffice-postgresql
       - onlyoffice-rabbitmq
-    environment:
-      - DB_TYPE=postgres
-      - DB_HOST=onlyoffice-postgresql
-      - DB_PORT=5432
-      - DB_NAME=dbname
-      - DB_USER=dbuser
-      - WOPI_ENABLED=true
-      - AMQP_URI=amqp://guest:guest@onlyoffice-rabbitmq
-      # Uncomment strings below to enable the JSON Web Token validation.
-      - JWT_ENABLED=false
-      - ALLOW_PRIVATE_IP_ADDRESS=true
-      - ALLOW_META_IP_ADDRESS=true
-      - USE_UNAUTHORIZED_STORAGE=true
-
+    env_file:
+      - ./onlyoffice_env.env
     ports:
       - '8880:80'
       - '8443:443'
@@ -27,11 +15,11 @@ services:
     restart: always
     stop_grace_period: 60s
     volumes:
-       - /var/www/onlyoffice/Data
-       - /var/log/onlyoffice
-       - /var/lib/onlyoffice/documentserver/App_Data/cache/files
-       - /var/www/onlyoffice/documentserver-example/public/files
-       - /usr/share/fonts
+      - /var/www/onlyoffice/Data
+      - /var/log/onlyoffice
+      - /var/lib/onlyoffice/documentserver/App_Data/cache/files
+      - /var/www/onlyoffice/documentserver-example/public/files
+      - /usr/share/fonts
 
   onlyoffice-rabbitmq:
     container_name: onlyoffice-rabbitmq
