@@ -200,6 +200,13 @@ sudo docker login \
 git clone https://github.com/unicommorg/unicchat.enterprise.git
 ```
 
+
+
+
+
+
+
+
 <!-- TOC --><a name="-2-nginx"></a>
 ### Шаг 2. Настройка NGINX
 
@@ -586,6 +593,11 @@ db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'htt
 ### Шаг 7. Настройка push-уведомлений
 
 Приложение Unicchat работает с внешним push сервером для доставки push-уведомлений в приложение Unicchat на мобильные устройства.
+
+
+### Шаг 8. Настройка vault
+  
+### Шаг 9. Настройка redminebot
 
 
 <!-- TOC --><a name="--7"></a>
