@@ -10,22 +10,13 @@ fi
 # Считываем переменные из файла .env
 export $(grep -v '^#' .env | xargs)
 
-# Проверяем, что переменные заданы
+# Проверяем, что переменная DIR задана
 if [ -z "$VCS_URL" ] && [ -z "$VCS_TURN_URL" ] && [ -z "$VCS_WHIP_URL" ]; then
-  echo "Переменные окружения VCS_URL | VCS_WHIP_URL | VCS_TURN_URL не заданы в .env!"
+  echo "Переменная окружения VCS_URL | VCS_WHIP_URL | VCS_TURN_URL не задана в .env!"
   exit 1
 fi
 
-# Получаем IP адрес для VCS_URL
-if [ -n "$VCS_URL" ]; then
-    VCS_IP=$(dig +short "$VCS_URL" A | head -n1)
-    if [ -z "$VCS_IP" ]; then
-        echo "Не удалось resolve IP адрес для $VCS_URL"
-        exit 1
-    fi
-    export LIVEKIT_IP=$VCS_IP
-    echo "Resolved IP для $VCS_URL: $VCS_IP"
-fi
+
 
 # create directories for vcs
 mkdir -p ./unicomm-vcs/caddy_data
@@ -117,6 +108,7 @@ apps:
 #                upstreams:
 #                  - dial: ["localhost:8080"]
 
+
 EOF
 
 # update ip script
@@ -125,9 +117,10 @@ cat << "EOF" > ./unicomm-vcs/update_ip.sh
 ip=`ip addr show |grep "inet " |grep -v 127.0.0. |head -1|cut -d" " -f6|cut -d/ -f1`
 sed -i.orig -r "s/\\\"(.+)(\:5349)/\\\"$ip\2/" ./unicomm-vcs/caddy.yaml
 
+
 EOF
 
-# docker compose - ИСПРАВЛЕННАЯ ЧАСТЬ
+# docker compose
 cat << EOF > ./unicomm-vcs/docker-compose.yaml
 # This docker-compose requires host networking, which is only available on Linux
 # This compose will not function correctly on Mac or Windows
@@ -147,9 +140,6 @@ services:
     network_mode: "host"
     volumes:
       - ./vcs.yaml:/etc/livekit.yaml
-    environment:
-      - LIVEKIT_IP=$VCS_IP
-
   redis:
     image: redis:7.4.1-alpine
     command: redis-server /etc/redis.conf
@@ -178,8 +168,8 @@ port 6379
 timeout 0
 tcp-keepalive 300
 
-EOF
 
+EOF
 # egress config
 cat << EOF > ./unicomm-vcs/egress.yaml
 redis:
@@ -200,8 +190,7 @@ ws_url: wss://$VCS_URL
 
 EOF
 
+
 chmod a+x ./unicomm-vcs/update_ip.sh
 ./unicomm-vcs/update_ip.sh
 
-echo "Конфигурация успешно создана!"
-echo "Для запуска выполните: cd ./unicomm-vcs && docker-compose up -d"
