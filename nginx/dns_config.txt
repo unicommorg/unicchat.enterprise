@@ -1,0 +1,3 @@
+APP_DNS="myapp.unic.chat"
+EDT_DNS="docs.unic.chat"
+MINIO_DNS="myminio.unic.chat"

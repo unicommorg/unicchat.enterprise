@@ -1,0 +1,22 @@
+# MinIO variables
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=rootpassword
+
+# OnlyOffice variables
+DB_TYPE=postgres
+DB_HOST=onlyoffice-postgresql
+DB_PORT=5432
+DB_NAME=dbname
+DB_USER=dbuser
+WOPI_ENABLED=true
+AMQP_URI=amqp://guest:guest@onlyoffice-rabbitmq
+JWT_ENABLED=false
+ALLOW_PRIVATE_IP_ADDRESS=true
+ALLOW_META_IP_ADDRESS=true
+USE_UNAUTHORIZED_STORAGE=true
+
+# DNS and IP variables
+MINIO_DNS=myminio.unic.chat
+ONLYOFFICE_DNS=myonlyoffice.unic.chat
+
+LOCAL_IP=$(hostname -I | awk '{print $1}')
