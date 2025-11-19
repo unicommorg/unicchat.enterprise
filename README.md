@@ -596,8 +596,63 @@ db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'htt
 
 
 ### Шаг 8. Настройка vault
-  
+8.1. Подключитесь к mongodb c root правами
+``` shell
+docker exec -it unic.chat.db.mongo mongosh -u root -p "$MONGODB_ROOT_PASSWORD"
+```
+
+8.2. Создайте базу данных для Vault:
+```javascript
+use vault_db
+```
+8.3. Создайте пользователя с правами на базу данных:
+```javascript
+db.createUser({
+  user: "vault_user",
+  pwd: "your_secure_password",
+  roles: [
+    { role: "readWrite", db: "vault_db" },
+    { role: "readWrite", db: "admin" }  // или другая база для аутентификации
+  ]
+})
+```
+8.4 Перейдите в директорию vault
+``` shell
+cd  ../vault
+```
+Создайте файл `.env` с переменными окружения:
+
+```bash
+# Замените значения на ваши реальные данные:
+# username - имя пользователя MongoDB
+# password - пароль пользователя
+# 10.0.X.X - IP-адрес сервера MongoDB
+# dbname - имя базы данных для Vault
+# authdbname - база данных для аутентификации
+
+MongoCS="mongodb://username:password@10.0.X.X/dbname?directConnection=true&authSource=authdbname&authMechanism=SCRAM-SHA-1"
+```
+Запустите vault.yml
+```bash
+docker compose -f vault.yml up -d
+```
+
 ### Шаг 9. Настройка redminebot
+Перейдите в redminebot 
+```shell
+cd ../redminebot
+```
+
+Запустите redminebot.yml
+```bash
+docker compose  -f redminebot.yml  up -d
+```
+
+#### Важные замечания
+
+- Убедитесь, что все IP-адреса и учетные данные заменены на реальные значения
+- Убедитесь, что порты 8201 и 8200 не заняты другими приложениями
+- Убедитесь, что пользователь MongoDB имеет необходимые права доступа к созданной базе данных
 
 
 <!-- TOC --><a name="--7"></a>
