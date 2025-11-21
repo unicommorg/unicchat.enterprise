@@ -1,7 +1,7 @@
 version: "3"
 services:
   uc.media.score:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid/prod:prod250421
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unicchat.solid/prod:prod251021
     container_name: unic.chat.solid
     restart: unless-stopped
     ports:
@@ -15,3 +15,4 @@ networks:
   unicchat-backend:
     driver: bridge
     external: true
+
