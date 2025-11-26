@@ -536,14 +536,14 @@ nginx: configuration file /etc/nginx/nginx.conf test is successful
 
 <!-- TOC --><a name="-3-"></a>
 ## Шаг 3. Установка локального медиа сервера для ВКС
-
+Установвка идёт на отдельном сервере от 
 <!-- TOC --><a name="31-"></a>
 ### 3.1 Порядок установки сервера
 
 Перейдите в директорию vcs.unic.chat.template.
 1. В файле `.env` указать домены на которых будет работать ВСК сервер. WHIP пока не обязателен и его можно пропустить.
 2. Запустить `./install_server.sh` (возможно, на последнюю операцию в файле нужно sudo). Перед запуском убедиться, что в директории, где запускается скрипт, есть файл `.env`. Сервер будет установлен в текущей поддиректории `./unicomm-vcs`.
-3. Если на сервере отсутствует docker, то выполнить скрипт под sudo `./install_docker.sh` (только для Ubuntu) или иным способом установить docker + compose.
+3. Если на сервере отсутствует docker, то выполнить скрипт под sudo `./install_docker.sh` (только для Ubuntu) или иным способом установить docker compose.
 4. Можно не использовать caddy, вместо этого использовать nginx. конфигурация сайтов в файле `example.sites.nginx.md`. На домены нужны HTTPS сертификаты. (плохо работает с TUNE сервером, лучше не использовать в продакш)
 5. В файле ./unicomn-vcs/egress.yaml при необходимости отредактируйте значения api_key и api_secret
 ```yml
@@ -559,7 +559,20 @@ token: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzUzNzgxOTEsImlzcyI6IkF
 <!-- TOC --><a name="32-"></a>
 ### 3.2 Проверка открытия портов
 
-1. Страница с открытыми портами: https://docs.livekit.io/home/self-hosting/ports-firewall/#ports
+
+#### Обязательные порты
+
+##### TCP порты:
+- **7880** - Основной порт для клиентских подключений
+- **7881** - Health checks и метрики (можно ограничить внутренней сетью)
+
+##### UDP порты:
+- **3478** - STUN/TURN сервер для NAT traversal
+- **50000-60000** - Диапазон для медиа трафика WebRTC
+
+##### Опциональные порты
+- **5349** - WebRTC over TLS (если нужен HTTPS для WebRTC)
+
 2. 
 ```shell
 sudo lsof -i:7880 -i:7881 -i:5349 -i:3478 -i:50879 -i:54655 -i:59763
@@ -830,7 +843,7 @@ cd ../redminebot
 docker compose  -f redminebot.yml  up -d
 ```
 
-10. Подключение к unicchat к redminebot и vault
+10. Подключение к unicchat к redminebot и unicvault
 Перейдите в директорию с unicchat
 ```
 cd ../multi-server-install/
