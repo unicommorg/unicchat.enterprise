@@ -1,3 +1,12 @@
+
+<!-- TOC --><a name="-unicchat"></a>
+# Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat
+
+версия документа 1.7
+
+<!-- TOC --><a name=""></a>
+## Оглавление
+
 <!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
 
 - [Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat](#-unicchat)
@@ -76,14 +85,6 @@
 
 
 
-<!-- TOC --><a name="-unicchat"></a>
-# Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat
-
-версия документа 1.7
-
-<!-- TOC --><a name=""></a>
-## Оглавление
-
 <!-- TOC --><a name="-pdf"></a>
 ## Скачать инструкции в PDF 
 
@@ -150,6 +151,7 @@ ___
 #### LDAP сервер
 
 Используется для получения списка пользователей в системе. UnicChat может обслуживать как пользователей, заведенных в LDAP каталоге, так и внутренних пользователей в собственной базе. **Интеграция с LDAP не является обязательным условием**
+#### 
 
 <!-- TOC --><a name="-1--1"></a>
 ## Шаг 1. Подготовка окружения
@@ -292,7 +294,7 @@ chmod +x ./unicchat.sh
 | 18 | `prepare_unicchat` | Подготавливает .env файлы и линкует сервисы |
 | 19 | `login_yandex` | Логин в Yandex Container Registry |
 | 20 | `start_unicchat` | Запускает основные контейнеры UnicChat |
-| 22 | `deploy_knowledgebase` | Разворачивает сервисы базы знаний |
+| 21 | `deploy_knowledgebase` | Разворачивает сервисы базы знаний |
 
 <!-- TOC --><a name="-1"></a>
 #####  Автоматизация
@@ -761,14 +763,15 @@ db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'htt
 Приложение Unicchat работает с внешним push сервером для доставки push-уведомлений в приложение Unicchat на мобильные устройства.
 
 <!-- TOC --><a name="-8-vault"></a>
-## Шаг 8. Настройка vault
+# Опциональные компонены
+## Шаг 8. Настройка unicvault
 
 8.1. Подключитесь к mongodb c root правами
 ``` shell
 docker exec -it unic.chat.db.mongo mongosh -u root -p "$MONGODB_ROOT_PASSWORD"
 ```
 
-8.2. Создайте базу данных для Vault:
+8.2. Создайте базу данных для unicvault:
 ```javascript
 use vault_db
 ```
@@ -783,7 +786,7 @@ db.createUser({
   ]
 })
 ```
-8.4 Перейдите в директорию vault
+8.4 Перейдите в директорию unicvault
 ``` shell
 cd  ../vault
 ```
@@ -799,7 +802,7 @@ cd  ../vault
 
 MongoCS="mongodb://username:password@10.0.X.X/dbname?directConnection=true&authSource=authdbname&authMechanism=SCRAM-SHA-1"
 ```
-Запустите vault.yml
+Запустите unicvault.yml
 ```bash
 docker compose -f vault.yml up -d
 ```
