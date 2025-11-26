@@ -71,6 +71,7 @@
          - [4.4.2 Запустите Базу Знаний](#442-)
          - [4.4.3 Доступ к MinIO:](#443-minio)
          - [4.4.4 Создание bucket](#444-bucket)
+         - [4.4.5 Настройка DNS записей для проксирования](#445-dns-)
    * [Шаг 5. Установка UnicChat](#-5-unicchat)
       + [5.1 Настройка Unic.Chat](#51-unicchat)
       + [5.2 Раздать права пользователю для подключения к базе](#52-)
@@ -659,7 +660,32 @@ sudo mv mc /usr/local/bin/
 mc mb myminio/uc.onlyoffice.docs
 mc anonymous set public myminio/uc.onlyoffice.docs
 ```
+<!-- TOC --><a name="445-dns-"></a>
+#### 4.4.5 Настройка DNS записей для проксирования
 
+::: note
+**Внимание**: Для корректной работы проксирования через NGINX необходимо на серверах с сервисами `myminio.unic.chat` и `myedt.unic.chat` добавить DNS записи в файл `/etc/hosts`.
+
+**Добавьте следующие строки**:
+```bash
+10.0.XX.XX myminio.unic.chat
+10.0.XX.XX myedt.unic.chat
+```
+
+**Где**:
+- `10.0.XX.XX` — IP-адрес сервера с NGINX, на котором настроено проксирование
+- Записи указывают, что домены должны разрешаться на NGINX сервер
+
+**Команда для редактирования файла**:
+```bash
+sudo nano /etc/hosts
+```
+:::
+
+После добавления записей сохраните файл и перезапустите сетевой сервис:
+```bash
+sudo systemctl restart systemd-resolved
+```
 <!-- TOC --><a name="-5-unicchat"></a>
 ## Шаг 5. Установка UnicChat
 
