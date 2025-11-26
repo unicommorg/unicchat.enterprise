@@ -279,7 +279,7 @@ chmod +x ./unicchat.sh
 
 Скрипт представляет собой интерактивный помощник для установки и настройки UnicChat.
 
-скрипт предполагает что вы устанавливаете все компоненты на одном сервере.
+Скрипт предполагает что вы устанавливаете все компоненты на одном сервере.
 
 <!-- TOC --><a name="--8"></a>
 #### Основные функции в меню
@@ -590,10 +590,13 @@ cp minio_env.env.example  minio_env.env
 ```
 nano minio_env.env
 ```
-``` 
+
 <!-- TOC --><a name="442-"></a>
 #### 4.4.2 Запустите Базу Знаний
 
+```
+ cd ../../
+```
 ```bash
 docker compose -f knowledgebase/minio/docker-compose.yml up -d && docker compose -f knowledgebase/Docker-DocumentServer/docker-compose.yml up -d  
 ```
@@ -602,11 +605,7 @@ docker compose -f knowledgebase/minio/docker-compose.yml up -d && docker compose
 #### 4.4.3 Доступ к MinIO:
 
 http://<hostname minio>:9002
-логин и пароль указан в `knowledgebase.env` файле
-```yml
-MINIO_ROOT_USER: minioadmin
-MINIO_ROOT_PASSWORD:rootpassword
-```
+логин и пароль указан в ` minio_env.env` файле
 
 <!-- TOC --><a name="444-bucket"></a>
 #### 4.4.4 Создание bucket
@@ -651,15 +650,11 @@ mc anonymous set public myminio/uc.onlyoffice.docs
 docker network create unicchat-backend
 docker network create unicchat-frontend
 ```
-```
-
-Запустите скрипт 
-```shell
-chmod +x multi_server_install/update_multi_server_env.sh
-cd multi_server_install
-./update_multi_server_env.sh
-cd ..
-```
+3. Создайте .env файлы
+Создайте .env файлы
+* solid.env
+* appserver.env
+* mongo.env
 
 Запустите контейнеры 
 ```shell
