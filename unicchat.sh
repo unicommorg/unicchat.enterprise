@@ -997,8 +997,7 @@ main_menu() {
 [18]  Prepare .env files
 [19]  Login to Yandex registry
 [20]  Start UnicChat containers
-
-[22]  Deploy knowledge base services
+[21]  Deploy knowledge base services
 [99]  🚀 Full automatic setup (with knowledge base)
 [100] Remove all
  [0]  Exit
@@ -1026,7 +1025,7 @@ MENU
      19) login_yandex ;;
      20) start_unicchat ;;
  #    21) update_site_url ;;
-     22) deploy_knowledgebase ;;
+     21) deploy_knowledgebase ;;
      99) auto_setup ;;
     100) cleanup_utilities ;;
       0) echo "👋 Goodbye!" && break ;;
