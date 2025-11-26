@@ -595,26 +595,6 @@ telnet `internal_IP` 7880 # 7880 7881 5349
 <!-- TOC --><a name="441-"></a>
 #### 4.4.1 Создание перемееных окружения для Базы Знаний
 
-В файле `knowledgebase.env` 
-По своему желанию вы можете изменить значения переменных, или не менять их.
-Запомните значения MINIO_ROOT_USER и MINIO_ROOT_PASSWORD,  они необходимы для настройки интеграции `Базы Знаний` и `UnicChat`.
-
-```yml
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=rootpassword
-DB_NAME=dbname
-DB_USER=dbuser
-```
-``` shell
-nano knowledgebase/knowledgebase.env
-```
-
-Запустите скрипт update_knowledgebase_env.sh
-``` shell
-cd knowledgebase
-chmod  +x update_knowledgebase_env.sh
-./update_knowledgebase_env.sh
-cd ..
 ``` 
 <!-- TOC --><a name="442-"></a>
 #### 4.4.2 Запустите Базу Знаний
@@ -671,17 +651,11 @@ mc anonymous set public myminio/uc.onlyoffice.docs
 1. [Linux] На сервере БД выполните команду `grep avx /proc/cpuinfo`. Если в ответе вы не видите AVX, то вам лучше выбрать версию mongodb < 5.х, например, 4.4
  если AVX на вашем сервере поддерживается, рекомендуется выбрать версию mongodb > 5.х.
 2. ВАЖНО! Если вы планируете запустить БД и сервер UnicChat на разных виртуальных серверах, то в параметрах `MONGODB_INITIAL_PRIMARY_HOST` и `MONGODB_ADVERTISED_HOSTNAME` вам нужно указать адрес (DNS или IP) вашего сервера, где запускается БД.
-3. Если же установка планируется на одной машине, создайте вначале сети в которые будут подключаться контейнеры приложения и БД
-unicchat-backend для unic.chat.solid и unic.chat.db.mongo
-nicchat-frontend для unic.chat.appserver и unic.chat.db.mongo
+
 ```shell
 docker network create unicchat-backend
 docker network create unicchat-frontend
 ```
-4. Измените по своему усмотрению значения переменных окружения.
-Обязательно вставьте значения в UNIC_LICENSE=
-```shell
-nano multi_server_install/env/multi_server_env.env
 ```
 
 Запустите скрипт 
@@ -737,14 +711,6 @@ show users
 ```
 
 <!-- TOC --><a name="53-unicchat-https"></a>
-### 5.3 Настройка Unicchat для работы с HTTPS
-
-Провести настройку для обхода работы CORS в приложение для HTTPS, для этого в базе выполнить c вашим dns именем:
-
-```javascript
-db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"value":'https://myapp.unic.chat'}}) 
-db.rocketchat_settings.updateOne({"_id":"Site_Url"},{"$set":{"packageValue":'https://myapp.unic.chat'}})
-```
 
 Сайт открывается https://myapp.unic.chat
 Если сайт сразу не открывается, то для сброса кеша использовать очистку кеша и cookie браузера, ctrl+R или использовать безопасный режим браузера.
