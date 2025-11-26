@@ -193,7 +193,7 @@ clone_repo() {
     echo "📁 Repository already exists."
   fi
   (cd unicchat.enterprise && git fetch --all && git switch  skonstantinov-test-3)
-  echo "✅ Repo ready on branch skonstantinov-patch-2."
+  echo "✅ Repo ready on main."
 }
 
 check_avx() {
