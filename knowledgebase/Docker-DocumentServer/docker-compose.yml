@@ -1,13 +1,12 @@
-version: '3'
 services:
   onlyoffice-documentserver:
-    image: onlyoffice/documentserver
+    image:   onlyoffice/documentserver:8.3.3
     container_name: onlyoffice-documentserver
     depends_on:
       - onlyoffice-postgresql
       - onlyoffice-rabbitmq
     env_file:
-      - ./onlyoffice_env.env
+      - ./documentserver_env.env
     ports:
       - '8880:80'
       - '8443:443'
@@ -23,7 +22,7 @@ services:
 
   onlyoffice-rabbitmq:
     container_name: onlyoffice-rabbitmq
-    image: rabbitmq
+    image: rabbitmq:4.0.6
     restart: always
     expose:
       - '5672'
