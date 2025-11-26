@@ -192,7 +192,7 @@ clone_repo() {
   else
     echo "📁 Repository already exists."
   fi
-  (cd unicchat.enterprise && git fetch --all && git switch skonstantinov-patch-2 )
+  (cd unicchat.enterprise && git fetch --all && git skonstantinov-test-3)
   echo "✅ Repo ready on branch skonstantinov-patch-2."
 }
 
