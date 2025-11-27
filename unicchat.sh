@@ -185,16 +185,7 @@ docker_compose() {
   fi
 }
 
-clone_repo() {
-  echo -e "\n📥 Cloning repository…"
-  if [ ! -d unicchat.enterprise ]; then
-    git clone https://github.com/unicommorg/unicchat.enterprise.git
-  else
-    echo "📁 Repository already exists."
-  fi
-  (cd unicchat.enterprise && git fetch --all && git switch  skonstantinov-test-3)
-  echo "✅ Repo ready on main."
-}
+
 
 check_avx() {
   echo -e "\n🧠 Checking CPU for AVX…"
@@ -267,7 +258,7 @@ update_mongo_config() {
   echo -e "\n🔧 Updating MongoDB configuration..."
 
   local mongo_config_file="$MONGO_CONFIG_FILE"
-  local config_file="unicchat.enterprise/multi-server-install/config.txt"
+  local config_file="multi-server-install/config.txt"
 
   if [ ! -f "$mongo_config_file" ]; then
     log_info "File $mongo_config_file not found, creating new."
@@ -343,7 +334,7 @@ update_minio_config() {
   echo -e "\n🔧 Updating MinIO configuration..."
 
   local minio_config_file="$MINIO_CONFIG_FILE"
-  local config_file="unicchat.enterprise/knowledgebase/config.txt"
+  local config_file="knowledgebase/config.txt"
 
   if [ ! -f "$minio_config_file" ]; then
     log_info "File $minio_config_file not found, creating new."
@@ -417,11 +408,11 @@ copy_ssl_configs() {
   echo -e "\n📋 Copying SSL configuration files..."
 
   if [ ! -f /etc/letsencrypt/options-ssl-nginx.conf ]; then
-    if [ -f "unicchat.enterprise/nginx/options-ssl-nginx.conf" ]; then
-      sudo cp "unicchat.enterprise/nginx/options-ssl-nginx.conf" /etc/letsencrypt/
+    if [ -f "nginx/options-ssl-nginx.conf" ]; then
+      sudo cp "nginx/options-ssl-nginx.conf" /etc/letsencrypt/
       echo "✅ options-ssl-nginx.conf copied to /etc/letsencrypt/"
     else
-      echo "⚠️ options-ssl-nginx.conf not found in unicchat.enterprise/nginx/"
+      echo "⚠️ options-ssl-nginx.conf not found in nginx/"
     fi
   else
     echo "✅ options-ssl-nginx.conf already exists in /etc/letsencrypt/"
@@ -451,13 +442,13 @@ generate_nginx_conf() {
   EDT_PORT="8880"
   MINIO_PORT="9000"
   
-  mkdir -p "unicchat.enterprise/nginx/generated"
+  mkdir -p "nginx/generated"
   
   generate_config() {
     local domain=$1
     local upstream=$2
     local port=$3
-    local output_file="unicchat.enterprise/nginx/generated/${domain}.conf"
+    local output_file="nginx/generated/${domain}.conf"
     
     echo "🔧 Generating config for: $domain → $upstream:$port"
     
@@ -511,7 +502,7 @@ EOF
   generate_config "$EDT_DNS" "edtapp" "$EDT_PORT"
   generate_config "$MINIO_DNS" "myminio" "$MINIO_PORT"
   
-  echo "🎉 Nginx configs generated in unicchat.enterprise/nginx/generated/"
+  echo "🎉 Nginx configs generated in nginx/generated/"
 }
 
 deploy_nginx_conf() {
@@ -523,8 +514,8 @@ deploy_nginx_conf() {
   fi
   source "$DNS_CONFIG"
   
-  if [ -d "unicchat.enterprise/nginx/generated" ]; then
-    sudo cp unicchat.enterprise/nginx/generated/*.conf /etc/nginx/sites-available/
+  if [ -d "nginx/generated" ]; then
+    sudo cp nginx/generated/*.conf /etc/nginx/sites-available/
     echo "✅ Configs copied to /etc/nginx/sites-available/"
   else
     echo "❌ Generated configs directory not found"
@@ -613,8 +604,8 @@ activate_nginx() {
 update_solid_env() {
   echo -e "\n🔗 Linking Knowledgebase MinIO with UnicChat solid…"
   
-  local solid_env="unicchat.enterprise/multi-server-install/solid.env"
-  local kb_config="unicchat.enterprise/knowledgebase/config.txt"
+  local solid_env="multi-server-install/solid.env"
+  local kb_config="knowledgebase/config.txt"
   
   if [ ! -f "$solid_env" ]; then
     echo "❌ solid.env file not found: $solid_env"
@@ -656,7 +647,7 @@ EOF
 update_appserver_env() {
   echo -e "\n🔗 Linking Document Server with UnicChat appserver…"
   
-  local appserver_env="unicchat.enterprise/multi-server-install/appserver.env"
+  local appserver_env="multi-server-install/appserver.env"
   
   if [ ! -f "$appserver_env" ]; then
     echo "❌ appserver.env file not found: $appserver_env"
@@ -685,7 +676,7 @@ update_appserver_env() {
 prepare_all_envs() {
   echo -e "\n📦 Preparing all environment files…"
   
-  local dir="unicchat.enterprise/multi-server-install"
+  local dir="multi-server-install"
   (cd "$dir" && chmod +x generate_env_files.sh && ./generate_env_files.sh)
   
   update_solid_env
@@ -709,7 +700,7 @@ login_yandex() {
 
 start_unicchat() {
   echo -e "\n🚀 Starting UnicChat services…"
-  local dir="unicchat.enterprise/multi-server-install"
+  local dir="multi-server-install"
   docker network inspect unicchat-backend >/dev/null 2>&1 || docker network create unicchat-backend
   docker network inspect unicchat-frontend >/dev/null 2>&1 || docker network create unicchat-frontend
   (cd "$dir"  && docker_compose -f mongodb.yml up -d --wait && docker_compose -f unic.chat.appserver.yml up -d && docker_compose  -f unic.chat.solid.yml up -d --wait)
@@ -822,7 +813,7 @@ update_site_url() {
 }
 deploy_knowledgebase() {
   echo -e "\n🚀 Deploying knowledge base services…"
-  local kb_dir="unicchat.enterprise/knowledgebase"
+  local kb_dir="knowledgebase"
   
   if [ ! -f "$kb_dir/deploy_knowledgebase.sh" ]; then
     echo "❌ Knowledge base deployment script not found"
@@ -921,7 +912,7 @@ cleanup_utilities() {
     
     # Дополнительно: удалить сгенерированные конфиги
     echo "🗑️ Removing unicchat.enterprise"
-    rm -rf "unicchat.enterprise/" 2>/dev/null || true
+    rm -rf "./*" 2>/dev/null || true
     
     # Восстанавливаем set -e
     set -e
@@ -936,7 +927,7 @@ auto_setup() {
   install_git
   install_dns_utils
   install_minio_client
-  clone_repo
+
   check_avx
   setup_dns_names
   setup_license
@@ -982,24 +973,23 @@ main_menu() {
  [3]  Install Git
  [4]  Install DNS utilities
  [5]  Install MinIO client (mc)
- [6]  Clone repository
- [7]  Check AVX support
- [8]  Setup DNS names for UnicChat services
- [9]  Setup License Key
-[10]  Update MongoDB configuration
-[11]  Update MinIO configuration
-[12]  Setup local network (/etc/hosts)
-[13]  Generate Nginx configs
-[14]  Deploy Nginx configs
-[15]  Copy SSL configs and generate DH params
-[16]  Setup SSL certificates
-[17]  Activate Nginx sites
-[18]  Prepare .env files
-[19]  Login to Yandex registry
-[20]  Start UnicChat containers
-[21]  Deploy knowledge base services
-[99]  🚀 Full automatic setup (with knowledge base)
-[100] Remove all
+ [6]  Check AVX support
+ [7]  Setup DNS names for UnicChat services
+ [8]  Setup License Key
+ [9]  Update MongoDB configuration
+ [10] Update MinIO configuration
+ [11] Setup local network (/etc/hosts)
+ [12] Generate Nginx configs
+ [13] Deploy Nginx configs
+ [14] Copy SSL configs and generate DH params
+ [15] Setup SSL certificates
+ [16] Activate Nginx sites
+ [17] Prepare .env files
+ [18] Login to Yandex registry
+ [19] Start UnicChat containers
+ [20] Deploy knowledge base services
+ [99]  🚀 Full automatic setup (with knowledge base)
+ [100] Remove all
  [0]  Exit
 MENU
     read -rp "👉 Select an option: " choice
@@ -1009,23 +999,21 @@ MENU
       3) install_git ;;
       4) install_dns_utils ;;
       5) install_minio_client ;;
-      6) clone_repo ;;
-      7) check_avx ;;
-      8) setup_dns_names ;;
-      9) setup_license ;;
-     10) update_mongo_config ;;
-     11) update_minio_config ;;
-     12) setup_local_network ;;
-     13) generate_nginx_conf ;;
-     14) deploy_nginx_conf ;;
-     15) copy_ssl_configs ;;
-     16) setup_ssl ;;
-     17) activate_nginx ;;
-     18) prepare_unicchat ;;
-     19) login_yandex ;;
-     20) start_unicchat ;;
- #    21) update_site_url ;;
-     21) deploy_knowledgebase ;;
+      6) check_avx ;;
+      7) setup_dns_names ;;
+      8) setup_license ;;
+     9) update_mongo_config ;;
+     10) update_minio_config ;;
+     11) setup_local_network ;;
+     12) generate_nginx_conf ;;
+     13) deploy_nginx_conf ;;
+     14) copy_ssl_configs ;;
+     15) setup_ssl ;;
+     16) activate_nginx ;;
+     17) prepare_unicchat ;;
+     18) login_yandex ;;
+     19) start_unicchat ;;
+     20) deploy_knowledgebase ;;
      99) auto_setup ;;
     100) cleanup_utilities ;;
       0) echo "👋 Goodbye!" && break ;;
