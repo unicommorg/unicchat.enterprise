@@ -910,10 +910,17 @@ cleanup_utilities() {
     cleanup_dns_utils
     cleanup_minio_client
     
-    # Дополнительно: удалить сгенерированные конфиги
-    echo "🗑️ Removing unicchat.enterprise"
-    rm -rf "./*" 2>/dev/null || true
-    
+    # Дополнительно: удалить всю папку unicchat.enterprise
+    echo "🗑️ Removing unicchat.enterprise directory"
+
+    # Переходим на уровень выше и удаляем всю папку
+
+    rm -rf "../unicchat.enterprise" 2>/dev/null || true
+
+    # Восстанавливаем set -e
+    set -e
+
+    echo -e "\n✅ unicchat.enterprise completely removed!"
     # Восстанавливаем set -e
     set -e
     
