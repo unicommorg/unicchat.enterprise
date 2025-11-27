@@ -10,7 +10,7 @@ services:
       - chat_data:/app/uploads
     ports:
       - "8080:3000"
-    envirioment:
+    environment:
       - VAULT__HOST=http://internal_IP:8200
       - REDMINE_BOT_HOST=http://internal_IP:8201
     networks:
@@ -24,6 +24,7 @@ networks:
 volumes:
   chat_data:
     driver: local
+
 
 
 
