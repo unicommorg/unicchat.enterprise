@@ -1,0 +1,22 @@
+services:
+  nginx:
+    image: nginx:1.26
+    container_name: unicchat-nginx
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./docker/conf.d:/etc/nginx/conf.d:ro
+      - ./logs:/var/log/nginx
+      - ./docker/certbot/conf:/etc/letsencrypt
+
+  certbot:
+    image: certbot/certbot:v2.11.0
+    container_name: unicchat-certbot
+    network_mode: host
+    restart: "no"
+    volumes:
+      - ./docker/certbot/conf:/etc/letsencrypt
+      - ./docker/certbot/work:/var/lib/letsencrypt
+      - ./docker/certbot/logs:/var/log/letsencrypt
+
+
