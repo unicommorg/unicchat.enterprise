@@ -421,7 +421,9 @@ chmod +x ./unicchat.sh
 <!-- TOC --><a name="--manual"></a>
 ## 2. Ручная настройка 
 
-
+### 2.1 Установите Docker
+Установите 
+https://docs.docker.com/engine/install/
 
 
 <!-- TOC --><a name="22-nginx"></a>
