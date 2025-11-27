@@ -274,18 +274,7 @@ git clone https://github.com/unicommorg/unicchat.enterprise.git
 ```shell
 chmod +x ./unicchat.sh
 ```
-
-2. Переместите скрипт в родительскую директорию:
-```shell
-mv ./unicchat.sh ../
-```
-
-3. Перейдите в родительскую директорию:
-```shell
-cd ../
-```
-
-4. Запустите скрипт:
+2. Запустите скрипт:
 ```shell
 ./unicchat.sh
 ```
@@ -322,35 +311,33 @@ cd ../
 
 | № | Функция | Описание |
 |---|---------|-----------|
-| 6 | `clone_repo` | Клонирует репозиторий UnicChat Enterprise |
-| 7 | `check_avx` | Проверяет поддержку AVX для выбора версии MongoDB |
-| 8 | `setup_dns_names` | Настраивает доменные имена для сервисов |
-| 9 | `setup_license` | Добавляет лицензионный ключ UnicChat |
-| 10 | `update_mongo_config` | Настраивает параметры MongoDB |
-| 11 | `update_minio_config` | Настраивает параметры MinIO |
-| 12 | `setup_local_network` | Обновляет /etc/hosts для локальных DNS |
+| 6 | `check_avx` | Проверяет поддержку AVX для выбора версии MongoDB |
+| 7 | `setup_dns_names` | Настраивает доменные имена для сервисов |
+| 8 | `setup_license` | Добавляет лицензионный ключ UnicChat |
+| 9 | `update_mongo_config` | Настраивает параметры MongoDB |
+| 10 | `update_minio_config` | Настраивает параметры MinIO |
+| 11 | `setup_local_network` | Обновляет /etc/hosts для локальных DNS |
 
 <!-- TOC --><a name="--11"></a>
-#####  Настройка веб-сервера
+##### Настройка веб-сервера
 
 | № | Функция | Описание |
 |---|---------|-----------|
-| 13 | `generate_nginx_conf` | Генерирует конфиги Nginx для сервисов |
-| 14 | `deploy_nginx_conf` | Разворачивает конфиги Nginx |
-| 15 | `copy_ssl_configs` | Копирует SSL конфиги и генерирует DH параметры |
-| 16 | `setup_ssl` | Настраивает SSL сертификаты через Let's Encrypt |
-| 17 | `activate_nginx` | Активирует сайты Nginx |
+| 12 | `generate_nginx_conf` | Генерирует конфиги Nginx для сервисов |
+| 13 | `deploy_nginx_conf` | Разворачивает конфиги Nginx |
+| 14 | `copy_ssl_configs` | Копирует SSL конфиги и генерирует DH параметры |
+| 15 | `setup_ssl` | Настраивает SSL сертификаты через Let's Encrypt |
+| 16 | `activate_nginx` | Активирует сайты Nginx |
 
 <!-- TOC --><a name="--12"></a>
-#####  Запуск сервисов
+##### Запуск сервисов
 
 | № | Функция | Описание |
 |---|---------|-----------|
-| 18 | `prepare_unicchat` | Подготавливает .env файлы и линкует сервисы |
-| 19 | `login_yandex` | Логин в Yandex Container Registry |
-| 20 | `start_unicchat` | Запускает основные контейнеры UnicChat |
-| 21 | `deploy_knowledgebase` | Разворачивает сервисы базы знаний |
-
+| 17 | `prepare_unicchat` | Подготавливает .env файлы и линкует сервисы |
+| 18 | `login_yandex` | Логин в Yandex Container Registry |
+| 19 | `start_unicchat` | Запускает основные контейнеры UnicChat |
+| 20 | `deploy_knowledgebase` | Разворачивает сервисы базы знаний |
 <!-- TOC --><a name="-1"></a>
 #####  Автоматизация
 
