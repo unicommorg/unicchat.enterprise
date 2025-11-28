@@ -820,9 +820,10 @@ cp appserver.env.example appserver.env
 cp mongo.env.example mongo.env
 
 # Отредактируйте файлы под свою конфигурацию
-nano solid.env
-nano appserver.env
 nano mongo.env
+nano appserver.env
+nano solid.env
+
 ```
 
 Вернитесь в корневую директорию проекта:
