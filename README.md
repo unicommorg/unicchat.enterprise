@@ -722,7 +722,10 @@ nano minio_env.env
 ```shell
 cd ../../
 ```
-
+Создайте сеть для minio
+```bash
+docker network create minio
+```
 Запустите контейнеры из корня проекта:
 ```bash
 docker compose -f knowledgebase/minio/docker-compose.yml up -d && docker compose -f knowledgebase/Docker-DocumentServer/docker-compose.yml up -d  
