@@ -484,7 +484,27 @@ docker compose up -d nginx
 - HTTP сервер (порт 80) с редиректом на HTTPS
 - HTTPS сервер (порт 443) с SSL сертификатами и проксированием на upstream
 
-Для ручной генерации используйте скрипт `unicchat.sh` (пункт меню 12) или скрипт `nginx/generate_nginx_conf.sh`.
+**Для ручной настройки:**
+
+1. В директории `nginx/` находятся шаблоны конфигурационных файлов:
+   - `myapp.unic.chat` - шаблон для основного приложения
+   - `myedt.unic.chat` - шаблон для Document Server
+   - `myminio.unic.chat` - шаблон для MinIO
+
+2. Отредактируйте эти файлы под свою конфигурацию:
+   - Замените доменные имена (`myapp.unic.chat`, `myedt.unic.chat`, `myminio.unic.chat`) на ваши реальные домены
+   - В upstream блоке замените `127.0.0.1` на IP-адрес вашего сервера (если сервисы запущены на другом хосте)
+   - Убедитесь, что порты (8080, 8880, 9000) соответствуют портам ваших сервисов
+
+3. Скопируйте отредактированные файлы в директорию `nginx/docker/conf.d/` с расширением `.conf`:
+```shell
+cd nginx
+cp myapp.unic.chat docker/conf.d/myapp.unic.chat.conf
+cp myedt.unic.chat docker/conf.d/myedt.unic.chat.conf
+cp myminio.unic.chat docker/conf.d/myminio.unic.chat.conf
+```
+
+Или переименуйте файлы напрямую в директории `nginx/docker/conf.d/` после редактирования.
 
 <!-- TOC --><a name="223-certbot-"></a>
 #### 2.2.3 Получение SSL сертификатов через Certbot
