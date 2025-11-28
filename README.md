@@ -51,10 +51,10 @@
       + [2. Ручная настройка](#--manual)
          - [2.1 Установите Docker](#21-docker)
          - [2.2 Провести настройку Nginx](#22-nginx)
-            - [2.2.1 Подготовка Docker Compose стека для Nginx](#221-nginx)
-            - [2.2.2 Генерация конфигурации Nginx для UnicChat и Базы знаний](#222-nginx-unicchat-)
-            - [2.2.3 Получение SSL сертификатов через Certbot](#223-certbot-)
-            - [2.2.4 Развертывание и активация конфигураций Nginx](#224-nginx)
+            - [2.2.1 Подготовка структуры директорий](#221-nginx)
+            - [2.2.2 Получение SSL сертификатов через Certbot](#223-certbot-)
+            - [2.2.3 Генерация конфигурации Nginx для UnicChat и Базы знаний](#222-nginx-unicchat-)
+            - [2.2.4 Запуск и активация Nginx](#224-nginx)
             - [2.2.6 Настройка автоматического обновления сертификатов Certbot](#226-certbot)
       + [2.3 Открыть доступы до внутренних ресурсов](#23-)
          - [Входящие соединения на стороне сервера UnicChat:](#-unicchat-2)
@@ -444,10 +444,15 @@ docker compose version
 
 Настройка Nginx и Let's Encrypt выполняется через Docker Compose. Все конфигурационные файлы и сертификаты хранятся в директории `nginx/docker/`.
 
-<!-- TOC --><a name="221-nginx"></a>
-#### 2.2.1 Подготовка Docker Compose стека для Nginx
+Перейдите в директорию nginx для выполнения всех команд этого раздела:
+```shell
+cd nginx
+```
 
-Скрипт `unicchat.sh` автоматически подготовит необходимую структуру директорий и запустит Docker Compose стек. 
+<!-- TOC --><a name="221-nginx"></a>
+#### 2.2.1 Подготовка структуры директорий
+
+Скрипт `unicchat.sh` автоматически подготовит необходимую структуру директорий. 
 
 Структура директорий:
 ```
@@ -461,14 +466,47 @@ nginx/
         └── logs/                # Логи Certbot
 ```
 
-Для ручной настройки выполните:
+Убедитесь, что директории созданы (скрипт `unicchat.sh` создаст их автоматически).
+
+<!-- TOC --><a name="223-certbot-"></a>
+#### 2.2.2 Получение SSL сертификатов через Certbot
+
+SSL сертификаты получаются автоматически через Docker контейнер Certbot. Скрипт `unicchat.sh` (пункт меню 15 - `setup_ssl`) выполнит:
+
+1. Копирование файла `options-ssl-nginx.conf` в `docker/certbot/conf/`
+2. Генерацию DH параметров (`ssl-dhparams.pem`)
+3. Получение сертификатов для всех доменов через Certbot контейнер (в режиме standalone, nginx не требуется)
+
+Для ручного получения сертификатов:
+
+1. **Скопируйте файл `options-ssl-nginx.conf`** в директорию certbot:
 ```shell
-cd nginx
-docker compose up -d nginx
+cp options-ssl-nginx.conf docker/certbot/conf/
 ```
 
+2. **Сгенерируйте DH параметры** (если еще не созданы):
+```shell
+openssl dhparam -out docker/certbot/conf/ssl-dhparams.pem 2048
+```
+
+3. **Получите сертификаты** (замените `your-email@example.com` на ваш реальный email адрес):
+```shell
+docker compose run --rm --service-ports certbot certonly \
+  --standalone \
+  --non-interactive \
+  --agree-tos \
+  --email your-email@example.com \
+  -d myapp.unic.chat \
+  -d myedt.unic.chat \
+  -d myminio.unic.chat
+```
+
+**Важно**: Используйте действительный email адрес! Let's Encrypt требует валидный email для регистрации аккаунта. Не используйте заглушки типа `your-email@example.com`.
+
+Сертификаты будут сохранены в `docker/certbot/conf/live/<домен>/`.
+
 <!-- TOC --><a name="222-nginx-unicchat-"></a>
-#### 2.2.2 Генерация конфигурации Nginx для UnicChat и Базы знаний
+#### 2.2.3 Генерация конфигурации Nginx для UnicChat и Базы знаний
 
 Конфигурационные файлы генерируются автоматически скриптом `unicchat.sh` (пункт меню 12 - `generate_nginx_conf`).
 
@@ -496,9 +534,8 @@ docker compose up -d nginx
    - В upstream блоке замените `127.0.0.1` на IP-адрес вашего сервера (если сервисы запущены на другом хосте)
    - Убедитесь, что порты (8080, 8880, 9000) соответствуют портам ваших сервисов
 
-3. Скопируйте отредактированные файлы в директорию `nginx/docker/conf.d/` с расширением `.conf`:
+3. Скопируйте отредактированные файлы в директорию `docker/conf.d/` с расширением `.conf`:
 ```shell
-cd nginx
 cp myapp.unic.chat docker/conf.d/myapp.unic.chat.conf
 cp myedt.unic.chat docker/conf.d/myedt.unic.chat.conf
 cp myminio.unic.chat docker/conf.d/myminio.unic.chat.conf
@@ -506,60 +543,10 @@ cp myminio.unic.chat docker/conf.d/myminio.unic.chat.conf
 
 Или переименуйте файлы напрямую в директории `nginx/docker/conf.d/` после редактирования.
 
-<!-- TOC --><a name="223-certbot-"></a>
-#### 2.2.3 Получение SSL сертификатов через Certbot
-
-SSL сертификаты получаются автоматически через Docker контейнер Certbot. Скрипт `unicchat.sh` (пункт меню 15 - `setup_ssl`) выполнит:
-
-1. Копирование файла `options-ssl-nginx.conf` в `nginx/docker/certbot/conf/`
-2. Генерацию DH параметров (`ssl-dhparams.pem`)
-3. Остановку контейнера Nginx для освобождения портов 80/443
-4. Получение сертификатов для всех доменов через Certbot контейнер
-5. Запуск контейнера Nginx с новыми сертификатами
-
-Для ручного получения сертификатов:
-
-1. **Скопируйте файл `options-ssl-nginx.conf`** в директорию certbot:
-```shell
-cd nginx
-cp options-ssl-nginx.conf docker/certbot/conf/
-```
-
-2. **Сгенерируйте DH параметры** (если еще не созданы):
-```shell
-openssl dhparam -out docker/certbot/conf/ssl-dhparams.pem 2048
-```
-
-3. **Остановите Nginx контейнер** для освобождения портов 80/443:
-```shell
-docker compose stop nginx
-```
-
-4. **Получите сертификаты** (замените `your-email@example.com` на ваш реальный email адрес):
-```shell
-docker compose run --rm --service-ports certbot certonly \
-  --standalone \
-  --non-interactive \
-  --agree-tos \
-  --email your-email@example.com \
-  -d myapp.unic.chat \
-  -d myedt.unic.chat \
-  -d myminio.unic.chat
-```
-
-**Важно**: Используйте действительный email адрес! Let's Encrypt требует валидный email для регистрации аккаунта. Не используйте заглушки типа `your-email@example.com`.
-
-5. **Запустите Nginx контейнер**:
-```shell
-docker compose up -d nginx
-```
-
-Сертификаты будут сохранены в `nginx/docker/certbot/conf/live/<домен>/`.
-
 <!-- TOC --><a name="224-nginx"></a>
-#### 2.2.4 Развертывание и активация конфигураций Nginx
+#### 2.2.4 Запуск и активация Nginx
 
-После генерации конфигураций и получения сертификатов разверните конфигурации:
+После получения SSL сертификатов и создания конфигураций запустите Nginx:
 
 **Автоматически через скрипт:**
 Используйте скрипт `unicchat.sh`:
@@ -567,17 +554,26 @@ docker compose up -d nginx
 - Пункт меню 16 - `activate_nginx` (активация и перезагрузка)
 
 **Вручную:**
+
+1. **Запустите Nginx контейнер**:
 ```shell
-cd nginx
+docker compose up -d nginx
+```
 
-# Проверить конфигурацию
+2. **Проверьте конфигурацию**:
+```shell
 docker compose exec nginx nginx -t
+```
 
-# Если проверка успешна, перезагрузить Nginx
+3. **Если проверка успешна, перезагрузите Nginx**:
+```shell
 docker compose exec nginx nginx -s reload
+```
 
-# Или перезапустить контейнер
-docker compose restart nginx
+Проверка конфигурации должна показать:
+```
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
 ```
 
 Проверка конфигурации должна показать:
@@ -610,6 +606,11 @@ docker compose exec nginx nginx -s reload
 Сделайте файл исполняемым:
 ```shell
 chmod +x /etc/cron.daily/certbot-renew
+```
+
+Вернитесь в корневую директорию проекта:
+```shell
+cd ..
 ```
 
 <!-- TOC --><a name="23-"></a>
