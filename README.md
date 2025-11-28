@@ -803,12 +803,34 @@ sudo systemctl restart systemd-resolved
 docker network create unicchat-backend
 docker network create unicchat-frontend
 ```
-3. Создайте .env файлы в директории `multi-server-install/`:
-* solid.env
-* appserver.env
-* mongo.env
+3. Создайте .env файлы. Перейдите в директорию `multi-server-install/`:
+```shell
+cd multi-server-install/
+```
 
-Запустите контейнеры из корневой директории проекта:
+В этой директории находятся примеры файлов:
+* `solid.env.example` - пример для solid сервиса
+* `appserver.env.example` - пример для appserver сервиса
+* `mongo.env.example` - пример для MongoDB
+
+Скопируйте примеры и отредактируйте под свою конфигурацию:
+```shell
+cp solid.env.example solid.env
+cp appserver.env.example appserver.env
+cp mongo.env.example mongo.env
+
+# Отредактируйте файлы под свою конфигурацию
+nano solid.env
+nano appserver.env
+nano mongo.env
+```
+
+Вернитесь в корневую директорию проекта:
+```shell
+cd ..
+```
+
+4. Запустите контейнеры из корневой директории проекта:
 ```shell
 docker compose -f multi-server-install/mongodb.yml up -d && docker compose -f multi-server-install/unic.chat.solid.yml up -d && docker compose -f multi-server-install/unic.chat.appserver.yml up -d
 ```
