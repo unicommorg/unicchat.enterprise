@@ -565,22 +565,19 @@ docker compose up -d nginx
 docker compose exec nginx nginx -t
 ```
 
+
+Проверка конфигурации должна показать:
+```
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+```
+
 3. **Если проверка успешна, перезагрузите Nginx**:
 ```shell
 docker compose exec nginx nginx -s reload
 ```
 
-Проверка конфигурации должна показать:
-```
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-```
 
-Проверка конфигурации должна показать:
-```
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-```
 
 <!-- TOC --><a name="226-certbot"></a>
 #### 2.2.6 Настройка автоматического обновления сертификатов Certbot
