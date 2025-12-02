@@ -1,0 +1,22 @@
+version: "3.7"
+services:
+  vault:
+    image:  cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
+    container_name: vault
+    hostname: vault
+    ports:
+      - 8200:80
+    volumes:
+      - ./config.hcl:/vault/config/config.hcl
+      - vault-data:/vault/file/
+    environment:
+      - VAULT_ADDR=http://127.0.0.1:8200
+    env_file:
+      - .env
+    cap_add:
+      - IPC_LOCK
+    command: server
+    restart: always
+
+volumes:
+  vault-data:
