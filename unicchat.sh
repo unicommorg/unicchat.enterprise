@@ -32,6 +32,13 @@ MONGO_CONFIG_FILE="mongo_config.txt"
 MINIO_CONFIG_FILE="minio_config.txt"
 LOG_FILE="unicchat_install.log"
 
+NGINX_STACK_DIR="nginx/docker"
+NGINX_CONF_DIR="$NGINX_STACK_DIR/conf.d"
+NGINX_CERTBOT_CONF_DIR="$NGINX_STACK_DIR/certbot/conf"
+NGINX_CERTBOT_WORK_DIR="$NGINX_STACK_DIR/certbot/work"
+NGINX_CERTBOT_LOG_DIR="$NGINX_STACK_DIR/certbot/logs"
+NGINX_COMPOSE_FILE="nginx/docker-compose.yml"
+
 # Variables
 EMAIL=""
 APP_DNS=""
@@ -134,14 +141,21 @@ install_docker() {
 }
 
 install_nginx_ssl() {
-  echo -e "\n🌐 Installing Nginx and SSL components…"
+  echo -e "\n🌐 Preparing dockerized Nginx + Certbot stack…"
 
-  apt update -y
-  apt install -y nginx certbot python3-certbot-nginx
+  mkdir -p "$NGINX_CONF_DIR" "$NGINX_CERTBOT_CONF_DIR" "$NGINX_CERTBOT_WORK_DIR" "$NGINX_CERTBOT_LOG_DIR" "nginx/logs"
 
-  echo "✅ Nginx and SSL components installed:"
-  echo "   - nginx"
-  echo "   - certbot, python3-certbot-nginx"
+  if [ ! -f "$NGINX_COMPOSE_FILE" ]; then
+    log_error "Docker compose file not found: $NGINX_COMPOSE_FILE"
+    return 1
+  fi
+
+  copy_ssl_configs
+
+  docker_compose -f "$NGINX_COMPOSE_FILE" pull nginx certbot
+  docker_compose -f "$NGINX_COMPOSE_FILE" up -d nginx
+
+  echo "✅ Dockerized Nginx stack is ready"
 }
 
 install_git() {
@@ -185,16 +199,7 @@ docker_compose() {
   fi
 }
 
-clone_repo() {
-  echo -e "\n📥 Cloning repository…"
-  if [ ! -d unicchat.enterprise ]; then
-    git clone https://github.com/unicommorg/unicchat.enterprise.git
-  else
-    echo "📁 Repository already exists."
-  fi
-  (cd unicchat.enterprise && git fetch --all && git switch skonstantinov-patch-2 )
-  echo "✅ Repo ready on branch skonstantinov-patch-2."
-}
+
 
 check_avx() {
   echo -e "\n🧠 Checking CPU for AVX…"
@@ -267,7 +272,7 @@ update_mongo_config() {
   echo -e "\n🔧 Updating MongoDB configuration..."
 
   local mongo_config_file="$MONGO_CONFIG_FILE"
-  local config_file="unicchat.enterprise/multi-server-install/config.txt"
+  local config_file="multi-server-install/config.txt"
 
   if [ ! -f "$mongo_config_file" ]; then
     log_info "File $mongo_config_file not found, creating new."
@@ -343,7 +348,7 @@ update_minio_config() {
   echo -e "\n🔧 Updating MinIO configuration..."
 
   local minio_config_file="$MINIO_CONFIG_FILE"
-  local config_file="unicchat.enterprise/knowledgebase/config.txt"
+  local config_file="knowledgebase/config.txt"
 
   if [ ! -f "$minio_config_file" ]; then
     log_info "File $minio_config_file not found, creating new."
@@ -416,20 +421,22 @@ update_minio_config() {
 copy_ssl_configs() {
   echo -e "\n📋 Copying SSL configuration files..."
 
-  if [ ! -f /etc/letsencrypt/options-ssl-nginx.conf ]; then
-    if [ -f "unicchat.enterprise/nginx/options-ssl-nginx.conf" ]; then
-      sudo cp "unicchat.enterprise/nginx/options-ssl-nginx.conf" /etc/letsencrypt/
-      echo "✅ options-ssl-nginx.conf copied to /etc/letsencrypt/"
+  mkdir -p "$NGINX_CERTBOT_CONF_DIR"
+
+  if [ ! -f "$NGINX_CERTBOT_CONF_DIR/options-ssl-nginx.conf" ]; then
+    if [ -f "nginx/options-ssl-nginx.conf" ]; then
+      cp "nginx/options-ssl-nginx.conf" "$NGINX_CERTBOT_CONF_DIR/"
+      echo "✅ options-ssl-nginx.conf copied to $NGINX_CERTBOT_CONF_DIR"
     else
-      echo "⚠️ options-ssl-nginx.conf not found in unicchat.enterprise/nginx/"
+      echo "⚠️ options-ssl-nginx.conf not found in nginx/"
     fi
   else
-    echo "✅ options-ssl-nginx.conf already exists in /etc/letsencrypt/"
+    echo "✅ options-ssl-nginx.conf already exists in $NGINX_CERTBOT_CONF_DIR"
   fi
 
-  if [ ! -f /etc/letsencrypt/ssl-dhparams.pem ]; then
+  if [ ! -f "$NGINX_CERTBOT_CONF_DIR/ssl-dhparams.pem" ]; then
     echo -e "\n⏳ Generating DH parameters..."
-    sudo openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
+    openssl dhparam -out "$NGINX_CERTBOT_CONF_DIR/ssl-dhparams.pem" 2048
     echo "✅ DH parameters generated"
   else
     echo "✅ DH parameters already exist"
@@ -451,13 +458,13 @@ generate_nginx_conf() {
   EDT_PORT="8880"
   MINIO_PORT="9000"
   
-  mkdir -p "unicchat.enterprise/nginx/generated"
+  mkdir -p "$NGINX_CONF_DIR"
   
   generate_config() {
     local domain=$1
     local upstream=$2
     local port=$3
-    local output_file="unicchat.enterprise/nginx/generated/${domain}.conf"
+    local output_file="$NGINX_CONF_DIR/${domain}.conf"
     
     echo "🔧 Generating config for: $domain → $upstream:$port"
     
@@ -471,11 +478,18 @@ upstream $upstream {
 }
 
 server {
+    listen 80;
+    listen 443 ssl;
+    http2 on;
     server_name $domain;
     client_max_body_size 200M;
 
     error_log /var/log/nginx/${domain}.error.log;
     access_log /var/log/nginx/${domain}.access.log;
+
+    if (\$scheme = http) {
+        return 301 https://\$host\$request_uri;
+    }
 
     location / {
         proxy_pass http://$upstream;
@@ -490,17 +504,10 @@ server {
         proxy_redirect off;
     }
 
-    listen 443 ssl;
     ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-}
-
-server {
-    server_name $domain;
-    listen 80;
-    return 301 https://\$host\$request_uri;
 }
 EOF
     
@@ -511,33 +518,55 @@ EOF
   generate_config "$EDT_DNS" "edtapp" "$EDT_PORT"
   generate_config "$MINIO_DNS" "myminio" "$MINIO_PORT"
   
-  echo "🎉 Nginx configs generated in unicchat.enterprise/nginx/generated/"
+  echo "🎉 Nginx configs generated in $NGINX_CONF_DIR"
 }
 
 deploy_nginx_conf() {
   echo -e "\n📤 Deploying Nginx configs…"
   
+  if [ ! -f "$NGINX_COMPOSE_FILE" ]; then
+    echo "❌ Docker compose file not found: $NGINX_COMPOSE_FILE"
+    return 1
+  fi
+
   if [ ! -f "$DNS_CONFIG" ]; then
-    echo "❌ DNS configuration not found. Run step 5 first."
+    echo "❌ DNS configuration not found. Run step 7 first."
     return 1
   fi
   source "$DNS_CONFIG"
-  
-  if [ -d "unicchat.enterprise/nginx/generated" ]; then
-    sudo cp unicchat.enterprise/nginx/generated/*.conf /etc/nginx/sites-available/
-    echo "✅ Configs copied to /etc/nginx/sites-available/"
-  else
-    echo "❌ Generated configs directory not found"
+
+  if [ ! -d "$NGINX_CONF_DIR" ] || [ -z "$(ls -A "$NGINX_CONF_DIR" 2>/dev/null)" ]; then
+    echo "❌ No configs found in $NGINX_CONF_DIR. Run step 12 first."
     return 1
   fi
-  
-  sudo ln -sf "/etc/nginx/sites-available/${APP_DNS}.conf" "/etc/nginx/sites-enabled/" || true
-  sudo ln -sf "/etc/nginx/sites-available/${EDT_DNS}.conf" "/etc/nginx/sites-enabled/" || true
-  sudo ln -sf "/etc/nginx/sites-available/${MINIO_DNS}.conf" "/etc/nginx/sites-enabled/" || true
-  
-  sudo rm -f /etc/nginx/sites-enabled/default || true
-  
-  echo "✅ Nginx configs deployed"
+
+  local domains=()
+  [ -n "${APP_DNS:-}" ] && domains+=("$APP_DNS")
+  [ -n "${EDT_DNS:-}" ] && domains+=("$EDT_DNS")
+  [ -n "${MINIO_DNS:-}" ] && domains+=("$MINIO_DNS")
+
+  local missing_certs=()
+  for domain in "${domains[@]}"; do
+    if [ ! -f "$NGINX_CERTBOT_CONF_DIR/live/$domain/fullchain.pem" ]; then
+      missing_certs+=("$domain")
+    fi
+  done
+
+  if [ ${#missing_certs[@]} -gt 0 ]; then
+    echo "⚠️ SSL certificates not found for: ${missing_certs[*]}"
+    echo "   Run 'Setup SSL certificates' (menu option 15) before deploying configs."
+    return 1
+  fi
+
+  docker_compose -f "$NGINX_COMPOSE_FILE" up -d nginx
+
+  if docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -t; then
+    docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -s reload
+    echo "✅ Nginx container reloaded with new configs"
+  else
+    echo "❌ Nginx config test failed. Check logs."
+    return 1
+  fi
 }
 
 setup_ssl() {
@@ -562,59 +591,67 @@ setup_ssl() {
   fi
   
   echo "📋 Creating SSL certificates for: ${domains[*]}"
-  
-  echo "🛑 Stopping nginx to free port 80/443..."
-  sudo systemctl stop nginx
-  if [ $? -ne 0 ]; then
-    echo "❌ Failed to stop nginx"
+
+  if [ ! -f "$NGINX_COMPOSE_FILE" ]; then
+    echo "❌ Docker compose file not found: $NGINX_COMPOSE_FILE"
     return 1
   fi
-  
+
+  echo "🛑 Stopping dockerized nginx to free port 80/443..."
+  docker_compose -f "$NGINX_COMPOSE_FILE" stop nginx || true
+
   for domain in "${domains[@]}"; do
-    CERT_PATH="/etc/letsencrypt/live/$domain"
+    CERT_PATH="$NGINX_CERTBOT_CONF_DIR/live/$domain"
     if [ -d "$CERT_PATH" ]; then
       echo "ℹ️ Certificate for $domain found. Attempting to renew if needed..."
-      sudo certbot renew --cert-name "$domain" --quiet --deploy-hook "systemctl reload nginx"
-      if [ $? -ne 0 ]; then
+      if ! docker_compose -f "$NGINX_COMPOSE_FILE" run --rm --service-ports certbot renew --cert-name "$domain" --non-interactive; then
         echo "❌ Certbot renew failed for $domain"
-        sudo systemctl start nginx
+        docker_compose -f "$NGINX_COMPOSE_FILE" start nginx >/dev/null 2>&1 || true
         return 1
       fi
     else
       echo "📝 No certificate found for $domain. Requesting new certificate..."
-      sudo certbot certonly --standalone --non-interactive --agree-tos --email "$EMAIL" -d "$domain"
-      if [ $? -ne 0 ]; then
+      if ! docker_compose -f "$NGINX_COMPOSE_FILE" run --rm --service-ports certbot certonly --standalone --non-interactive --agree-tos --email "$EMAIL" -d "$domain"; then
         echo "❌ Certbot failed to obtain certificate for $domain"
-        sudo systemctl start nginx
+        docker_compose -f "$NGINX_COMPOSE_FILE" start nginx >/dev/null 2>&1 || true
         return 1
       fi
     fi
   done
   
-  echo "▶️ Starting nginx..."
-  sudo systemctl start nginx
+  echo "▶️ Starting dockerized nginx..."
+  docker_compose -f "$NGINX_COMPOSE_FILE" up -d nginx
   
-  if [ $? -ne 0 ]; then
-    echo "❌ Failed to start nginx"
-    echo "🔍 Checking nginx configuration..."
-    nginx -t
+  if docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -t; then
+    docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -s reload
+    echo "✅ SSL setup complete for UnicChat domains"
+  else
+    echo "❌ Nginx config test failed after SSL setup."
     return 1
   fi
-  
-  echo "✅ SSL setup complete for UnicChat domains"
 }
 
 activate_nginx() {
-  echo -e "\n🚀 Activating Nginx sites…"
-  nginx -t && systemctl reload nginx
-  echo "✅ Nginx activated for all sites"
+  echo -e "\n🚀 Activating dockerized Nginx…"
+  if [ ! -f "$NGINX_COMPOSE_FILE" ]; then
+    echo "❌ Docker compose file not found: $NGINX_COMPOSE_FILE"
+    return 1
+  fi
+
+  if docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -t; then
+    docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -s reload
+    echo "✅ Nginx container reloaded"
+  else
+    echo "❌ Nginx config test failed."
+    return 1
+  fi
 }
 
 update_solid_env() {
   echo -e "\n🔗 Linking Knowledgebase MinIO with UnicChat solid…"
   
-  local solid_env="unicchat.enterprise/multi-server-install/solid.env"
-  local kb_config="unicchat.enterprise/knowledgebase/config.txt"
+  local solid_env="multi-server-install/solid.env"
+  local kb_config="knowledgebase/config.txt"
   
   if [ ! -f "$solid_env" ]; then
     echo "❌ solid.env file not found: $solid_env"
@@ -656,7 +693,7 @@ EOF
 update_appserver_env() {
   echo -e "\n🔗 Linking Document Server with UnicChat appserver…"
   
-  local appserver_env="unicchat.enterprise/multi-server-install/appserver.env"
+  local appserver_env="multi-server-install/appserver.env"
   
   if [ ! -f "$appserver_env" ]; then
     echo "❌ appserver.env file not found: $appserver_env"
@@ -685,7 +722,7 @@ update_appserver_env() {
 prepare_all_envs() {
   echo -e "\n📦 Preparing all environment files…"
   
-  local dir="unicchat.enterprise/multi-server-install"
+  local dir="multi-server-install"
   (cd "$dir" && chmod +x generate_env_files.sh && ./generate_env_files.sh)
   
   update_solid_env
@@ -709,7 +746,7 @@ login_yandex() {
 
 start_unicchat() {
   echo -e "\n🚀 Starting UnicChat services…"
-  local dir="unicchat.enterprise/multi-server-install"
+  local dir="multi-server-install"
   docker network inspect unicchat-backend >/dev/null 2>&1 || docker network create unicchat-backend
   docker network inspect unicchat-frontend >/dev/null 2>&1 || docker network create unicchat-frontend
   (cd "$dir"  && docker_compose -f mongodb.yml up -d --wait && docker_compose -f unic.chat.appserver.yml up -d && docker_compose  -f unic.chat.solid.yml up -d --wait)
@@ -822,7 +859,7 @@ update_site_url() {
 }
 deploy_knowledgebase() {
   echo -e "\n🚀 Deploying knowledge base services…"
-  local kb_dir="unicchat.enterprise/knowledgebase"
+  local kb_dir="knowledgebase"
   
   if [ ! -f "$kb_dir/deploy_knowledgebase.sh" ]; then
     echo "❌ Knowledge base deployment script not found"
@@ -870,19 +907,18 @@ cleanup_docker() {
 }
 
 cleanup_nginx() {
-    echo -e "\n🗑️ Removing Nginx...\n"
-    systemctl stop nginx 2>/dev/null || true
-    apt remove -y --purge nginx* 2>/dev/null || true
-    rm -rf /etc/nginx /var/log/nginx 2>/dev/null || true
-    apt autoremove -y 2>/dev/null || true
-    echo "✅ Nginx removed!"
+    echo -e "\n🗑️ Removing dockerized Nginx...\n"
+    if [ -f "$NGINX_COMPOSE_FILE" ]; then
+        docker_compose -f "$NGINX_COMPOSE_FILE" down || true
+    fi
+    rm -rf "$NGINX_STACK_DIR" "nginx/logs"
+    echo "✅ Nginx stack removed!"
 }
 
 cleanup_ssl() {
-    echo "Removing SSL certificates and Certbot..."
-    apt remove -y --purge certbot 2>/dev/null || true
-    rm -rf /etc/letsencrypt 2>/dev/null || true
-    echo "✅ SSL removed!"
+    echo "Removing SSL certificates and Certbot volumes..."
+    rm -rf "$NGINX_CERTBOT_CONF_DIR" "$NGINX_CERTBOT_WORK_DIR" "$NGINX_CERTBOT_LOG_DIR"
+    echo "✅ SSL assets removed!"
 }
 
 cleanup_git() {
@@ -919,10 +955,17 @@ cleanup_utilities() {
     cleanup_dns_utils
     cleanup_minio_client
     
-    # Дополнительно: удалить сгенерированные конфиги
-    echo "🗑️ Removing unicchat.enterprise"
-    rm -rf "unicchat.enterprise/" 2>/dev/null || true
-    
+    # Дополнительно: удалить всю папку unicchat.enterprise
+    echo "🗑️ Removing unicchat.enterprise directory"
+
+    # Переходим на уровень выше и удаляем всю папку
+
+    rm -rf "../unicchat.enterprise" 2>/dev/null || true
+
+    # Восстанавливаем set -e
+    set -e
+
+    echo -e "\n✅ unicchat.enterprise completely removed!"
     # Восстанавливаем set -e
     set -e
     
@@ -936,7 +979,7 @@ auto_setup() {
   install_git
   install_dns_utils
   install_minio_client
-  clone_repo
+
   check_avx
   setup_dns_names
   setup_license
@@ -944,9 +987,8 @@ auto_setup() {
   update_minio_config
   setup_local_network
   generate_nginx_conf
-  deploy_nginx_conf
-  copy_ssl_configs
   setup_ssl
+  deploy_nginx_conf
   activate_nginx
   prepare_unicchat
   login_yandex
@@ -982,24 +1024,23 @@ main_menu() {
  [3]  Install Git
  [4]  Install DNS utilities
  [5]  Install MinIO client (mc)
- [6]  Clone repository
- [7]  Check AVX support
- [8]  Setup DNS names for UnicChat services
- [9]  Setup License Key
-[10]  Update MongoDB configuration
-[11]  Update MinIO configuration
-[12]  Setup local network (/etc/hosts)
-[13]  Generate Nginx configs
-[14]  Deploy Nginx configs
-[15]  Copy SSL configs and generate DH params
-[16]  Setup SSL certificates
-[17]  Activate Nginx sites
-[18]  Prepare .env files
-[19]  Login to Yandex registry
-[20]  Start UnicChat containers
-[21]  Deploy knowledge base services
-[99]  🚀 Full automatic setup (with knowledge base)
-[100] Remove all
+ [6]  Check AVX support
+ [7]  Setup DNS names for UnicChat services
+ [8]  Setup License Key
+ [9]  Update MongoDB configuration
+ [10] Update MinIO configuration
+ [11] Setup local network (/etc/hosts)
+ [12] Generate Nginx configs
+ [13] Deploy Nginx configs
+ [14] Copy SSL configs and generate DH params
+ [15] Setup SSL certificates
+ [16] Activate Nginx sites
+ [17] Prepare .env files
+ [18] Login to Yandex registry
+ [19] Start UnicChat containers
+ [20] Deploy knowledge base services
+ [99]  🚀 Full automatic setup (with knowledge base)
+ [100] Remove all
  [0]  Exit
 MENU
     read -rp "👉 Select an option: " choice
@@ -1009,23 +1050,21 @@ MENU
       3) install_git ;;
       4) install_dns_utils ;;
       5) install_minio_client ;;
-      6) clone_repo ;;
-      7) check_avx ;;
-      8) setup_dns_names ;;
-      9) setup_license ;;
-     10) update_mongo_config ;;
-     11) update_minio_config ;;
-     12) setup_local_network ;;
-     13) generate_nginx_conf ;;
-     14) deploy_nginx_conf ;;
-     15) copy_ssl_configs ;;
-     16) setup_ssl ;;
-     17) activate_nginx ;;
-     18) prepare_unicchat ;;
-     19) login_yandex ;;
-     20) start_unicchat ;;
- #    21) update_site_url ;;
-     21) deploy_knowledgebase ;;
+      6) check_avx ;;
+      7) setup_dns_names ;;
+      8) setup_license ;;
+     9) update_mongo_config ;;
+     10) update_minio_config ;;
+     11) setup_local_network ;;
+     12) generate_nginx_conf ;;
+     13) deploy_nginx_conf ;;
+     14) copy_ssl_configs ;;
+     15) setup_ssl ;;
+     16) activate_nginx ;;
+     17) prepare_unicchat ;;
+     18) login_yandex ;;
+     19) start_unicchat ;;
+     20) deploy_knowledgebase ;;
      99) auto_setup ;;
     100) cleanup_utilities ;;
       0) echo "👋 Goodbye!" && break ;;
