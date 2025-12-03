@@ -1,22 +1,26 @@
-version: "3.7"
 services:
   vault:
-    image:  cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
     container_name: vault
-    hostname: vault
     ports:
       - 8200:80
     volumes:
       - ./config.hcl:/vault/config/config.hcl
       - vault-data:/vault/file/
     environment:
-      - VAULT_ADDR=http://127.0.0.1:8200
+      - VAULT_ADDR=http://vault:80
     env_file:
       - .env
     cap_add:
       - IPC_LOCK
     command: server
     restart: always
+    networks:
+      - unicchat-frontend
 
 volumes:
   vault-data:
+
+networks:
+  unicchat-frontend:
+    external: true
