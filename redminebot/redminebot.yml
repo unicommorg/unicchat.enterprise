@@ -3,11 +3,6 @@ networks:
   unicchat-frontend:
     driver: bridge
     external: true
-  vault_default:
-    driver: bridge
-    external: true
-
-
 services:
   ucredminebot:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatbotredmine:prod
@@ -17,7 +12,5 @@ services:
     environment:
       - Vault__Host=http://vault:80
     restart: always
-
     networks:
       - unicchat-frontend
-      - vault_default
