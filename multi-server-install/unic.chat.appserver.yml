@@ -11,8 +11,8 @@ services:
     ports:
       - "8080:3000"
     environment:
-      - VAULT__HOST=http://internal_IP:8200
-      - REDMINE_BOT_HOST=http://internal_IP:8201
+      - VAULT__HOST=http://internal_IP:8200 # http://vault:80 если в одной сети  unic.chat.appserver  и vault
+      - REDMINE_BOT_HOST=http://internal_IP:8201 # http://ucredminebot:8080 если в одной сети  unic.chat.appserver  и ucredminebot
     networks:
       - unicchat-frontend
 
@@ -24,6 +24,7 @@ networks:
 volumes:
   chat_data:
     driver: local
+
 
 
 
