@@ -4,7 +4,7 @@ networks:
     external: true
 services:
   minio:
-    image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
+    image: cr.yandex/crpst6ndtaf70or2n2bb/minio:RELEASE.2024-12-18T13-15-44Z
     hostname: minio
     container_name: unic.chat.minio
     command: server --console-address ":9002" /data
@@ -26,4 +26,5 @@ services:
 
 volumes:
   minio_data:
+
 
