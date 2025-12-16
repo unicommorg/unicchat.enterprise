@@ -1,10 +1,10 @@
 services:
-  onlyoffice-documentserver:
+  uniceditor-documentserver:
     image:  cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
-    container_name: onlyoffice-documentserver
+    container_name: uniceditor-documentserver
     depends_on:
-      - onlyoffice-postgresql
-      - onlyoffice-rabbitmq
+      - uniceditor-postgresql
+      - uniceditor-rabbitmq
     env_file:
       - ./documentserver_env.env
     ports:
@@ -14,21 +14,21 @@ services:
     restart: always
     stop_grace_period: 60s
     volumes:
-      - /var/www/onlyoffice/Data
-      - /var/log/onlyoffice
-      - /var/lib/onlyoffice/documentserver/App_Data/cache/files
-      - /var/www/onlyoffice/documentserver-example/public/files
+      - /var/www/uniceditor/Data
+      - /var/log/uniceditor
+      - /var/lib/uniceditor/documentserver/App_Data/cache/files
+      - /var/www/uniceditor/documentserver-example/public/files
       - /usr/share/fonts
 
-  onlyoffice-rabbitmq:
-    container_name: onlyoffice-rabbitmq
+  uniceditor-rabbitmq:
+    container_name: uniceditor-rabbitmq
     image: cr.yandex/crpst6ndtaf70or2n2bb/rabbitmq:latest
     restart: always
     expose:
       - '5672'
 
-  onlyoffice-postgresql:
-    container_name: onlyoffice-postgresql
+  uniceditor-postgresql:
+    container_name: uniceditor-postgresql
     image: cr.yandex/crpst6ndtaf70or2n2bb/postgres:12
     environment:
       - POSTGRES_DB=dbname
@@ -42,3 +42,4 @@ services:
 
 volumes:
   postgresql_data:
+
