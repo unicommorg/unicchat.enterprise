@@ -1,6 +1,6 @@
 services:
   onlyoffice-documentserver:
-    image:   onlyoffice/documentserver:8.3.3
+    image:  cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
     container_name: onlyoffice-documentserver
     depends_on:
       - onlyoffice-postgresql
@@ -22,14 +22,14 @@ services:
 
   onlyoffice-rabbitmq:
     container_name: onlyoffice-rabbitmq
-    image: rabbitmq:4.0.6
+    image: cr.yandex/crpst6ndtaf70or2n2bb/rabbitmq:latest
     restart: always
     expose:
       - '5672'
 
   onlyoffice-postgresql:
     container_name: onlyoffice-postgresql
-    image: postgres:12
+    image: cr.yandex/crpst6ndtaf70or2n2bb/postgres:12
     environment:
       - POSTGRES_DB=dbname
       - POSTGRES_USER=dbuser
