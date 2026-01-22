@@ -1,1072 +1,1029 @@
 #!/usr/bin/env bash
 #
-# UnicChat installation helper with license support (updated 2025-09-10)
+# UnicChat Enterprise Installation Helper
+# Refactored version with multi-service DNS support
 #
 
 set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Logging functions
-log_info() { echo -e "${BLUE}📝 ${NC}$1"; }
-log_success() { echo -e "${GREEN}✅ ${NC}$1"; }
-log_warning() { echo -e "${YELLOW}⚠️ ${NC}$1"; }
-log_error() { echo -e "${RED}❌ ${NC}$1"; }
-
 # Ensure running as root or via sudo
 if [[ $EUID -ne 0 ]]; then
-  log_error "This script must be run as root or with sudo."
+  echo "🚫 This script must be run as root or with sudo."
   exit 1
 fi
 
-# Configuration files
-CONFIG_FILE="app_config.txt"
-DNS_CONFIG="dns_config.txt"
-LICENSE_FILE="license.txt"
-MONGO_CONFIG_FILE="mongo_config.txt"
-MINIO_CONFIG_FILE="minio_config.txt"
-LOG_FILE="unicchat_install.log"
-
-NGINX_STACK_DIR="nginx/docker"
-NGINX_CONF_DIR="$NGINX_STACK_DIR/conf.d"
-NGINX_CERTBOT_CONF_DIR="$NGINX_STACK_DIR/certbot/conf"
-NGINX_CERTBOT_WORK_DIR="$NGINX_STACK_DIR/certbot/work"
-NGINX_CERTBOT_LOG_DIR="$NGINX_STACK_DIR/certbot/logs"
-NGINX_COMPOSE_FILE="nginx/docker-compose.yml"
-
-# Variables
-EMAIL=""
-APP_DNS=""
-EDT_DNS=""
-MINIO_DNS=""
-UNIC_LICENSE=""
-HOSTS_FILE="/etc/hosts"
-LOCAL_IP=$(hostname -I | awk '{print $1}')
-
-# Initialize logging
-exec > >(tee -a "$LOG_FILE") 2>&1
-
-log_info "Starting UnicChat installation - $(date)"
-
-load_config() {
-  log_info "Loading configuration..."
-  
-  # Load email from config if exists
-  if [ -f "$CONFIG_FILE" ]; then
-    log_info "Loading email from $CONFIG_FILE..."
-    EMAIL=$(grep '^EMAIL=' "$CONFIG_FILE" | cut -d '=' -f2- | tr -d '\r' | tr -d '"' | tr -d "'")
+# Check if Docker is installed
+check_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "❌ Docker не установлен. Установите Docker и повторите попытку."
+    exit 1
   fi
   
-  # Prompt for email if not in config
-  if [ -z "$EMAIL" ]; then
-    log_info "First-time setup:"
-    while [ -z "$EMAIL" ]; do
-      read -rp "📧 Enter contact email for Let's Encrypt: " EMAIL
-      # Basic email validation
-      if [[ ! "$EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
-        log_warning "Invalid email format. Please try again."
-        EMAIL=""
-      fi
-    done
-    echo "EMAIL=\"$EMAIL\"" > "$CONFIG_FILE"
-    log_success "Email saved to $CONFIG_FILE"
-  fi
-  
-  # Load DNS configuration if exists
-  if [ -f "$DNS_CONFIG" ]; then
-    log_info "Loading DNS configuration from $DNS_CONFIG..."
-    source "$DNS_CONFIG"
-    log_success "DNS names loaded from config"
-  fi
-  
-  # Load license if exists
-  if [ -f "$LICENSE_FILE" ]; then
-    log_info "Loading license from $LICENSE_FILE..."
-    UNIC_LICENSE=$(cat "$LICENSE_FILE" | tr -d '\r' | tr -d '"' | tr -d "'" | xargs)
-    if [ -n "$UNIC_LICENSE" ]; then
-      log_success "License loaded from $LICENSE_FILE"
-    else
-      log_warning "License file exists but is empty"
+  if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+    if ! command -v docker-compose >/dev/null 2>&1; then
+      echo "❌ Docker Compose не установлен. Установите Docker Compose и повторите попытку."
+      exit 1
     fi
   fi
-}
-
-setup_local_network() {
-  log_info "Setting up local network..."
-  # Check for duplicates in /etc/hosts
-  if ! grep -q "$MINIO_DNS" "$HOSTS_FILE"; then
-    echo "$LOCAL_IP $MINIO_DNS" >> "$HOSTS_FILE"
-  fi
-  if ! grep -q "$EDT_DNS" "$HOSTS_FILE"; then
-    echo "$LOCAL_IP $EDT_DNS" >> "$HOSTS_FILE"
-  fi
-  log_success "/etc/hosts updated"
-}
-
-install_docker() {
-  echo -e "\n🐳 Installing Docker and related components…"
-
-  # Remove conflicting packages if present
-  apt remove -y containerd || true
-  apt autoremove -y
-
-  apt update -y
-  apt install -y ca-certificates curl gnupg lsb-release software-properties-common
-
-  mkdir -p /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-    gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  chmod a+r /etc/apt/keyrings/docker.gpg
-
-  echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/ubuntu \
-    $(. /etc/os-release; echo "$VERSION_CODENAME") stable" | \
-    tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-  apt update -y
   
-  # Install Docker packages with dependency resolution
-  apt install -y -f docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose
-
-  echo "✅ Docker and related components installed:"
-  echo "   - docker-ce, docker-ce-cli, containerd.io"
-  echo "   - docker-compose-plugin, docker-compose"
-  echo "   - ca-certificates, curl, gnupg, lsb-release, software-properties-common"
-}
-
-install_nginx_ssl() {
-  echo -e "\n🌐 Preparing dockerized Nginx + Certbot stack…"
-
-  mkdir -p "$NGINX_CONF_DIR" "$NGINX_CERTBOT_CONF_DIR" "$NGINX_CERTBOT_WORK_DIR" "$NGINX_CERTBOT_LOG_DIR" "nginx/logs"
-
-  if [ ! -f "$NGINX_COMPOSE_FILE" ]; then
-    log_error "Docker compose file not found: $NGINX_COMPOSE_FILE"
-    return 1
-  fi
-
-  copy_ssl_configs
-
-  docker_compose -f "$NGINX_COMPOSE_FILE" pull nginx certbot
-  docker_compose -f "$NGINX_COMPOSE_FILE" up -d nginx
-
-  echo "✅ Dockerized Nginx stack is ready"
-}
-
-install_git() {
-  echo -e "\n📦 Installing Git…"
-
-  apt update -y
-  apt install -y git
-
-  echo "✅ Git installed"
-}
-
-install_dns_utils() {
-  echo -e "\n🔍 Installing DNS utilities…"
-
-  apt update -y
-  apt install -y dnsutils
-
-  echo "✅ DNS utilities installed:"
-  echo "   - dnsutils (nslookup, dig, etc.)"
-}
-
-install_minio_client() {
-  echo -e "\n📦 Installing MinIO client (mc)…"
-  if ! command -v mc &> /dev/null; then
-    curl https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
-    chmod +x /usr/local/bin/mc
-    echo "✅ MinIO client installed"
-  else
-    echo "✅ MinIO client already installed"
-  fi
-}
-
-docker_compose() {
-  if command -v docker compose >/dev/null 2>&1; then
-    docker compose "$@"
-  elif command -v docker-compose >/dev/null 2>&1; then
-    docker-compose "$@"
-  else
-    echo "❌ docker compose not found."
+  if ! docker info >/dev/null 2>&1; then
+    echo "❌ Docker daemon не запущен. Запустите Docker: sudo systemctl start docker"
     exit 1
   fi
 }
 
+# Configuration files
+DNS_CONFIG_FILE="dns_config.txt"
+MONGO_CONFIG_FILE="mongo_config.txt"
+MINIO_CONFIG_FILE="minio_config.txt"
+LOG_FILE="unicchat_install.log"
 
+# DNS variables
+APP_DNS=""
+EDT_DNS=""
+MINIO_DNS=""
+
+# === Helper Functions ===
+
+log_info() {
+  echo "📝 $1" | tee -a "$LOG_FILE"
+}
+
+log_success() {
+  echo "✅ $1" | tee -a "$LOG_FILE"
+}
+
+log_warning() {
+  echo "⚠️ $1" | tee -a "$LOG_FILE"
+}
+
+log_error() {
+  echo "❌ $1" | tee -a "$LOG_FILE"
+}
+
+# Enhanced docker_compose function with better compatibility
+docker_compose() {
+  local compose_file="${COMPOSE_FILE:--f docker-compose.yml}"
+  
+  # Try docker compose (plugin) first
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+    return $?
+  # Fall back to docker-compose (standalone)
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose "$@"
+    return $?
+  else
+    log_error "Neither 'docker compose' nor 'docker-compose' found."
+    log_info "Please install Docker Compose:"
+    log_info "  - Plugin: https://docs.docker.com/compose/install/"
+    log_info "  - Standalone: apt-get install docker-compose"
+    exit 1
+  fi
+}
 
 check_avx() {
   echo -e "\n🧠 Checking CPU for AVX…"
   if grep -m1 -q avx /proc/cpuinfo; then
-    echo "✅ AVX supported. You can use MongoDB 5.x+"
+    log_success "AVX supported. You can use MongoDB 5.x+"
   else
-    echo "⚠️ No AVX. Use MongoDB 4.4"
+    log_warning "No AVX support. Use MongoDB 4.4 or lower"
   fi
+}
+
+# === DNS Configuration ===
+
+load_dns_config() {
+  if [ -f "$DNS_CONFIG_FILE" ]; then
+    log_info "Loading DNS configuration from $DNS_CONFIG_FILE..."
+    source "$DNS_CONFIG_FILE"
+    
+    if [ -n "$APP_DNS" ] && [ -n "$EDT_DNS" ] && [ -n "$MINIO_DNS" ]; then
+      log_success "DNS names loaded from config"
+      return 0
+    fi
+  fi
+  return 1
 }
 
 setup_dns_names() {
   echo -e "\n🌐 Setting up DNS names for UnicChat services..."
   
-  if [ -f "$DNS_CONFIG" ]; then
-    source "$DNS_CONFIG"
-    echo "✅ DNS names loaded from config:"
+  if load_dns_config; then
+    log_success "DNS names loaded from config:"
     echo "   App Server: $APP_DNS"
     echo "   Document Server: $EDT_DNS"
     echo "   MinIO: $MINIO_DNS"
-    return
+    
+    read -rp "Do you want to change these? (y/N): " change
+    if [[ ! "$change" =~ ^[Yy]$ ]]; then
+      return 0
+    fi
   fi
   
-  echo "🔧 Configure DNS names for UnicChat services:"
+  echo ""
+  echo "Enter DNS names for each service:"
+  read -rp "  App Server DNS (e.g., app.unic.chat): " APP_DNS
+  read -rp "  Document Server DNS (e.g., docs.unic.chat): " EDT_DNS
+  read -rp "  MinIO DNS (e.g., minio.unic.chat): " MINIO_DNS
   
-  while [ -z "$APP_DNS" ]; do
-    read -rp "Enter DNS for App Server (e.g. app.unic.chat): " APP_DNS
-  done
+  # Validate
+  if [ -z "$APP_DNS" ] || [ -z "$EDT_DNS" ] || [ -z "$MINIO_DNS" ]; then
+    log_error "All DNS names are required!"
+    return 1
+  fi
   
-  while [ -z "$EDT_DNS" ]; do
-    read -rp "Enter DNS for Document Server (e.g. docs.unic.chat): " EDT_DNS
-  done
-  
-  while [ -z "$MINIO_DNS" ]; do
-    read -rp "Enter DNS for MinIO (e.g. minio.unic.chat): " MINIO_DNS
-  done
-  
-  # Save to UnicChat config
-  cat > "$DNS_CONFIG" <<EOF
+  # Save configuration
+  cat > "$DNS_CONFIG_FILE" <<EOF
+# UnicChat DNS Configuration
 APP_DNS="$APP_DNS"
 EDT_DNS="$EDT_DNS"
 MINIO_DNS="$MINIO_DNS"
 EOF
-  echo "✅ UnicChat DNS configuration saved to $DNS_CONFIG"
+  
+  log_success "DNS configuration saved to $DNS_CONFIG_FILE"
+  
+  # Check DNS resolution
+  echo ""
+  echo "🔍 Checking DNS resolution..."
+  for dns in "$APP_DNS" "$EDT_DNS" "$MINIO_DNS"; do
+    echo -n "  $dns: "
+    if dig +short "$dns" | grep -q .; then
+      echo "✅ Resolved"
+    else
+      echo "⚠️ Not resolved (configure your DNS or /etc/hosts)"
+    fi
+  done
+  
+  # Export for docker-compose
+  export APP_DNS EDT_DNS MINIO_DNS
 }
 
-setup_license() {
-  echo -e "\n🔑 Setting up UnicChat license..."
-  
-  if [ -f "$LICENSE_FILE" ] && [ -n "$(cat "$LICENSE_FILE" 2>/dev/null | xargs)" ]; then
-    UNIC_LICENSE=$(cat "$LICENSE_FILE" | tr -d '\r' | tr -d '"' | tr -d "'" | xargs)
-    echo "✅ License already exists in $LICENSE_FILE"
-    echo "   License: $UNIC_LICENSE"
-    return
-  fi
-  
-  echo "📝 Enter UnicChat License Key (or press Enter to skip):"
-  read -rp "License Key: " license_input
-  
-  if [ -n "$license_input" ]; then
-    echo "$license_input" > "$LICENSE_FILE"
-    UNIC_LICENSE="$license_input"
-    chmod 600 "$LICENSE_FILE"
-    log_success "License saved to $LICENSE_FILE"
-  else
-    log_warning "No license provided. Some features may be limited."
-  fi
+# === URL Encoding ===
+
+urlencode() {
+  local string="$1"
+  local strlen=${#string}
+  local encoded=""
+  local pos c o
+
+  for (( pos=0 ; pos<strlen ; pos++ )); do
+    c=${string:$pos:1}
+    case "$c" in
+      [-_.~a-zA-Z0-9] ) o="${c}" ;;
+      * ) printf -v o '%%%02x' "'$c"
+    esac
+    encoded+="${o}"
+  done
+  echo "${encoded}"
 }
+
+urldecode() {
+  local url_encoded="${1//+/ }"
+  printf '%b' "${url_encoded//%/\\x}"
+}
+
+# === MongoDB Configuration ===
 
 update_mongo_config() {
   echo -e "\n🔧 Updating MongoDB configuration..."
-
+  
   local mongo_config_file="$MONGO_CONFIG_FILE"
-  local config_file="multi-server-install/config.txt"
-
+  
   if [ ! -f "$mongo_config_file" ]; then
     log_info "File $mongo_config_file not found, creating new."
     touch "$mongo_config_file"
   fi
-
-  if [ ! -f "$config_file" ]; then
-    log_info "File $config_file not found, creating new."
-    mkdir -p "$(dirname "$config_file")"
-    touch "$config_file"
-  fi
-
+  
   update_config() {
     local key=$1
     local value=$2
     local file=$3
-    if grep -q "^$key=" "$file"; then
+    if grep -q "^$key=" "$file" 2>/dev/null; then
       sed -i "s|^$key=.*|$key=\"$value\"|" "$file"
     else
       echo "$key=\"$value\"" >> "$file"
     fi
-    if [ $? -eq 0 ]; then
-      log_success "Successfully updated: $key=\"$value\" in $file"
-    else
-      log_error "Error updating $key in $file"
-      exit 1
-    fi
+    log_success "Updated: $key"
   }
-
-  get_value_from_mongo_config() {
+  
+  get_value_from_config() {
     local key=$1
     local value
-    if grep -q "^$key=" "$mongo_config_file"; then
+    if grep -q "^$key=" "$mongo_config_file" 2>/dev/null; then
       value=$(grep "^$key=" "$mongo_config_file" | cut -d'=' -f2 | tr -d '"')
       echo "$value"
     else
       echo ""
     fi
   }
-
+  
   prompt_value() {
     local key=$1
     local prompt=$2
-    read -p "$prompt: " value
-    if [ -z "$value" ]; then
-      log_error "Value for $key cannot be empty."
-      exit 1
-    fi
+    local default=$3
+    local value
+    
+    local current=$(get_value_from_config "$key")
+    local show_default="${current:-$default}"
+    
+    read -rp "$prompt [default: $show_default]: " value
+    value=${value:-$show_default}
+    
     update_config "$key" "$value" "$mongo_config_file"
-    update_config "$key" "$value" "$config_file"
   }
-
-  local keys=(
-    "MONGODB_ROOT_PASSWORD"
-    "MONGODB_USERNAME"
-    "MONGODB_PASSWORD"
-    "MONGODB_DATABASE"
-  )
-
-  for key in "${keys[@]}"; do
-    value=$(get_value_from_mongo_config "$key")
-    if [ -n "$value" ]; then
-      update_config "$key" "$value" "$config_file"
-    else
-      prompt_value "$key" "Enter $key"
-    fi
-  done
-
-  log_success "MongoDB configuration updated in $mongo_config_file and $config_file."
+  
+  echo "📦 Main MongoDB credentials:"
+  prompt_value "MONGODB_ROOT_PASSWORD" "  MongoDB root password" "rootpass"
+  prompt_value "MONGODB_USERNAME" "  MongoDB admin username" "unicchat_admin"
+  prompt_value "MONGODB_PASSWORD" "  MongoDB admin password" "secure_password_123"
+  prompt_value "MONGODB_DATABASE" "  MongoDB database name" "unicchat_db"
+  
+  echo ""
+  echo "🔐 Logger service credentials:"
+  prompt_value "LOGGER_USER" "  Logger MongoDB username" "logger_user"
+  prompt_value "LOGGER_PASSWORD" "  Logger MongoDB password" "logger_pass_123"
+  prompt_value "LOGGER_DB" "  Logger database name" "logger_db"
+  
+  echo ""
+  echo "🔐 Vault service credentials:"
+  prompt_value "VAULT_USER" "  Vault MongoDB username" "vault_user"
+  prompt_value "VAULT_PASSWORD" "  Vault MongoDB password" "vault_pass_123"
+  prompt_value "VAULT_DB" "  Vault database name" "vault_db"
+  
+  log_success "MongoDB configuration updated in $mongo_config_file"
 }
+
+# === MinIO Configuration ===
 
 update_minio_config() {
   echo -e "\n🔧 Updating MinIO configuration..."
-
+  
   local minio_config_file="$MINIO_CONFIG_FILE"
-  local config_file="knowledgebase/config.txt"
-
+  
   if [ ! -f "$minio_config_file" ]; then
     log_info "File $minio_config_file not found, creating new."
     touch "$minio_config_file"
   fi
-
-  if [ ! -f "$config_file" ]; then
-    log_info "File $config_file not found, creating new."
-    mkdir -p "$(dirname "$config_file")"
-    touch "$config_file"
-  fi
-
+  
   update_config() {
     local key=$1
     local value=$2
     local file=$3
-    if grep -q "^$key=" "$file"; then
+    if grep -q "^$key=" "$file" 2>/dev/null; then
       sed -i "s|^$key=.*|$key=\"$value\"|" "$file"
     else
       echo "$key=\"$value\"" >> "$file"
     fi
-    if [ $? -eq 0 ]; then
-      log_success "Successfully updated: $key=\"$value\" in $file"
-    else
-      log_error "Error updating $key in $file"
-      exit 1
-    fi
+    log_success "Updated: $key"
   }
-
-  get_value_from_minio_config() {
+  
+  get_value_from_config() {
     local key=$1
     local value
-    if grep -q "^$key=" "$minio_config_file"; then
+    if grep -q "^$key=" "$minio_config_file" 2>/dev/null; then
       value=$(grep "^$key=" "$minio_config_file" | cut -d'=' -f2 | tr -d '"')
       echo "$value"
     else
       echo ""
     fi
   }
-
+  
   prompt_value() {
     local key=$1
     local prompt=$2
-    read -p "$prompt: " value
-    if [ -z "$value" ]; then
-      log_error "Value for $key cannot be empty."
-      exit 1
-    fi
+    local default=$3
+    local value
+    
+    local current=$(get_value_from_config "$key")
+    local show_default="${current:-$default}"
+    
+    read -rp "$prompt [default: $show_default]: " value
+    value=${value:-$show_default}
+    
     update_config "$key" "$value" "$minio_config_file"
-    update_config "$key" "$value" "$config_file"
-  }
-
-  local keys=(
-    "MINIO_ROOT_USER"
-    "MINIO_ROOT_PASSWORD"
-  )
-
-  for key in "${keys[@]}"; do
-    value=$(get_value_from_minio_config "$key")
-    if [ -n "$value" ]; then
-      update_config "$key" "$value" "$config_file"
-    else
-      prompt_value "$key" "Enter $key"
-    fi
-  done
-
-  log_success "MinIO configuration updated in $minio_config_file and $config_file."
-}
-
-copy_ssl_configs() {
-  echo -e "\n📋 Copying SSL configuration files..."
-
-  mkdir -p "$NGINX_CERTBOT_CONF_DIR"
-
-  if [ ! -f "$NGINX_CERTBOT_CONF_DIR/options-ssl-nginx.conf" ]; then
-    if [ -f "nginx/options-ssl-nginx.conf" ]; then
-      cp "nginx/options-ssl-nginx.conf" "$NGINX_CERTBOT_CONF_DIR/"
-      echo "✅ options-ssl-nginx.conf copied to $NGINX_CERTBOT_CONF_DIR"
-    else
-      echo "⚠️ options-ssl-nginx.conf not found in nginx/"
-    fi
-  else
-    echo "✅ options-ssl-nginx.conf already exists in $NGINX_CERTBOT_CONF_DIR"
-  fi
-
-  if [ ! -f "$NGINX_CERTBOT_CONF_DIR/ssl-dhparams.pem" ]; then
-    echo -e "\n⏳ Generating DH parameters..."
-    openssl dhparam -out "$NGINX_CERTBOT_CONF_DIR/ssl-dhparams.pem" 2048
-    echo "✅ DH parameters generated"
-  else
-    echo "✅ DH parameters already exist"
-  fi
-}
-
-generate_nginx_conf() {
-  echo -e "\n🛠️ Generating Nginx configs for UnicChat services…"
-  
-  if [ ! -f "$DNS_CONFIG" ]; then
-    echo "❌ DNS configuration not found. Run step 5 first."
-    return 1
-  fi
-  source "$DNS_CONFIG"
-  
-  SERVER_IP=$(hostname -I | awk '{print $1}')
-  
-  APP_PORT="8080"
-  EDT_PORT="8880"
-  MINIO_PORT="9000"
-  
-  mkdir -p "$NGINX_CONF_DIR"
-  
-  generate_config() {
-    local domain=$1
-    local upstream=$2
-    local port=$3
-    local output_file="$NGINX_CONF_DIR/${domain}.conf"
-    
-    echo "🔧 Generating config for: $domain → $upstream:$port"
-    
-    cat > "$output_file" <<EOF
-# Configuration for $domain
-# Generated: $(date)
-# Server IP: $SERVER_IP
-
-upstream $upstream {
-    server $SERVER_IP:$port;
-}
-
-server {
-    listen 80;
-    listen 443 ssl;
-    http2 on;
-    server_name $domain;
-    client_max_body_size 200M;
-
-    error_log /var/log/nginx/${domain}.error.log;
-    access_log /var/log/nginx/${domain}.access.log;
-
-    if (\$scheme = http) {
-        return 301 https://\$host\$request_uri;
-    }
-
-    location / {
-        proxy_pass http://$upstream;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$http_host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header X-Nginx-Proxy true;
-        proxy_redirect off;
-    }
-
-    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-}
-EOF
-    
-    echo "✅ Created: $output_file"
   }
   
-  generate_config "$APP_DNS" "myapp" "$APP_PORT"
-  generate_config "$EDT_DNS" "edtapp" "$EDT_PORT"
-  generate_config "$MINIO_DNS" "myminio" "$MINIO_PORT"
+  echo "🪣 MinIO credentials:"
+  prompt_value "MINIO_ROOT_USER" "  MinIO root user" "minioadmin"
+  prompt_value "MINIO_ROOT_PASSWORD" "  MinIO root password" "minioadmin123"
   
-  echo "🎉 Nginx configs generated in $NGINX_CONF_DIR"
+  log_success "MinIO configuration updated in $minio_config_file"
 }
 
-deploy_nginx_conf() {
-  echo -e "\n📤 Deploying Nginx configs…"
-  
-  if [ ! -f "$NGINX_COMPOSE_FILE" ]; then
-    echo "❌ Docker compose file not found: $NGINX_COMPOSE_FILE"
-    return 1
-  fi
-
-  if [ ! -f "$DNS_CONFIG" ]; then
-    echo "❌ DNS configuration not found. Run step 7 first."
-    return 1
-  fi
-  source "$DNS_CONFIG"
-
-  if [ ! -d "$NGINX_CONF_DIR" ] || [ -z "$(ls -A "$NGINX_CONF_DIR" 2>/dev/null)" ]; then
-    echo "❌ No configs found in $NGINX_CONF_DIR. Run step 12 first."
-    return 1
-  fi
-
-  local domains=()
-  [ -n "${APP_DNS:-}" ] && domains+=("$APP_DNS")
-  [ -n "${EDT_DNS:-}" ] && domains+=("$EDT_DNS")
-  [ -n "${MINIO_DNS:-}" ] && domains+=("$MINIO_DNS")
-
-  local missing_certs=()
-  for domain in "${domains[@]}"; do
-    if [ ! -f "$NGINX_CERTBOT_CONF_DIR/live/$domain/fullchain.pem" ]; then
-      missing_certs+=("$domain")
-    fi
-  done
-
-  if [ ${#missing_certs[@]} -gt 0 ]; then
-    echo "⚠️ SSL certificates not found for: ${missing_certs[*]}"
-    echo "   Run 'Setup SSL certificates' (menu option 15) before deploying configs."
-    return 1
-  fi
-
-  docker_compose -f "$NGINX_COMPOSE_FILE" up -d nginx
-
-  if docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -t; then
-    docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -s reload
-    echo "✅ Nginx container reloaded with new configs"
-  else
-    echo "❌ Nginx config test failed. Check logs."
-    return 1
-  fi
-}
-
-setup_ssl() {
-  echo -e "\n🔐 Setting up SSL certificates for UnicChat domains…"
-  
-  if [ ! -f "$DNS_CONFIG" ]; then
-    echo "❌ DNS configuration not found. Run step 5 first."
-    return 1
-  fi
-  source "$DNS_CONFIG"
-  
-  copy_ssl_configs
-  
-  local domains=()
-  [ -n "$APP_DNS" ] && domains+=("$APP_DNS")
-  [ -n "$EDT_DNS" ] && domains+=("$EDT_DNS")
-  [ -n "$MINIO_DNS" ] && domains+=("$MINIO_DNS")
-  
-  if [ ${#domains[@]} -eq 0 ]; then
-    echo "❌ No domains found in DNS config."
-    return 1
-  fi
-  
-  echo "📋 Creating SSL certificates for: ${domains[*]}"
-
-  if [ ! -f "$NGINX_COMPOSE_FILE" ]; then
-    echo "❌ Docker compose file not found: $NGINX_COMPOSE_FILE"
-    return 1
-  fi
-
-  echo "🛑 Stopping dockerized nginx to free port 80/443..."
-  docker_compose -f "$NGINX_COMPOSE_FILE" stop nginx || true
-
-  for domain in "${domains[@]}"; do
-    CERT_PATH="$NGINX_CERTBOT_CONF_DIR/live/$domain"
-    if [ -d "$CERT_PATH" ]; then
-      echo "ℹ️ Certificate for $domain found. Attempting to renew if needed..."
-      if ! docker_compose -f "$NGINX_COMPOSE_FILE" run --rm --service-ports certbot renew --cert-name "$domain" --non-interactive; then
-        echo "❌ Certbot renew failed for $domain"
-        docker_compose -f "$NGINX_COMPOSE_FILE" start nginx >/dev/null 2>&1 || true
-        return 1
-      fi
-    else
-      echo "📝 No certificate found for $domain. Requesting new certificate..."
-      if ! docker_compose -f "$NGINX_COMPOSE_FILE" run --rm --service-ports certbot certonly --standalone --non-interactive --agree-tos --email "$EMAIL" -d "$domain"; then
-        echo "❌ Certbot failed to obtain certificate for $domain"
-        docker_compose -f "$NGINX_COMPOSE_FILE" start nginx >/dev/null 2>&1 || true
-        return 1
-      fi
-    fi
-  done
-  
-  echo "▶️ Starting dockerized nginx..."
-  docker_compose -f "$NGINX_COMPOSE_FILE" up -d nginx
-  
-  if docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -t; then
-    docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -s reload
-    echo "✅ SSL setup complete for UnicChat domains"
-  else
-    echo "❌ Nginx config test failed after SSL setup."
-    return 1
-  fi
-}
-
-activate_nginx() {
-  echo -e "\n🚀 Activating dockerized Nginx…"
-  if [ ! -f "$NGINX_COMPOSE_FILE" ]; then
-    echo "❌ Docker compose file not found: $NGINX_COMPOSE_FILE"
-    return 1
-  fi
-
-  if docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -t; then
-    docker_compose -f "$NGINX_COMPOSE_FILE" exec -T nginx nginx -s reload
-    echo "✅ Nginx container reloaded"
-  else
-    echo "❌ Nginx config test failed."
-    return 1
-  fi
-}
-
-update_solid_env() {
-  echo -e "\n🔗 Linking Knowledgebase MinIO with UnicChat solid…"
-  
-  local solid_env="multi-server-install/solid.env"
-  local kb_config="knowledgebase/config.txt"
-  
-  if [ ! -f "$solid_env" ]; then
-    echo "❌ solid.env file not found: $solid_env"
-    return 1
-  fi
-  
-  if [ ! -f "$kb_config" ]; then
-    echo "❌ Knowledgebase config not found: $kb_config"
-    echo "⚠️ Please deploy knowledgebase first to get MinIO credentials"
-    return 1
-  fi
-  
-  source "$kb_config"
-  
-  if [ ! -f "$DNS_CONFIG" ]; then
-    echo "❌ DNS configuration not found. Run step 5 first."
-    return 1
-  fi
-  source "$DNS_CONFIG"
-  
-  sed -i '/# MinIO Configuration/,/MINIO_SECRET_KEY/d' "$solid_env"
-  
-  cat >> "$solid_env" <<EOF
-
-# MinIO Configuration from Knowledgebase
-UnInit.1="'Minio': { 'Type': 'NamedServiceAuth', 'IpOrHost': '$MINIO_DNS', 'UserName': '$MINIO_ROOT_USER', 'Password': '$MINIO_ROOT_PASSWORD' }"
-EOF
-  
-  if [ -n "$UNIC_LICENSE" ]; then
-    echo "UnicLicense=\"$UNIC_LICENSE\"" >> "$solid_env"
-    echo "✅ License added to solid.env"
-  fi
-  
-  echo "✅ Knowledgebase MinIO linked to UnicChat solid"
-  echo "   MinIO URL: $MINIO_DNS"
-  echo "   Username: $MINIO_ROOT_USER"
-}
-
-update_appserver_env() {
-  echo -e "\n🔗 Linking Document Server with UnicChat appserver…"
-  
-  local appserver_env="multi-server-install/appserver.env"
-  
-  if [ ! -f "$appserver_env" ]; then
-    echo "❌ appserver.env file not found: $appserver_env"
-    return 1
-  fi
-  
-  if [ ! -f "$DNS_CONFIG" ]; then
-    echo "❌ DNS configuration not found. Run step 5 first."
-    return 1
-  fi
-  source "$DNS_CONFIG"
-  
-  # Removed ROOT_URL modification as requested
-  sed -i "s|ROOT_URL=.*|ROOT_URL=https://$APP_DNS|" "$appserver_env"
-  
-  if ! grep -q "DOCUMENT_SERVER_HOST" "$appserver_env"; then
-    echo "DOCUMENT_SERVER_HOST=https://$EDT_DNS" >> "$appserver_env"
-  else
-    sed -i "s|DOCUMENT_SERVER_HOST=.*|DOCUMENT_SERVER_HOST=https://$EDT_DNS|" "$appserver_env"
-  fi
-  
-  echo "✅ Document Server linked to UnicChat appserver"
-  echo "   Document Server URL: https://$EDT_DNS"
-}
+# === Environment Files Generation ===
 
 prepare_all_envs() {
   echo -e "\n📦 Preparing all environment files…"
   
   local dir="multi-server-install"
-  (cd "$dir" && chmod +x generate_env_files.sh && ./generate_env_files.sh)
   
-  update_solid_env
-  update_appserver_env
+  # Load MongoDB configuration
+  if [ ! -f "$MONGO_CONFIG_FILE" ]; then
+    log_warning "$MONGO_CONFIG_FILE not found. Run 'Update MongoDB configuration' first."
+    return 1
+  fi
   
-  echo "✅ All environment files prepared and updated"
+  source "$MONGO_CONFIG_FILE"
+  
+  # Load MinIO configuration
+  if [ ! -f "$MINIO_CONFIG_FILE" ]; then
+    log_warning "$MINIO_CONFIG_FILE not found. Run 'Update MinIO configuration' first."
+    return 1
+  fi
+  
+  source "$MINIO_CONFIG_FILE"
+  
+  # Load DNS configuration
+  if [ ! -f "$DNS_CONFIG_FILE" ]; then
+    log_warning "$DNS_CONFIG_FILE not found. Run 'Setup DNS names' first."
+    return 1
+  fi
+  
+  source "$DNS_CONFIG_FILE"
+  
+  # Default values if not set
+  MONGODB_REPLICA_SET_MODE=${MONGODB_REPLICA_SET_MODE:-primary}
+  MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME:-rs0}
+  MONGODB_REPLICA_SET_KEY=${MONGODB_REPLICA_SET_KEY:-rs0key}
+  MONGODB_PORT_NUMBER=${MONGODB_PORT_NUMBER:-27017}
+  MONGODB_INITIAL_PRIMARY_HOST=${MONGODB_INITIAL_PRIMARY_HOST:-unicchat.mongodb}
+  MONGODB_INITIAL_PRIMARY_PORT_NUMBER=${MONGODB_INITIAL_PRIMARY_PORT_NUMBER:-27017}
+  MONGODB_ADVERTISED_HOSTNAME=${MONGODB_ADVERTISED_HOSTNAME:-unicchat.mongodb}
+  MONGODB_ENABLE_JOURNAL=${MONGODB_ENABLE_JOURNAL:-true}
+  MONGODB_ROOT_PASSWORD=${MONGODB_ROOT_PASSWORD:-rootpass}
+  MONGODB_USERNAME=${MONGODB_USERNAME:-unicchat_admin}
+  MONGODB_PASSWORD=${MONGODB_PASSWORD:-secure_password_123}
+  MONGODB_DATABASE=${MONGODB_DATABASE:-unicchat_db}
+  
+  # Service defaults
+  LOGGER_USER=${LOGGER_USER:-logger_user}
+  LOGGER_PASSWORD=${LOGGER_PASSWORD:-logger_pass_123}
+  LOGGER_DB=${LOGGER_DB:-logger_db}
+  
+  VAULT_USER=${VAULT_USER:-vault_user}
+  VAULT_PASSWORD=${VAULT_PASSWORD:-vault_pass_123}
+  VAULT_DB=${VAULT_DB:-vault_db}
+  
+  MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+  MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
+  
+  # Generate mongo.env
+  cat > "$dir/mongo.env" << EOL
+# Replica Set Configuration
+MONGODB_REPLICA_SET_MODE=$MONGODB_REPLICA_SET_MODE
+MONGODB_REPLICA_SET_NAME=$MONGODB_REPLICA_SET_NAME
+MONGODB_REPLICA_SET_KEY=$MONGODB_REPLICA_SET_KEY
+MONGODB_PORT_NUMBER=$MONGODB_PORT_NUMBER
+MONGODB_INITIAL_PRIMARY_HOST=$MONGODB_INITIAL_PRIMARY_HOST
+MONGODB_INITIAL_PRIMARY_PORT_NUMBER=$MONGODB_INITIAL_PRIMARY_PORT_NUMBER
+MONGODB_ADVERTISED_HOSTNAME=$MONGODB_ADVERTISED_HOSTNAME
+MONGODB_ENABLE_JOURNAL=$MONGODB_ENABLE_JOURNAL
+EOL
+  log_success "Generated $dir/mongo.env"
+  
+  # Generate mongo_creds.env
+  cat > "$dir/mongo_creds.env" << EOL
+# MongoDB Authentication
+MONGODB_ROOT_PASSWORD=$MONGODB_ROOT_PASSWORD
+MONGODB_USERNAME=$MONGODB_USERNAME
+MONGODB_PASSWORD=$MONGODB_PASSWORD
+MONGODB_DATABASE=$MONGODB_DATABASE
+EOL
+  chmod 600 "$dir/mongo_creds.env" 2>/dev/null || true
+  log_success "Generated $dir/mongo_creds.env"
+  
+  # Generate appserver.env with MongoDB connection
+  local mongo_url="mongodb://$MONGODB_USERNAME:$MONGODB_PASSWORD@$MONGODB_INITIAL_PRIMARY_HOST:$MONGODB_PORT_NUMBER/$MONGODB_DATABASE?replicaSet=$MONGODB_REPLICA_SET_NAME"
+  local mongo_oplog_url="mongodb://$MONGODB_USERNAME:$MONGODB_PASSWORD@$MONGODB_INITIAL_PRIMARY_HOST:$MONGODB_PORT_NUMBER/local"
+  
+  cat > "$dir/appserver.env" << EOL
+# UnicChat AppServer Configuration
+MONGO_URL=$mongo_url
+MONGO_OPLOG_URL=$mongo_oplog_url
+ROOT_URL=https://$APP_DNS
+DOCUMENT_SERVER_HOST=https://$EDT_DNS
+PORT=3000
+DEPLOY_METHOD=docker
+DB_COLLECTIONS_PREFIX=unicchat_
+EOL
+  log_success "Generated $dir/appserver.env"
+  
+  # URL-encode passwords
+  local LOGGER_PASSWORD_ENCODED=$(urlencode "$LOGGER_PASSWORD")
+  local VAULT_PASSWORD_ENCODED=$(urlencode "$VAULT_PASSWORD")
+  
+  # Generate logger_creds.env
+  cat > "$dir/logger_creds.env" << EOL
+# MongoDB connection for logger service
+MongoCS="mongodb://$LOGGER_USER:$LOGGER_PASSWORD_ENCODED@$MONGODB_INITIAL_PRIMARY_HOST:$MONGODB_PORT_NUMBER/$LOGGER_DB?directConnection=true&authSource=$LOGGER_DB&authMechanism=SCRAM-SHA-256"
+EOL
+  chmod 600 "$dir/logger_creds.env" 2>/dev/null || true
+  log_success "Generated $dir/logger_creds.env"
+  
+  # Generate vault_creds.env
+  cat > "$dir/vault_creds.env" << EOL
+# MongoDB connection for vault service
+MongoCS="mongodb://$VAULT_USER:$VAULT_PASSWORD_ENCODED@$MONGODB_INITIAL_PRIMARY_HOST:$MONGODB_PORT_NUMBER/$VAULT_DB?directConnection=true&authSource=$VAULT_DB&authMechanism=SCRAM-SHA-256"
+EOL
+  chmod 600 "$dir/vault_creds.env" 2>/dev/null || true
+  log_success "Generated $dir/vault_creds.env"
+  
+  # Generate logger.env
+  cat > "$dir/logger.env" << EOL
+# Logger API URL (internal)
+api.logger.url=http://unicchat.logger:8080/
+EOL
+  log_success "Generated $dir/logger.env"
+  
+  # Generate minio_env.env
+  mkdir -p "$dir/env"
+  cat > "$dir/env/minio_env.env" << EOL
+# MinIO Configuration
+MINIO_ROOT_USER=$MINIO_ROOT_USER
+MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD
+MINIO_BROWSER=on
+MINIO_DOMAIN=$MINIO_DNS
+EOL
+  log_success "Generated $dir/env/minio_env.env"
+  
+  # Generate documentserver_env.env
+  cat > "$dir/env/documentserver_env.env" << EOL
+# DocumentServer Configuration
+JWT_ENABLED=true
+JWT_SECRET=your_jwt_secret_here
+JWT_HEADER=Authorization
+DB_TYPE=postgres
+DB_HOST=uniceditor-postgresql
+DB_PORT=5432
+DB_NAME=dbname
+DB_USER=dbuser
+AMQP_URI=amqp://guest:guest@uniceditor-rabbitmq
+EOL
+  log_success "Generated $dir/env/documentserver_env.env"
+  
+  echo ""
+  log_success "All environment files prepared:"
+  echo "   • mongo.env (replica set config)"
+  echo "   • mongo_creds.env (authentication)"
+  echo "   • logger_creds.env (Logger service MongoDB)"
+  echo "   • vault_creds.env (Vault service MongoDB)"
+  echo "   • appserver.env (AppServer with ROOT_URL=$APP_DNS)"
+  echo "   • env/minio_env.env (MinIO configuration)"
+  echo "   • env/documentserver_env.env (DocumentServer)"
 }
 
-prepare_unicchat() {
-  echo -e "\n📦 Preparing env files…"
-  prepare_all_envs
+# === MongoDB Users Setup ===
+
+setup_mongodb_users() {
+  echo -e "\n🔐 Setting up MongoDB users for services…"
+  local dir="multi-server-install"
+  
+  # Check MongoDB is running
+  if ! docker ps | grep -q "unicchat.mongodb"; then
+    log_warning "MongoDB container is not running. Start services first."
+    return 1
+  fi
+  
+  # Read root password
+  local mongo_creds_file="$dir/mongo_creds.env"
+  if [ ! -f "$mongo_creds_file" ]; then
+    log_error "File $mongo_creds_file not found. Run 'Prepare .env files' first."
+    return 1
+  fi
+  
+  local root_password=$(grep '^MONGODB_ROOT_PASSWORD=' "$mongo_creds_file" | cut -d '=' -f2- | tr -d '\r')
+  local container="unicchat.mongodb"
+  
+  if [ -z "$root_password" ]; then
+    log_error "MONGODB_ROOT_PASSWORD not found in $mongo_creds_file"
+    return 1
+  fi
+  
+  # Wait for MongoDB
+  echo "⏳ Waiting for MongoDB to be ready..."
+  local max_attempts=15
+  local attempt=0
+  while [ $attempt -lt $max_attempts ]; do
+    if docker exec "$container" mongosh -u root -p "$root_password" --quiet --eval "db.adminCommand('ping')" 2>/dev/null | grep -q "ok.*1"; then
+      log_success "MongoDB is ready"
+      break
+    fi
+    attempt=$((attempt + 1))
+    echo "  Attempt $attempt/$max_attempts..."
+    sleep 2
+  done
+  
+  if [ $attempt -eq $max_attempts ]; then
+    log_warning "MongoDB is not ready after $max_attempts attempts. Trying to continue anyway..."
+  fi
+  
+  # Create logger user
+  local logger_creds_file="$dir/logger_creds.env"
+  if [ -f "$logger_creds_file" ]; then
+    local logger_mongocs=$(grep '^MongoCS=' "$logger_creds_file" | cut -d '=' -f2- | tr -d '\r' | sed 's/^"//;s/"$//')
+    if [ -n "$logger_mongocs" ]; then
+      local creds_part=$(echo "$logger_mongocs" | sed 's|^mongodb://||' | cut -d '@' -f1)
+      local host_part=$(echo "$logger_mongocs" | sed 's|^mongodb://||' | cut -d '@' -f2)
+      local logger_user=$(echo "$creds_part" | cut -d ':' -f1)
+      local logger_pass_encoded=$(echo "$creds_part" | cut -d ':' -f2-)
+      local logger_db=$(echo "$host_part" | cut -d '/' -f2 | cut -d '?' -f1)
+      logger_db=${logger_db:-logger_db}
+      
+      local logger_pass
+      if [[ "$logger_pass_encoded" == *%* ]]; then
+        logger_pass=$(urldecode "$logger_pass_encoded")
+      else
+        logger_pass="$logger_pass_encoded"
+      fi
+      
+      if [ -n "$logger_user" ] && [ -n "$logger_pass" ] && [ -n "$logger_db" ]; then
+        echo "📝 Creating $logger_db and user $logger_user..."
+        
+        local temp_script=$(mktemp)
+        cat > "$temp_script" <<EOF
+use admin
+db = db.getSiblingDB('$logger_db')
+try {
+  db.createUser({
+    user: '$logger_user',
+    pwd: '$logger_pass',
+    roles: [{ role: 'readWrite', db: '$logger_db' }]
+  })
+  print('CREATED')
+} catch(e) {
+  if (e.code === 51003 || e.codeName === 'DuplicateKey' || e.message.includes('already exists')) {
+    db.changeUserPassword('$logger_user', '$logger_pass')
+    print('PASSWORD_UPDATED')
+  } else {
+    print('ERROR: ' + e.message)
+    throw e
+  }
 }
+EOF
+        
+        local create_output=$(timeout 30 docker exec -i "$container" mongosh -u root -p "$root_password" --authenticationDatabase admin < "$temp_script" 2>&1)
+        rm -f "$temp_script"
+        
+        if echo "$create_output" | grep -qE "CREATED|PASSWORD_UPDATED"; then
+          log_success "Logger user configured"
+        else
+          log_warning "Logger user configuration uncertain"
+          echo "   Output: $(echo "$create_output" | grep -E "CREATED|PASSWORD_UPDATED|ERROR" | head -1)"
+        fi
+      fi
+    fi
+  fi
+  
+  # Create vault user
+  local vault_env_file="$dir/vault_creds.env"
+  if [ -f "$vault_env_file" ]; then
+    local vault_mongocs=$(grep '^MongoCS=' "$vault_env_file" | cut -d '=' -f2- | tr -d '\r' | sed 's/^"//;s/"$//')
+    if [ -n "$vault_mongocs" ]; then
+      local creds_part=$(echo "$vault_mongocs" | sed 's|^mongodb://||' | cut -d '@' -f1)
+      local host_part=$(echo "$vault_mongocs" | sed 's|^mongodb://||' | cut -d '@' -f2)
+      local vault_user=$(echo "$creds_part" | cut -d ':' -f1)
+      local vault_pass_encoded=$(echo "$creds_part" | cut -d ':' -f2-)
+      local vault_db=$(echo "$host_part" | cut -d '/' -f2 | cut -d '?' -f1)
+      vault_db=${vault_db:-vault_db}
+      
+      local vault_pass
+      if [[ "$vault_pass_encoded" == *%* ]]; then
+        vault_pass=$(urldecode "$vault_pass_encoded")
+      else
+        vault_pass="$vault_pass_encoded"
+      fi
+      
+      if [ -n "$vault_user" ] && [ -n "$vault_pass" ] && [ -n "$vault_db" ]; then
+        echo "📝 Creating $vault_db and user $vault_user..."
+        
+        local temp_script=$(mktemp)
+        cat > "$temp_script" <<EOF
+use admin
+db = db.getSiblingDB('$vault_db')
+try {
+  db.createUser({
+    user: '$vault_user',
+    pwd: '$vault_pass',
+    roles: [{ role: 'readWrite', db: '$vault_db' }]
+  })
+  print('CREATED')
+} catch(e) {
+  if (e.code === 51003 || e.codeName === 'DuplicateKey' || e.message.includes('already exists')) {
+    db.changeUserPassword('$vault_user', '$vault_pass')
+    print('PASSWORD_UPDATED')
+  } else {
+    print('ERROR: ' + e.message)
+    throw e
+  }
+}
+EOF
+        
+        local create_output=$(timeout 30 docker exec -i "$container" mongosh -u root -p "$root_password" --authenticationDatabase admin < "$temp_script" 2>&1)
+        rm -f "$temp_script"
+        
+        if echo "$create_output" | grep -qE "CREATED|PASSWORD_UPDATED"; then
+          log_success "Vault user configured"
+        else
+          log_warning "Vault user configuration uncertain"
+          echo "   Output: $(echo "$create_output" | grep -E "CREATED|PASSWORD_UPDATED|ERROR" | head -1)"
+        fi
+      fi
+    fi
+  fi
+  
+  log_success "MongoDB users configured."
+}
+
+# === Vault Secrets Setup (with real values, using bash) ===
+
+setup_vault_secrets() {
+  echo -e "\n🔐 Setting up Vault secrets for KBT service…"
+  local dir="multi-server-install"
+  
+  # Check Vault is running
+  local container="unicchat.vault"
+  if ! docker ps | grep -q "$container"; then
+    log_warning "Vault container is not running. Start services first."
+    return 1
+  fi
+  
+  # Load MinIO configuration
+  if [ ! -f "$MINIO_CONFIG_FILE" ]; then
+    log_error "$MINIO_CONFIG_FILE not found. Run 'Update MinIO configuration' first."
+    return 1
+  fi
+  
+  source "$MINIO_CONFIG_FILE"
+  
+  # Load DNS configuration
+  if [ ! -f "$DNS_CONFIG_FILE" ]; then
+    log_error "$DNS_CONFIG_FILE not found. Run 'Setup DNS names' first."
+    return 1
+  fi
+  
+  source "$DNS_CONFIG_FILE"
+  
+  # Read MongoDB connection string
+  local logger_creds_file="$dir/logger_creds.env"
+  if [ ! -f "$logger_creds_file" ]; then
+    log_error "File $logger_creds_file not found. Run 'Prepare .env files' first."
+    return 1
+  fi
+  
+  local mongo_url=$(grep '^MongoCS=' "$logger_creds_file" | cut -d '=' -f2- | tr -d '\r' | sed 's/^"//;s/"$//')
+  if [ -z "$mongo_url" ]; then
+    log_error "MongoCS not found in $logger_creds_file"
+    return 1
+  fi
+  
+  # Check and install curl in container if needed
+  echo "🔧 Checking for curl in Vault container..."
+  if ! docker exec "$container" bash -c "command -v curl >/dev/null 2>&1"; then
+    echo "   Installing curl (this may take a moment)..."
+    # Try with root user
+    if docker exec -u root "$container" bash -c "apt-get update -qq && apt-get install -y -qq curl" >/dev/null 2>&1; then
+      log_success "curl installed"
+    elif docker exec "$container" bash -c "apt-get update -qq && apt-get install -y -qq curl" >/dev/null 2>&1; then
+      log_success "curl installed"
+    else
+      log_error "Failed to install curl. Container may not have package manager access."
+      echo "   Try manually: docker exec -u root unicchat.vault apt-get update && apt-get install -y curl"
+      return 1
+    fi
+  else
+    echo "   ✓ curl available"
+  fi
+  
+  # Vault API configuration
+  local vault_url="http://localhost:80"
+  local token_id="0f8e160416b94225a73f86ac23b9118b"
+  local username="KBTservice"
+  
+  echo "📝 Step 1: Checking Vault availability..."
+  echo "   Container: $container"
+  echo "   Vault URL (internal): $vault_url"
+  echo "   Test endpoint: GET /api/token/$token_id?username=$username"
+  
+  echo "⏳ Waiting for Vault to be ready..."
+  local max_attempts=15
+  local attempt=0
+  while [ $attempt -lt $max_attempts ]; do
+    echo "   Attempt $attempt/$max_attempts - checking Vault health..."
+    if docker exec "$container" bash -c "curl -s -f '$vault_url/api/token/$token_id?username=$username' >/dev/null 2>&1"; then
+      log_success "Vault is responding (attempt $attempt)"
+      break
+    fi
+    attempt=$((attempt + 1))
+    if [ $attempt -lt $max_attempts ]; then
+      echo "   ⏱️  Waiting 2 seconds before retry..."
+      sleep 2
+    fi
+  done
+  
+  if [ $attempt -eq $max_attempts ]; then
+    log_warning "Vault didn't respond after $max_attempts attempts, trying to continue anyway..."
+  fi
+  
+  # Get token
+  echo ""
+  echo "📝 Step 2: Getting Vault authentication token..."
+  echo "   Token ID: ${token_id:0:8}...${token_id:(-8)}"
+  echo "   Username: $username"
+  echo "   Request: GET $vault_url/api/token/$token_id?username=$username"
+  echo "   Timeout: 30 seconds"
+  echo "   🔄 Executing curl inside container..."
+  
+  local token_response=$(timeout 30 docker exec "$container" bash -c "curl -s -w '\nHTTP_CODE:%{http_code}' -X 'GET' '$vault_url/api/token/$token_id?username=$username'" 2>&1)
+  
+  # Extract HTTP code and body
+  local http_code=$(echo "$token_response" | grep "HTTP_CODE:" | cut -d':' -f2)
+  local response_body=$(echo "$token_response" | grep -v "HTTP_CODE:" | tr -d '\n\r')
+  
+  echo "   ✓ Response received"
+  echo "   HTTP Code: ${http_code:-unknown}"
+  echo "   Response length: ${#response_body} chars"
+  echo "   Response (first 50 chars): ${response_body:0:50}..."
+  echo "   Response (last 30 chars): ...${response_body:(-30)}"
+  
+  local token=""
+  
+  echo "   🔍 Parsing token from response..."
+  
+  # API returns JWT token directly (not wrapped in JSON)
+  if [[ "$response_body" =~ ^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$ ]]; then
+    # JWT token format detected
+    token="$response_body"
+    echo "   ✓ JWT token format detected (3 base64url parts)"
+    local header=$(echo "$token" | cut -d'.' -f1)
+    local payload=$(echo "$token" | cut -d'.' -f2)
+    local signature=$(echo "$token" | cut -d'.' -f3)
+    echo "   ✓ Token parts: header(${#header}), payload(${#payload}), signature(${#signature})"
+  elif echo "$response_body" | grep -q '"token"'; then
+    # JSON format: {"token": "..."}
+    token=$(echo "$response_body" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+    echo "   ✓ JSON format detected, extracted 'token' field"
+  else
+    log_warning "Unexpected token format, using raw response"
+    token="$response_body"
+  fi
+  
+  if [ -z "$token" ] || [ "$token" = "null" ]; then
+    log_error "Failed to extract token from response."
+    echo "   Full response: $token_response"
+    return 1
+  fi
+  
+  log_success "Token obtained successfully"
+  echo "   Token length: ${#token} characters"
+  echo "   Token preview: ${token:0:40}...${token:(-40)}"
+  
+  # Create secret with real MinIO credentials
+  echo ""
+  echo "📝 Step 3: Creating KBTConfigs secret in Vault..."
+  echo "   Secret ID: KBTConfigs"
+  echo "   Secret Type: Password"
+  echo "   Expiration: 2030-12-31"
+  echo "   Tags: KB, Tasker, Mongo, Minio"
+  echo ""
+  echo "   📦 Secret contents:"
+  echo "      └─ metadata.MongoCS: ${mongo_url:0:25}...@..."
+  echo "      └─ metadata.MinioHost: $MINIO_DNS"
+  echo "      └─ metadata.MinioUser: $MINIO_ROOT_USER"
+  echo "      └─ metadata.MinioPass: ${MINIO_ROOT_PASSWORD:0:3}***${MINIO_ROOT_PASSWORD:(-3)}"
+  
+  local secret_payload=$(cat <<EOF
+{
+  "id": "KBTConfigs",
+  "name": "KBTConfigs",
+  "type": "Password",
+  "data": "All info in META",
+  "metadata": {
+    "MongoCS": "$mongo_url",
+    "MinioHost": "$MINIO_DNS",
+    "MinioUser": "$MINIO_ROOT_USER",
+    "MinioPass": "$MINIO_ROOT_PASSWORD"
+  },
+  "tags": ["KB", "Tasker", "Mongo", "Minio"],
+  "expiresAt": "2030-12-31T23:59:59.999Z"
+}
+EOF
+)
+  
+  # Escape JSON payload for shell
+  echo ""
+  echo "   🔧 Preparing JSON payload..."
+  local escaped_payload=$(echo "$secret_payload" | sed 's/"/\\"/g' | tr -d '\n')
+  echo "   ✓ Payload prepared (${#escaped_payload} chars after escaping)"
+  
+  # Send POST request using bash
+  echo ""
+  echo "   📤 Sending POST request to Vault API..."
+  echo "   Endpoint: POST $vault_url/api/Secrets"
+  echo "   Headers:"
+  echo "      └─ Authorization: Bearer ${token:0:20}...${token:(-20)}"
+  echo "      └─ Content-Type: application/json"
+  echo "      └─ Accept: text/plain"
+  echo "   Timeout: 90 seconds"
+  echo "   🔄 Executing..."
+  
+  local secret_response=$(timeout 90 docker exec "$container" bash -c "curl -s --max-time 85 -w '\n%{http_code}' -X 'POST' \
+    '$vault_url/api/Secrets' \
+    -H 'Authorization: Bearer $token' \
+    -H 'accept: text/plain' \
+    -H 'Content-Type: application/json' \
+    -d \"$escaped_payload\"" 2>&1) || secret_response="TIMEOUT"
+  
+  echo ""
+  if [ "$secret_response" = "TIMEOUT" ]; then
+    log_warning "Request timeout after 90s. Verifying if secret was created..."
+    
+    # Try to verify
+    echo "   🔍 Verification: GET /api/Secrets/KBTConfigs"
+    local verify_response=$(timeout 10 docker exec "$container" bash -c "curl -s -X 'GET' \
+      '$vault_url/api/Secrets/KBTConfigs' \
+      -H 'Authorization: Bearer $token'" 2>&1)
+    
+    if echo "$verify_response" | grep -q "KBTConfigs"; then
+      log_success "Secret KBTConfigs was created (verified after timeout)"
+      echo "   ✓ Secret exists in Vault"
+      return 0
+    else
+      log_warning "Could not verify secret creation. Please check Vault manually."
+      echo "   Verification response: ${verify_response:0:100}"
+      return 0
+    fi
+  fi
+  
+  local http_code=$(echo "$secret_response" | tail -n1)
+  local response_body=$(echo "$secret_response" | head -n-1)
+  
+  echo "   ✓ Response received"
+  echo "   HTTP Code: $http_code"
+  if [ -n "$response_body" ]; then
+    echo "   Response body (first 100 chars): ${response_body:0:100}"
+  fi
+  
+  echo ""
+  if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+    log_success "Vault secret KBTConfigs created successfully"
+    echo "   ✅ Secret stored in Vault"
+    echo "   ✅ MongoDB connection: configured"
+    echo "   ✅ MinIO credentials: configured"
+    echo "   ✅ Tags: KB, Tasker, Mongo, Minio"
+    echo "   ✅ Expires: 2030-12-31"
+  else
+    log_warning "Failed to create Vault secret. HTTP code: $http_code"
+    if [ -n "$response_body" ]; then
+      echo "   Full response: ${response_body:0:300}"
+    fi
+  fi
+}
+
+# === Docker Operations ===
 
 login_yandex() {
   echo -e "\n🔑 Logging into Yandex Container Registry…"
   docker login --username oauth \
     --password y0_AgAAAAB3muX6AATuwQAAAAEawLLRAAB9TQHeGyxGPZXkjVDHF1ZNJcV8UQ \
     cr.yandex
-  echo "✅ Logged in."
+  log_success "Logged in to Yandex CR"
+}
+
+create_network() {
+  echo -e "\n🌐 Creating Docker network…"
+  if docker network inspect unicchat-network >/dev/null 2>&1; then
+    log_success "Network 'unicchat-network' already exists"
+  else
+    docker network create unicchat-network
+    log_success "Network 'unicchat-network' created"
+  fi
 }
 
 start_unicchat() {
   echo -e "\n🚀 Starting UnicChat services…"
   local dir="multi-server-install"
-  docker network inspect unicchat-backend >/dev/null 2>&1 || docker network create unicchat-backend
-  docker network inspect unicchat-frontend >/dev/null 2>&1 || docker network create unicchat-frontend
-  (cd "$dir"  && docker_compose -f mongodb.yml up -d --wait && docker_compose -f unic.chat.appserver.yml up -d && docker_compose  -f unic.chat.solid.yml up -d --wait)
-  echo "✅ Services started."
+  create_network
+  (cd "$dir" && docker_compose -f docker-compose.yml up -d)
+  log_success "Services started (containers are starting in background)"
 }
 
-update_site_url() {
-  echo -e "\n📝 Updating Site_Url in MongoDB…"
-  local container="unic.chat.db.mongo"
-  local max_attempts=5
-  local attempt=1
-  local delay=2
+restart_unicchat() {
+  echo -e "\n🔄 Restarting UnicChat services…"
+  local dir="multi-server-install"
+  (cd "$dir" && docker_compose -f docker-compose.yml restart)
+  log_success "Services restarted"
+}
+
+cleanup_all() {
+  echo -e "\n🗑️ Cleaning up Docker resources…"
   
-  if [ ! -f "$DNS_CONFIG" ]; then
-    echo "❌ DNS configuration not found. Run step 5 first."
-    return 1
-  fi
-  source "$DNS_CONFIG"
-  
-  if [ ! -f "mongo_config.txt" ]; then
-    echo "❌ MongoDB configuration not found. Run 'Update MongoDB configuration' first."
-    return 1
-  fi
-  
-  source "mongo_config.txt"
-  
-  if ! docker ps --format '{{.Names}}' | grep -q "^${container}$"; then
-    echo "❌ MongoDB container is not running: $container"
-    return 1
-  fi
-  
-  local url="https://$APP_DNS"
-  
-  echo "🔄 Updating Site_Url to: $url"
-  echo "📊 Using database: $MONGODB_DATABASE"
-  
-  # Функция для проверки текущего значения
-  check_current_value() {
-    local field=$1
-    docker exec "$container" mongosh -u root -p "$MONGODB_ROOT_PASSWORD" --quiet --eval "
-      db.getSiblingDB('$MONGODB_DATABASE').unicchat_settings.findOne(
-        {_id: 'Site_Url'}, 
-        {'$field': 1}
-      ).$field
-    " 2>/dev/null
-  }
-  
-  # Функция для обновления значения с проверкой
-  update_with_retry() {
-    local field=$1
-    local update_command=$2
-    local current_value=""
-    
-    while [ $attempt -le $max_attempts ]; do
-      echo "🔄 Attempt $attempt/$max_attempts to update $field..."
-      
-      # Выполняем обновление
-      docker exec "$container" mongosh -u root -p "$MONGODB_ROOT_PASSWORD" --quiet --eval "$update_command" >/dev/null 2>&1
-      
-      # Даем время на применение изменений
-      sleep $delay
-      
-      # Проверяем текущее значение
-      current_value=$(check_current_value "$field")
-      
-      if [ "$current_value" = "$url" ]; then
-        echo "✅ $field successfully updated to: $url"
-        return 0
-      else
-        echo "⚠️  $field not updated yet. Current value: '$current_value', Expected: '$url'"
-        attempt=$((attempt + 1))
-        sleep $delay
-      fi
-    done
-    
-    echo "❌ Failed to update $field after $max_attempts attempts"
-    return 1
-  }
-  
-  # Обновляем value поле
-  attempt=1
-  update_command_value="db.getSiblingDB('$MONGODB_DATABASE').unicchat_settings.updateOne({_id:'Site_Url'},{\$set:{value:'$url'}})"
-  if ! update_with_retry "value" "$update_command_value"; then
-    return 1
-  fi
-  
-  # Обновляем packageValue поле
-  attempt=1
-  update_command_package="db.getSiblingDB('$MONGODB_DATABASE').unicchat_settings.updateOne({_id:'Site_Url'},{\$set:{packageValue:'$url'}})"
-  if ! update_with_retry "packageValue" "$update_command_package"; then
-    return 1
-  fi
-  
-  # Финальная проверка обоих полей
-  echo "🔍 Final verification..."
-  final_value=$(check_current_value "value")
-  final_package=$(check_current_value "packageValue")
-  
-  if [ "$final_value" = "$url" ] && [ "$final_package" = "$url" ]; then
-    echo "✅ Site_Url updated successfully in database: $MONGODB_DATABASE"
-    echo "   value: $final_value"
-    echo "   packageValue: $final_package"
+  read -rp "⚠️ This will remove ALL UnicChat containers, volumes, and images. Continue? (yes/NO): " confirm
+  if [ "$confirm" != "yes" ]; then
+    echo "Cleanup cancelled."
     return 0
-  else
-    echo "❌ Final verification failed:"
-    echo "   value: '$final_value' (expected: '$url')"
-    echo "   packageValue: '$final_package' (expected: '$url')"
-    return 1
-  fi
-}
-deploy_knowledgebase() {
-  echo -e "\n🚀 Deploying knowledge base services…"
-  local kb_dir="knowledgebase"
-  
-  if [ ! -f "$kb_dir/deploy_knowledgebase.sh" ]; then
-    echo "❌ Knowledge base deployment script not found"
-    return 1
   fi
   
-  # Делаем скрипт исполняемым
-  chmod +x "$kb_dir/deploy_knowledgebase.sh"
+  local dir="multi-server-install"
   
-  echo "📦 Running knowledge base deployment..."
-  (cd "$kb_dir" && ./deploy_knowledgebase.sh --auto)
+  # Stop and remove containers
+  echo "Stopping containers..."
+  (cd "$dir" && docker_compose -f docker-compose.yml down -v 2>/dev/null) || true
   
-  echo "✅ Knowledge base services deployed"
+  # Remove images
+  echo "Removing images..."
+  docker images | grep -E "unicchat|unic|uniceditor|minio|mongodb|rabbitmq|postgres" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
+  
+  # Remove network (but don't fail if it doesn't exist or in use)
+  echo "Removing network..."
+  docker network rm unicchat-network 2>/dev/null || true
+  
+  # Important: Do NOT remove the multi-server-install directory itself
+  # Only remove generated env files
+  echo "Removing generated .env files..."
+  rm -f "$dir"/mongo.env "$dir"/mongo_creds.env "$dir"/appserver.env "$dir"/logger.env
+  rm -f "$dir"/logger_creds.env "$dir"/vault_creds.env
+  rm -rf "$dir"/env/
+  
+  log_success "Cleanup complete (directory structure preserved)"
 }
 
-
-cleanup_docker() {
-    echo -e "\n🐳 Removing Docker completely...\n"
-    
-    # Удалить все Docker ресурсы
-    if command -v docker &>/dev/null; then
-        echo "🗑️ Cleaning up Docker resources..."
-        docker rm -f $(docker ps -aq) 2>/dev/null || true
-        docker rmi -f $(docker images -q) 2>/dev/null || true
-        docker volume rm -f $(docker volume ls -q) 2>/dev/null || true
-        docker network rm $(docker network ls -q) 2>/dev/null || true
-        docker system prune -af --volumes --force 2>/dev/null || true
-    fi
-    
-    # Удалить Docker пакеты
-    echo "📦 Removing Docker packages..."
-    apt remove -y --purge docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose 2>/dev/null || true
-    
-    # Удалить конфиги
-    echo "🗂️ Removing Docker configuration..."
-    rm -rf /var/lib/docker /etc/docker 2>/dev/null || true
-    rm -f /etc/apt/sources.list.d/docker.list 2>/dev/null || true
-    rm -f /etc/apt/keyrings/docker.gpg 2>/dev/null || true
-    
-    # Очистка
-    apt autoremove -y 2>/dev/null || true
-    apt clean 2>/dev/null || true
-    
-    echo -e "\n✅ Docker completely removed from system!"
-}
-
-cleanup_nginx() {
-    echo -e "\n🗑️ Removing dockerized Nginx...\n"
-    if [ -f "$NGINX_COMPOSE_FILE" ]; then
-        docker_compose -f "$NGINX_COMPOSE_FILE" down || true
-    fi
-    rm -rf "$NGINX_STACK_DIR" "nginx/logs"
-    echo "✅ Nginx stack removed!"
-}
-
-cleanup_ssl() {
-    echo "Removing SSL certificates and Certbot volumes..."
-    rm -rf "$NGINX_CERTBOT_CONF_DIR" "$NGINX_CERTBOT_WORK_DIR" "$NGINX_CERTBOT_LOG_DIR"
-    echo "✅ SSL assets removed!"
-}
-
-cleanup_git() {
-    echo -e "\n📦 Removing Git...\n"
-    apt remove -y --purge git 2>/dev/null || true
-    apt autoremove -y 2>/dev/null || true
-    echo "✅ Git completely removed!"
-}
-
-cleanup_dns_utils() {
-    echo -e "\n🔍 Removing DNS utilities...\n"
-    apt remove -y --purge dnsutils 2>/dev/null || true
-    apt autoremove -y 2>/dev/null || true
-    echo "✅ DNS utilities completely removed!"
-}
-
-cleanup_minio_client() {
-    echo -e "\n📦 Removing MinIO client...\n"
-    rm -f /usr/local/bin/mc 2>/dev/null || true
-    echo "✅ MinIO client completely removed!"
-}
-
-cleanup_utilities() {
-    echo -e "\n🗑️ Removing all installed utilities...\n"
-    
-    # Временно отключаем set -e для этой функции
-    set +e
-    
-    # Вызов всех отдельных функций очистки
-    cleanup_docker
-    cleanup_nginx
-    cleanup_ssl
-    cleanup_git
-    cleanup_dns_utils
-    cleanup_minio_client
-    
-    # Дополнительно: удалить всю папку unicchat.enterprise
-    echo "🗑️ Removing unicchat.enterprise directory"
-
-    # Переходим на уровень выше и удаляем всю папку
-
-    rm -rf "../unicchat.enterprise" 2>/dev/null || true
-
-    # Восстанавливаем set -e
-    set -e
-
-    echo -e "\n✅ unicchat.enterprise completely removed!"
-    # Восстанавливаем set -e
-    set -e
-    
-    echo -e "\n✅ All utilities completely removed!"
-}
+# === Automatic Setup ===
 
 auto_setup() {
   echo -e "\n⚙️ Running full automatic setup…"
-  install_docker
-  install_nginx_ssl
-  install_git
-  install_dns_utils
-  install_minio_client
-
+  
   check_avx
   setup_dns_names
-  setup_license
   update_mongo_config
   update_minio_config
-  setup_local_network
-  generate_nginx_conf
-  setup_ssl
-  deploy_nginx_conf
-  activate_nginx
-  prepare_unicchat
+  create_network
+  prepare_all_envs
   login_yandex
   start_unicchat
-#  update_site_url
-  deploy_knowledgebase
-  echo -e "\n🎉 UnicChat setup complete! (including knowledge base)"
+  
+  echo -e "\n⏳ Waiting for MongoDB to be ready..."
+  sleep 15
+  setup_mongodb_users
+  
+  echo -e "\n⏳ Waiting for Vault to be ready..."
+  sleep 10
+  setup_vault_secrets
+  
+  echo -e "\n🎉 UnicChat setup complete!"
+  echo -e "🌐 Access your services at:"
+  echo -e "   App Server: https://$APP_DNS"
+  echo -e "   Document Server: https://$EDT_DNS"
+  echo -e "   MinIO Console: https://$MINIO_DNS:9002"
 }
 
+# === Main Menu ===
+
 main_menu() {
-  echo -e "\n✨ Welcome to UnicChat Installer"
-  echo -e "✅ Email: $EMAIL"
+  # Load configurations if they exist
+  load_dns_config || true
   
-  if [ -f "$DNS_CONFIG" ]; then
-    source "$DNS_CONFIG"
-    echo "📋 Current DNS configuration:"
-    echo "   App Server: $APP_DNS"
-    echo "   Document Server: $EDT_DNS"
-    echo "   MinIO: $MINIO_DNS"
-  fi
-  
-  if [ -n "$UNIC_LICENSE" ]; then
-    echo "🔑 License: $UNIC_LICENSE"
-  else
-    echo "⚠️ No license configured"
+  echo -e "\n✨ Welcome to UnicChat Enterprise Installer"
+  if [ -n "$APP_DNS" ]; then
+    echo -e "📋 Current DNS configuration:"
+    echo -e "   App Server: $APP_DNS"
+    echo -e "   Document Server: $EDT_DNS"
+    echo -e "   MinIO: $MINIO_DNS"
   fi
   echo ""
   
   while true; do
     cat <<MENU
- [1]  Install Docker
- [2]  Install Nginx and Certbot
- [3]  Install Git
- [4]  Install DNS utilities
- [5]  Install MinIO client (mc)
- [6]  Check AVX support
- [7]  Setup DNS names for UnicChat services
- [8]  Setup License Key
- [9]  Update MongoDB configuration
- [10] Update MinIO configuration
- [11] Setup local network (/etc/hosts)
- [12] Generate Nginx configs
- [13] Deploy Nginx configs
- [14] Copy SSL configs and generate DH params
- [15] Setup SSL certificates
- [16] Activate Nginx sites
- [17] Prepare .env files
- [18] Login to Yandex registry
- [19] Start UnicChat containers
- [20] Deploy knowledge base services
- [99]  🚀 Full automatic setup (with knowledge base)
- [100] Remove all
+ [1]  Check AVX support
+ [2]  Setup DNS names for services (APP, EDT, MinIO)
+ [3]  Update MongoDB configuration
+ [4]  Update MinIO configuration
+ [5]  Prepare .env files
+ [6]  Login to Yandex registry
+ [7]  Create Docker network
+ [8]  Start UnicChat containers
+ [9]  Setup MongoDB users (separate DB per service)
+[10]  Setup Vault secrets for KBT service
+[11]  Restart all services
+[99]  🚀 Full automatic setup
+[100] 🗑️  Cleanup (remove containers & volumes)
  [0]  Exit
 MENU
     read -rp "👉 Select an option: " choice
     case $choice in
-      1) install_docker ;;
-      2) install_nginx_ssl ;;
-      3) install_git ;;
-      4) install_dns_utils ;;
-      5) install_minio_client ;;
-      6) check_avx ;;
-      7) setup_dns_names ;;
-      8) setup_license ;;
-     9) update_mongo_config ;;
-     10) update_minio_config ;;
-     11) setup_local_network ;;
-     12) generate_nginx_conf ;;
-     13) deploy_nginx_conf ;;
-     14) copy_ssl_configs ;;
-     15) setup_ssl ;;
-     16) activate_nginx ;;
-     17) prepare_unicchat ;;
-     18) login_yandex ;;
-     19) start_unicchat ;;
-     20) deploy_knowledgebase ;;
-     99) auto_setup ;;
-    100) cleanup_utilities ;;
+      1) check_avx ;;
+      2) setup_dns_names ;;
+      3) update_mongo_config ;;
+      4) update_minio_config ;;
+      5) prepare_all_envs ;;
+      6) login_yandex ;;
+      7) create_network ;;
+      8) start_unicchat ;;
+      9) setup_mongodb_users ;;
+      10) setup_vault_secrets ;;
+      11) restart_unicchat ;;
+      100) cleanup_all ;;
+      99) auto_setup ;;
       0) echo "👋 Goodbye!" && break ;;
       *) echo "❓ Invalid option." ;;
     esac
@@ -1074,6 +1031,10 @@ MENU
   done
 }
 
-# === Start ===
-load_config
+# === Entry Point ===
+
+# Check Docker before starting
+check_docker
+
+log_info "Starting UnicChat installation - $(date)"
 main_menu "$@"

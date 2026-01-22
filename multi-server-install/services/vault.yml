@@ -1,26 +1,28 @@
+version: '3.8'
+
 services:
-  vault:
+  unicchat.vault:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
-    container_name: vault
+    container_name: unicchat.vault
     ports:
       - 8200:80
     volumes:
-      - ./config.hcl:/vault/config/config.hcl
       - vault-data:/vault/file/
     environment:
-      - VAULT_ADDR=http://vault:80
+      - api.logger.url=http://unicchat.logger:8080/
     env_file:
-      - .env
+      - ../vault_creds.env
     cap_add:
       - IPC_LOCK
     command: server
     restart: always
     networks:
-      - unicchat-frontend
+      - unicchat-network
 
 volumes:
   vault-data:
+    driver: local
 
 networks:
-  unicchat-frontend:
+  unicchat-network:
     external: true
