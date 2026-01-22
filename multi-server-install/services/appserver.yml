@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  unicchat.appserver:
+    container_name: unicchat.appserver
+    image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.1.85-beta.0
+    restart: on-failure
+    ports:
+      - "8080:3000"
+    environment:
+      - MONGODB_HOST=unicchat.mongodb
+      - MONGODB_PORT=27017
+    env_file:
+      - ../appserver.env
+    volumes:
+      - chat_data:/app/uploads
+    networks:
+      - unicchat-network
+
+volumes:
+  chat_data:
+    driver: local
+
+networks:
+  unicchat-network:
+    external: true
