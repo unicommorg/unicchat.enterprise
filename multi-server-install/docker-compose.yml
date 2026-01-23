@@ -85,9 +85,9 @@ services:
     environment:
       - MONGODB_HOST=unicchat.mongodb
       - MONGODB_PORT=27017
-      - api.vault.url=http://unicchat.vault:80/
     env_file:
       - appserver.env
+      - appserver_creds.env
     volumes:
       - chat_data:/app/uploads
     networks:
