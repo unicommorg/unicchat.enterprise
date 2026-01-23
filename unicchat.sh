@@ -393,21 +393,30 @@ EOL
   chmod 600 "$dir/mongo_creds.env" 2>/dev/null || true
   log_success "Generated $dir/mongo_creds.env"
   
-  # Generate appserver.env with MongoDB connection
-  local mongo_url="mongodb://$MONGODB_USERNAME:$MONGODB_PASSWORD@$MONGODB_INITIAL_PRIMARY_HOST:$MONGODB_PORT_NUMBER/$MONGODB_DATABASE?replicaSet=$MONGODB_REPLICA_SET_NAME"
-  local mongo_oplog_url="mongodb://$MONGODB_USERNAME:$MONGODB_PASSWORD@$MONGODB_INITIAL_PRIMARY_HOST:$MONGODB_PORT_NUMBER/local"
-  
+  # Generate appserver.env (public configuration)
   cat > "$dir/appserver.env" << EOL
 # UnicChat AppServer Configuration
-MONGO_URL=$mongo_url
-MONGO_OPLOG_URL=$mongo_oplog_url
 ROOT_URL=https://$APP_DNS
 DOCUMENT_SERVER_HOST=https://$EDT_DNS
 PORT=3000
 DEPLOY_METHOD=docker
 DB_COLLECTIONS_PREFIX=unicchat_
+MONGODB_HOST=$MONGODB_INITIAL_PRIMARY_HOST
+MONGODB_PORT=$MONGODB_PORT_NUMBER
 EOL
   log_success "Generated $dir/appserver.env"
+  
+  # Generate appserver_creds.env (sensitive data)
+  local mongo_url="mongodb://$MONGODB_USERNAME:$MONGODB_PASSWORD@$MONGODB_INITIAL_PRIMARY_HOST:$MONGODB_PORT_NUMBER/$MONGODB_DATABASE?replicaSet=$MONGODB_REPLICA_SET_NAME"
+  local mongo_oplog_url="mongodb://$MONGODB_USERNAME:$MONGODB_PASSWORD@$MONGODB_INITIAL_PRIMARY_HOST:$MONGODB_PORT_NUMBER/local"
+  
+  cat > "$dir/appserver_creds.env" << EOL
+# UnicChat AppServer Credentials (sensitive)
+MONGO_URL=$mongo_url
+MONGO_OPLOG_URL=$mongo_oplog_url
+EOL
+  chmod 600 "$dir/appserver_creds.env" 2>/dev/null || true
+  log_success "Generated $dir/appserver_creds.env"
   
   # URL-encode passwords
   local LOGGER_PASSWORD_ENCODED=$(urlencode "$LOGGER_PASSWORD")
@@ -468,7 +477,9 @@ EOL
   echo "   • mongo_creds.env (authentication)"
   echo "   • logger_creds.env (Logger service MongoDB)"
   echo "   • vault_creds.env (Vault service MongoDB)"
-  echo "   • appserver.env (AppServer with ROOT_URL=$APP_DNS)"
+  echo "   • appserver.env (AppServer public config)"
+  echo "   • appserver_creds.env (AppServer credentials & Vault URL)"
+  echo "   • logger.env (Logger API URL)"
   echo "   • env/minio_env.env (MinIO configuration)"
   echo "   • env/documentserver_env.env (DocumentServer)"
 }
