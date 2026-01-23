@@ -73,23 +73,32 @@ generate_ssl() {
 
     # Создаем необходимые директории
     mkdir -p ssl www
-    chmod 755 ssl www
+    chmod 755 ssl www 2>/dev/null || true
 
-    # Скачиваем options-ssl-nginx.conf если его нет
+    # Проверяем наличие options-ssl-nginx.conf (должен быть в репозитории)
     if [ ! -f "ssl/options-ssl-nginx.conf" ]; then
-        echo "📥 Скачивание options-ssl-nginx.conf..."
-        curl -s https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf > ssl/options-ssl-nginx.conf
-        echo "   ✅ Файл скачан"
+        echo "❌ Файл ssl/options-ssl-nginx.conf не найден!"
+        echo "   Этот файл должен быть в репозитории."
+        return 1
     fi
+    echo "✅ SSL конфигурация найдена (ssl/options-ssl-nginx.conf)"
 
-    # Генерируем DH parameters если их нет
+    # Генерируем DH parameters если их нет (уникальные для каждого сервера)
     if [ ! -f "ssl/ssl-dhparams.pem" ]; then
         echo "⏳ Генерация DH parameters (это может занять несколько минут)..."
-        docker run --rm \
-          -v "$(pwd)/ssl:/etc/letsencrypt" \
-          alpine:latest \
-          sh -c "apk add --no-cache openssl && openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048"
-        echo "   ✅ DH parameters сгенерированы"
+        openssl dhparam -out ssl/ssl-dhparams.pem 2048 2>/dev/null
+        if [ $? -eq 0 ]; then
+            echo "   ✅ DH parameters сгенерированы"
+        else
+            echo "   ⚠️  Не удалось сгенерировать через openssl, используем Docker..."
+            docker run --rm \
+              -v "$(pwd)/ssl:/etc/letsencrypt" \
+              alpine:latest \
+              sh -c "apk add --no-cache openssl && openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048"
+            echo "   ✅ DH parameters сгенерированы через Docker"
+        fi
+    else
+        echo "✅ DH parameters уже существуют (ssl/ssl-dhparams.pem)"
     fi
 
     # Проверяем что сеть существует
