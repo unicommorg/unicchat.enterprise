@@ -1,20 +1,20 @@
-
+## 1. Убедитесь, что произвели клонирование репозитория:
 
 ```markdown
-1. Убедитесь, что произвели клонирование репозитория:
+
 
    ```bash
    git clone https://github.com/rightsoftware-ru/unicnet.enterprise.git
    cd unicnet.enterprise
    ```
 
-2. Перейдите в директорию vcs.unic.chat.template
+## 2. Перейдите в директорию vcs.unic.chat.template
 
    ```bash
    cd vcs.unic.chat.template
    ```
 
-3. Определите, как планируете использовать ВКС сервер:
+## 3. Определите, как планируете использовать ВКС сервер:
 
    ### 3.1 Установка ВКС сервера для использования в закрытом контуре:
    
@@ -67,4 +67,5 @@ livekit-s 5780 root   11u  IPv6  70260      0t0  TCP *:7880 (LISTEN)
 telnet <internal_IP> 7880  # проверить порты 7880, 7881, 5349
 ```
 ```
+
 
