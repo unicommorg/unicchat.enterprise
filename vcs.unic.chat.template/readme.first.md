@@ -66,6 +66,6 @@ livekit-s 5780 root   11u  IPv6  70260      0t0  TCP *:7880 (LISTEN)
 ```bash
 telnet <internal_IP> 7880  # проверить порты 7880, 7881, 5349
 ```
-```
+
 
 
