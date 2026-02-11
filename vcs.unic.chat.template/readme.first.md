@@ -3,14 +3,14 @@
 ```markdown
 
 
-   ```bash
+   ``` bash
    git clone https://github.com/rightsoftware-ru/unicnet.enterprise.git
    cd unicnet.enterprise
    ```
 
 ## 2. Перейдите в директорию vcs.unic.chat.template
 
-   ```bash
+   ``` bash
    cd vcs.unic.chat.template
    ```
 
@@ -20,7 +20,7 @@
    
    Запустить `./install_server_local.sh`. Перед запуском убедитесь, что в директории, где запускается скрипт, есть файл `local.env`. Сервер будет установлен в текущей директории.
    
-   ```bash
+   ``` bash
    ./install_server_local.sh
    ```
 
@@ -32,7 +32,7 @@
    
    Запустить `./install_server.sh` (возможно, на последнюю операцию в файле нужно `sudo`). Перед запуском убедитесь, что в директории, где запускается скрипт, есть файл `.env`. Сервер будет установлен в текущей директории.
    
-   ```bash
+   ``` bash
    ./install_server.sh
    ```
 
@@ -40,7 +40,7 @@
 
 4. Если на сервере отсутствует docker, то выполнить скрипт под `sudo`:
 
-   ```bash
+   ``` bash
    sudo ./install_docker.sh
    ```
    
@@ -50,7 +50,7 @@
 
 #### Проверка открытия портов для варианта установки с внешним доступом:
 
-```bash
+``` bash
 sudo lsof -i:7880 -i:7881 -i:5349 -i:3478 -i:50879 -i:54655 -i:59763
 ```
 
@@ -63,9 +63,10 @@ livekit-s 5780 root   10u  IPv4  69494      0t0  UDP *:3478
 livekit-s 5780 root   11u  IPv6  70260      0t0  TCP *:7880 (LISTEN)
 ```
 
-```bash
+``` bash
 telnet <internal_IP> 7880  # проверить порты 7880, 7881, 5349
 ```
+
 
 
 
