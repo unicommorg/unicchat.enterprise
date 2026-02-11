@@ -1,5 +1,6 @@
 1. Убедитесь, что произвели клонирование репозитория:
 git clone https://github.com/rightsoftware-ru/unicnet.enterprise.git
+
 cd unicnet.enterprise
 
 1.1 Перейдите в директорию vcs.unic.chat.template
@@ -37,6 +38,7 @@ livekit-s 5780 root   11u  IPv6  70260      0t0  TCP *:7880 (LISTEN)
 telnet `internal_IP` 7880 # 7880 7881 5349
 
 ```
+
 
 
 
