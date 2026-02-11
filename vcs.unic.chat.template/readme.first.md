@@ -1,16 +1,20 @@
-Перейдите в директорию livekit.unic.chat.template.
-1. В файле `.env` указать домены на которых будет работать ВСК сервер. WHIP пока не обязателен и его можно пропустить.
-2. Запустить `./install_server.sh` (возможно, на последнюю операцию в файле нужно sudo). Перед запуском убедиться, что в директории, 
-где запускается скрипт, есть файл `.env`. Сервер будет установлен в текущей директории.
+1. Убедитесь, что произвели клонирование репозитория:
+git clone https://github.com/rightsoftware-ru/unicnet.enterprise.git
+cd unicnet.enterprise
+1.1 Перейдите в директорию vcs.unic.chat.template
+cd vcs.unic.chat.template
+2. Определите, как планируете использовать ВКС сервер:
+2.2 Установка ВКС сервера для использования в закрытом контуре:
+Запустить ./install_server_local.sh. Перед запуском убедиться, что в директории, где запускается скрипт, есть файл .env. Сервер будет установлен в текущей директории.
+2.2.1 В файле `local.env` указать домен и ip адрес, на которых будет работать ВКС сервер.
+2.3 Установка ВКС сервера с доступом из интернета:
+Запустить ./install_server.sh (возможно, на последнюю операцию в файле нужно sudo). Перед запуском убедиться, что в директории, где запускается скрипт, есть файл local.env. Сервер будет установлен в текущей директории.
+2.3.1 В файле `.env` указать домены, на которых будет работать ВКС сервер.
 3. Если на сервере отсутствует docker, то выполнить скрипт под sudo `./install_docker.sh` (только для Ubuntu) или иным способом установить docker + compose
-4. Можно не использовать caddy, вместо этого использовать nginx. конфигурация сайтов в файле `example.sites.nginx.md`. На домены нужны HTTPS сертификаты. (плохо работает с TUNE сервером, лучше не использовать в продакш)
-5. Проверка поднятого сервера утилитой livekit-test: https://livekit.io/connection-test 
-token: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzUzNzgxOTEsImlzcyI6IkFQSUZCNnFMeEtKRFc3VCIsIm5hbWUiOiJUZXN0IFVzZXIiLCJuYmYiOjE3MzkzNzgxOTEsInN1YiI6InRlc3QtdXNlciIsInZpZGVvIjp7InJvb20iOiJteS1maXJzdC1yb29tIiwicm9vbUpvaW4iOnRydWV9fQ.20rviVegoNerAE_WiFxshYDpL2DVAHvnJzkjsV3L_0Y`
+4. Можно не использовать caddy, вместо этого использовать nginx. конфигурация сайтов в файле `example.sites.nginx.md`. На домены нужны HTTPS сертификаты.
 
+#### Проверка открытия портов для варианта установки с внешним доступом:
 
-#### Проверка открытия портов
-1. Страница с открытыми портами: https://docs.livekit.io/home/self-hosting/ports-firewall/#ports
-2. 
 ``` shell 
  sudo lsof -i:7880 -i:7881 -i:5349 -i:3478 -i:50879 -i:54655 -i:59763
 COMMAND    PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
@@ -21,4 +25,5 @@ livekit-s 5780 root   11u  IPv6  70260      0t0  TCP *:7880 (LISTEN)
 ```
 ``` shell
 telnet `internal_IP` 7880 # 7880 7881 5349
+
 ```
