@@ -352,58 +352,6 @@ sudo ./generate_ssl.sh
 - **Конфиг:** `../dns_config.txt` (APP_DNS, EDT_DNS, MINIO_DNS); при первом запросе email — `../unicchat_config.txt`.
 - **В каталоге `nginx/`:** `docker-compose.yml` (сервисы nginx и certbot), генерируемый `config/nginx.conf`, каталог `ssl/` (в т.ч. `options-ssl-nginx.conf`, `ssl-dhparams.pem`, `live/<домен>/` от Certbot). Сертификаты общие для всех трёх доменов (один мультидоменный от Let's Encrypt).
 
----
-
-<!-- TOC --><a name="-knowledgebase"></a>
-### 3. Скрипт развертывания базы знаний (`knowledgebase/deploy_knowledgebase.sh`)
-
-Скрипт для автоматического развертывания компонентов базы знаний: MinIO (S3 хранилище) и DocumentServer (OnlyOffice).
-
-#### Запуск скрипта
-
-```shell
-cd knowledgebase
-sudo ./deploy_knowledgebase.sh
-```
-
-Или в автоматическом режиме:
-```shell
-sudo ./deploy_knowledgebase.sh --auto
-```
-
-**Важно:** Скрипт требует права root для работы с Docker.
-
-#### Описание функций скрипта
-
-Скрипт читает конфигурацию из файла `config.txt` в директории `knowledgebase/` и автоматически разворачивает оба компонента.
-
-##### Основные функции
-
-| Функция | Описание |
-|---------|-----------|
-| `load_config` | Загружает переменные из `config.txt`:<br>• `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` - учетные данные MinIO<br>• `DB_TYPE`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` - параметры PostgreSQL для DocumentServer<br>• `WOPI_ENABLED`, `AMQP_URI`, `JWT_ENABLED` - параметры DocumentServer<br>• `ALLOW_PRIVATE_IP_ADDRESS`, `ALLOW_META_IP_ADDRESS`, `USE_UNAUTHORIZED_STORAGE` - параметры безопасности<br>• `MINIO_DNS`, `ONLYOFFICE_DNS`, `LOCAL_IP` - адреса сервисов<br><br>Проверяет наличие всех обязательных переменных |
-| `deploy_minio` | **Развертывание MinIO:**<br>• Удаляет атрибут `version` из `docker-compose.yml` (совместимость с Docker Compose v2)<br>• Создает сеть `minio` если не существует<br>• Генерирует `minio/minio_env.env` с учетными данными<br>• Запускает MinIO контейнер через Docker Compose<br>• Ожидает готовности MinIO (10 секунд)<br>• Создает bucket `uc.onlyoffice.docs` через MinIO клиент (`mc`)<br>• Настраивает bucket как публичный (`anonymous set public`)<br><br>**Результат:** MinIO доступен на `http://LOCAL_IP:9002` (консоль) и `http://LOCAL_IP:9000` (S3 API) |
-| `deploy_onlyoffice` | **Развертывание DocumentServer:**<br>• Удаляет атрибут `version` из `docker-compose.yml`<br>• Генерирует `Docker-DocumentServer/onlyoffice_env.env` с параметрами подключения к PostgreSQL, RabbitMQ и настройками безопасности<br>• Запускает DocumentServer контейнер через Docker Compose<br><br>**Результат:** DocumentServer доступен на `http://ONLYOFFICE_DNS` (через NGINX) или `http://LOCAL_IP:8880` (напрямую) |
-| `auto_deploy` | **Автоматическое развертывание:**<br>Выполняет все шаги последовательно:<br>1. Проверка зависимостей (git, curl, docker, docker compose)<br>2. Загрузка конфигурации<br>3. Развертывание MinIO<br>4. Развертывание DocumentServer<br><br>Логирует все операции в `deploy.log` |
-
-##### Файлы конфигурации
-
-| Файл | Назначение | Расположение |
-|------|------------|--------------|
-| `config.txt` | Все переменные окружения для базы знаний | `knowledgebase/` |
-| `minio/minio_env.env` | Учетные данные MinIO (генерируется автоматически) | `knowledgebase/minio/` |
-| `Docker-DocumentServer/onlyoffice_env.env` | Конфигурация DocumentServer (генерируется автоматически) | `knowledgebase/Docker-DocumentServer/` |
-| `deploy.log` | Лог развертывания | `knowledgebase/` |
-
-##### Особенности работы
-
-- ✅ **Требует файл `config.txt`** - все параметры должны быть настроены заранее
-- ✅ **Автоматическое создание bucket** - создает и настраивает `uc.onlyoffice.docs` как публичный
-- ✅ **Совместимость с Docker Compose v2** - удаляет атрибут `version` для работы с новыми версиями
-- ✅ **Логирование** - все операции записываются в `deploy.log` с временными метками
-- ✅ **Проверка зависимостей** - проверяет наличие git, curl, docker, docker compose перед запуском
-
----
 
 <!-- TOC --><a name="--18"></a>
 #### Рекомендуемая последовательность полной установки
@@ -423,12 +371,7 @@ sudo ./deploy_knowledgebase.sh --auto
    # Выберите [99] - Полная автоустановка (SSL + nginx)
    ```
 
-3. **Развертывание базы знаний через отдельный скрипт** — только если нужно развернуть MinIO и DocumentServer **отдельно** (например, на другом сервере). При установке через пункт [8] в `unicchat.sh` MinIO и DocumentServer уже запускаются из общего `docker-compose.yml`.
-   ```bash
-   cd ../knowledgebase
-   # Создайте config.txt с необходимыми параметрами
-   sudo ./deploy_knowledgebase.sh --auto
-   ```
+
 
 **Важно:** Убедитесь, что DNS записи настроены и указывают на IP вашего сервера перед запуском скрипта NGINX/SSL.
 
