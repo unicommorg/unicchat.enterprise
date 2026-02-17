@@ -114,6 +114,7 @@ setup_dns_names() {
     echo "   App Server: $APP_DNS"
     echo "   Document Server: $EDT_DNS"
     echo "   MinIO: $MINIO_DNS"
+    echo "   Push/License: ${PUSH_DNS:-push1.unic.chat}"
     
     read -rp "Do you want to change these? (y/N): " change
     if [[ ! "$change" =~ ^[Yy]$ ]]; then
@@ -126,6 +127,8 @@ setup_dns_names() {
   read -rp "  App Server DNS (e.g., app.unic.chat): " APP_DNS
   read -rp "  Document Server DNS (e.g., docs.unic.chat): " EDT_DNS
   read -rp "  MinIO DNS (e.g., minio.unic.chat): " MINIO_DNS
+  read -rp "  Push/License Server DNS (e.g., push1.unic.chat) [default: push1.unic.chat]: " PUSH_DNS
+  PUSH_DNS=${PUSH_DNS:-push1.unic.chat}
   
   # Validate
   if [ -z "$APP_DNS" ] || [ -z "$EDT_DNS" ] || [ -z "$MINIO_DNS" ]; then
@@ -139,6 +142,7 @@ setup_dns_names() {
 APP_DNS="$APP_DNS"
 EDT_DNS="$EDT_DNS"
 MINIO_DNS="$MINIO_DNS"
+PUSH_DNS="$PUSH_DNS"
 EOF
   
   log_success "DNS configuration saved to $DNS_CONFIG_FILE"
@@ -156,7 +160,7 @@ EOF
   done
   
   # Export for docker-compose
-  export APP_DNS EDT_DNS MINIO_DNS
+  export APP_DNS EDT_DNS MINIO_DNS PUSH_DNS
 }
 
 # === URL Encoding ===
@@ -347,9 +351,9 @@ prepare_all_envs() {
   MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME:-rs0}
   MONGODB_REPLICA_SET_KEY=${MONGODB_REPLICA_SET_KEY:-rs0key}
   MONGODB_PORT_NUMBER=${MONGODB_PORT_NUMBER:-27017}
-  MONGODB_INITIAL_PRIMARY_HOST=${MONGODB_INITIAL_PRIMARY_HOST:-unicchat.mongodb}
+  MONGODB_INITIAL_PRIMARY_HOST=${MONGODB_INITIAL_PRIMARY_HOST:-unicchat-mongodb}
   MONGODB_INITIAL_PRIMARY_PORT_NUMBER=${MONGODB_INITIAL_PRIMARY_PORT_NUMBER:-27017}
-  MONGODB_ADVERTISED_HOSTNAME=${MONGODB_ADVERTISED_HOSTNAME:-unicchat.mongodb}
+  MONGODB_ADVERTISED_HOSTNAME=${MONGODB_ADVERTISED_HOSTNAME:-unicchat-mongodb}
   MONGODB_ENABLE_JOURNAL=${MONGODB_ENABLE_JOURNAL:-true}
   MONGODB_ROOT_PASSWORD=${MONGODB_ROOT_PASSWORD:-rootpass}
   MONGODB_USERNAME=${MONGODB_USERNAME:-unicchat_admin}
@@ -393,11 +397,15 @@ EOL
   chmod 600 "$dir/mongo_creds.env" 2>/dev/null || true
   log_success "Generated $dir/mongo_creds.env"
   
+  # LICENSE_HOST for Push Gateway (default: https://push1.unic.chat/)
+  LICENSE_HOST="${LICENSE_HOST:-https://${PUSH_DNS:-push1.unic.chat}/}"
+  
   # Generate appserver.env (public configuration)
   cat > "$dir/appserver.env" << EOL
 # UnicChat AppServer Configuration
 ROOT_URL=https://$APP_DNS
 DOCUMENT_SERVER_HOST=https://$EDT_DNS
+LICENSE_HOST=$LICENSE_HOST
 PORT=3000
 DEPLOY_METHOD=docker
 DB_COLLECTIONS_PREFIX=unicchat_
@@ -441,7 +449,7 @@ EOL
   # Generate logger.env
   cat > "$dir/logger.env" << EOL
 # Logger API URL (internal)
-api.logger.url=http://unicchat.logger:8080/
+api.logger.url=http://unicchat-logger:8080/
 EOL
   log_success "Generated $dir/logger.env"
   
@@ -463,11 +471,11 @@ JWT_ENABLED=true
 JWT_SECRET=your_jwt_secret_here
 JWT_HEADER=Authorization
 DB_TYPE=postgres
-DB_HOST=uniceditor-postgresql
+DB_HOST=unicchat-postgresql
 DB_PORT=5432
 DB_NAME=dbname
 DB_USER=dbuser
-AMQP_URI=amqp://guest:guest@uniceditor-rabbitmq
+AMQP_URI=amqp://guest:guest@unicchat-rabbitmq
 EOL
   log_success "Generated $dir/env/documentserver_env.env"
   
@@ -491,7 +499,7 @@ setup_mongodb_users() {
   local dir="multi-server-install"
   
   # Check MongoDB is running
-  if ! docker ps | grep -q "unicchat.mongodb"; then
+  if ! docker ps | grep -q "unicchat-mongodb"; then
     log_warning "MongoDB container is not running. Start services first."
     return 1
   fi
@@ -504,7 +512,7 @@ setup_mongodb_users() {
   fi
   
   local root_password=$(grep '^MONGODB_ROOT_PASSWORD=' "$mongo_creds_file" | cut -d '=' -f2- | tr -d '\r')
-  local container="unicchat.mongodb"
+  local container="unicchat-mongodb"
   
   if [ -z "$root_password" ]; then
     log_error "MONGODB_ROOT_PASSWORD not found in $mongo_creds_file"
@@ -653,7 +661,7 @@ setup_vault_secrets() {
   local dir="multi-server-install"
   
   # Check Vault is running
-  local container="unicchat.vault"
+  local container="unicchat-vault"
   if ! docker ps | grep -q "$container"; then
     log_warning "Vault container is not running. Start services first."
     return 1
@@ -699,7 +707,7 @@ setup_vault_secrets() {
       log_success "curl installed"
     else
       log_error "Failed to install curl. Container may not have package manager access."
-      echo "   Try manually: docker exec -u root unicchat.vault apt-get update && apt-get install -y curl"
+      echo "   Try manually: docker exec -u root unicchat-vault apt-get update && apt-get install -y curl"
       return 1
     fi
   else

@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  unicchat.logger:
+  unicchat-logger:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/uniclogger:prod
-    container_name: unicchat.logger
+    container_name: unicchat-logger
     ports:
       - '8082:8080'
     networks:

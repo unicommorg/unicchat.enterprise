@@ -181,22 +181,22 @@ curl -I https://minio.domain.com
 ```nginx
 # App Server (UnicChat)
 upstream app_server {
-    server unicchat.appserver:3000;
+    server unicchat-appserver:3000;
 }
 
 # Document Server (OnlyOffice)
 upstream doc_server {
-    server unicchat.documentserver:80;
+    server unicchat-documentserver:80;
 }
 
 # MinIO S3 API
 upstream minio_server {
-    server unicchat.minio:9000;
+    server unicchat-minio:9000;
 }
 
 # MinIO Console
 upstream minio_console {
-    server unicchat.minio:9002;
+    server unicchat-minio:9002;
 }
 ```
 
@@ -204,10 +204,10 @@ upstream minio_console {
 
 | Домен | Upstream | Порт | Назначение |
 |-------|----------|------|------------|
-| `app.domain.com` | unicchat.appserver:3000 | 443 | Основное приложение |
-| `edt.domain.com` | unicchat.documentserver:80 | 443 | OnlyOffice DocumentServer |
-| `minio.domain.com` | unicchat.minio:9000 | 443 | MinIO S3 API |
-| `minio.domain.com` | unicchat.minio:9002 | 9002 | MinIO Web Console |
+| `app.domain.com` | unicchat-appserver:3000 | 443 | Основное приложение |
+| `edt.domain.com` | unicchat-documentserver:80 | 443 | OnlyOffice DocumentServer |
+| `minio.domain.com` | unicchat-minio:9000 | 443 | MinIO S3 API |
+| `minio.domain.com` | unicchat-minio:9002 | 9002 | MinIO Web Console |
 
 ### Особенности конфигурации
 
@@ -220,7 +220,7 @@ upstream minio_console {
 
 ## 🔄 Автоматическое обновление SSL
 
-Контейнер `unicchat.certbot` автоматически:
+Контейнер `unicchat-certbot` автоматически:
 - Проверяет сертификаты **каждые 12 часов**
 - Обновляет сертификаты **за 30 дней до истечения**
 - Сертификаты Let's Encrypt действительны **90 дней**
@@ -232,10 +232,10 @@ upstream minio_console {
 docker ps | grep certbot
 
 # Логи
-docker logs unicchat.certbot
+docker logs unicchat-certbot
 
 # Список сертификатов
-docker exec unicchat.certbot certbot certificates
+docker exec unicchat-certbot certbot certificates
 ```
 
 ## 🔧 Troubleshooting
@@ -302,13 +302,13 @@ nslookup app.domain.com 8.8.8.8
 
 ```bash
 # Проверить логи
-docker logs unicchat.nginx
+docker logs unicchat-nginx
 
 # Проверить конфигурацию
-docker exec unicchat.nginx nginx -t
+docker exec unicchat-nginx nginx -t
 
 # Проверить healthcheck
-docker inspect unicchat.nginx | grep -A 10 Health
+docker inspect unicchat-nginx | grep -A 10 Health
 
 # Через меню
 cd nginx
@@ -321,10 +321,10 @@ sudo ./generate_ssl.sh
 
 ```bash
 # Проверить worker process
-docker exec unicchat.nginx ps aux | grep nginx
+docker exec unicchat-nginx ps aux | grep nginx
 
 # Проверить порты внутри контейнера
-docker exec unicchat.nginx netstat -tuln | grep -E ':(80|443)'
+docker exec unicchat-nginx netstat -tuln | grep -E ':(80|443)'
 
 # Перезапустить nginx
 cd nginx
@@ -452,9 +452,9 @@ docker network inspect unicchat-network
 docker ps --format "table {{.Names}}\t{{.Networks}}"
 
 # Проверить доступность upstream
-docker exec unicchat.nginx curl -I http://unicchat.appserver:3000
-docker exec unicchat.nginx curl -I http://unicchat.documentserver:80
-docker exec unicchat.nginx curl -I http://unicchat.minio:9000
+docker exec unicchat-nginx curl -I http://unicchat-appserver:3000
+docker exec unicchat-nginx curl -I http://unicchat-documentserver:80
+docker exec unicchat-nginx curl -I http://unicchat-minio:9000
 ```
 
 ## 📚 Дополнительные ресурсы

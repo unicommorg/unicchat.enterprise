@@ -59,5 +59,5 @@ docker-compose -f documentserver.yml up -d
 Если сервисы на разных серверах, настройте:
 
 1. Внешнюю сеть (overlay network в Docker Swarm или аналог)
-2. Измените `unicchat.mongodb` на реальный IP/hostname MongoDB сервера
+2. Измените `unicchat-mongodb` на реальный IP/hostname MongoDB сервера
 3. Аналогично для других зависимостей

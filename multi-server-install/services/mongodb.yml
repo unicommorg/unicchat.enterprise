@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  unicchat.mongodb:
+  unicchat-mongodb:
     image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
-    container_name: unicchat.mongodb
+    container_name: unicchat-mongodb
     restart: on-failure
     volumes:
       - mongodb_data:/bitnami/mongodb

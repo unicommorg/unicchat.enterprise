@@ -110,8 +110,8 @@ generate_ssl() {
 
     # Останавливаем nginx если запущен
     echo "🛑 Остановка nginx (если запущен) для освобождения портов 80/443..."
-    docker stop unicchat.nginx 2>/dev/null || true
-    docker rm unicchat.nginx 2>/dev/null || true
+    docker stop unicchat-nginx 2>/dev/null || true
+    docker rm unicchat-nginx 2>/dev/null || true
     sleep 2
 
     # Проверяем что порты 80 и 443 свободны
@@ -200,21 +200,21 @@ generate_config_files() {
 
 # Upstream для App Server
 upstream app_server {
-    server unicchat.appserver:3000;
+    server unicchat-appserver:3000;
 }
 
 # Upstream для Document Server  
 upstream doc_server {
-    server unicchat.documentserver:80;
+    server unicchat-documentserver:80;
 }
 
 # Upstream для MinIO
 upstream minio_server {
-    server unicchat.minio:9000;
+    server unicchat-minio:9000;
 }
 
 upstream minio_console {
-    server unicchat.minio:9002;
+    server unicchat-minio:9002;
 }
 
 # ============================================================================
@@ -442,24 +442,24 @@ start_nginx() {
     echo "   ⏳ Ожидание запуска nginx..."
     sleep 3
     
-    if docker ps --filter "name=unicchat.nginx" --filter "status=running" | grep -q "unicchat.nginx"; then
+    if docker ps --filter "name=unicchat-nginx" --filter "status=running" | grep -q "unicchat-nginx"; then
         echo "   ✅ Nginx контейнер запущен"
         
         # Проверяем что worker process запустился
-        if docker exec unicchat.nginx sh -c "ps aux | grep 'nginx: worker process' | grep -v grep" >/dev/null 2>&1; then
+        if docker exec unicchat-nginx sh -c "ps aux | grep 'nginx: worker process' | grep -v grep" >/dev/null 2>&1; then
             echo "   ✅ Nginx worker process активен"
         fi
         
         # Проверяем конфигурацию
-        if docker exec unicchat.nginx nginx -t 2>&1 | grep -q "successful"; then
+        if docker exec unicchat-nginx nginx -t 2>&1 | grep -q "successful"; then
             echo "   ✅ Конфигурация nginx корректна"
         else
             echo "   ⚠️ Ошибка в конфигурации nginx"
-            docker exec unicchat.nginx nginx -t
+            docker exec unicchat-nginx nginx -t
         fi
         
         # Показываем healthcheck статус (если есть)
-        local health_status=$(docker inspect --format='{{.State.Health.Status}}' unicchat.nginx 2>/dev/null || echo "none")
+        local health_status=$(docker inspect --format='{{.State.Health.Status}}' unicchat-nginx 2>/dev/null || echo "none")
         if [ "$health_status" != "none" ]; then
             echo "   ℹ️  Healthcheck: $health_status"
         fi
@@ -467,7 +467,7 @@ start_nginx() {
         return 0
     else
         echo "   ❌ Nginx контейнер не запустился. Проверьте логи:"
-        echo "      docker logs unicchat.nginx"
+        echo "      docker logs unicchat-nginx"
         return 1
     fi
     echo ""
@@ -481,7 +481,7 @@ stop_nginx() {
 
     cd "$SCRIPT_DIR"
     echo "🛑 Остановка nginx..."
-    docker_compose stop nginx 2>/dev/null || docker stop unicchat.nginx 2>/dev/null || true
+    docker_compose stop nginx 2>/dev/null || docker stop unicchat-nginx 2>/dev/null || true
     echo "   ✅ Nginx остановлен"
     echo ""
 }
@@ -502,10 +502,10 @@ restart_nginx() {
         generate_config_files
     fi
 
-    docker restart unicchat.nginx 2>/dev/null || docker_compose restart nginx
+    docker restart unicchat-nginx 2>/dev/null || docker_compose restart nginx
     sleep 2
 
-    if docker ps | grep -q "unicchat.nginx"; then
+    if docker ps | grep -q "unicchat-nginx"; then
         echo "   ✅ Nginx перезапущен"
     else
         echo "   ⚠️ Nginx не запустился. Проверьте логи"
@@ -521,8 +521,8 @@ status() {
     echo ""
 
     # Статус nginx
-    if docker ps --filter "name=unicchat.nginx" --filter "status=running" | grep -q "unicchat.nginx"; then
-        local health_status=$(docker inspect --format='{{.State.Health.Status}}' unicchat.nginx 2>/dev/null || echo "none")
+    if docker ps --filter "name=unicchat-nginx" --filter "status=running" | grep -q "unicchat-nginx"; then
+        local health_status=$(docker inspect --format='{{.State.Health.Status}}' unicchat-nginx 2>/dev/null || echo "none")
         if [ "$health_status" = "healthy" ]; then
             echo "✅ Nginx: запущен (healthy)"
         elif [ "$health_status" = "unhealthy" ]; then
@@ -532,15 +532,15 @@ status() {
         else
             echo "✅ Nginx: запущен (no healthcheck)"
         fi
-        docker ps --filter "name=unicchat.nginx" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        docker ps --filter "name=unicchat-nginx" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
     else
         echo "❌ Nginx: остановлен"
     fi
     echo ""
     
     # Статус certbot
-    if docker ps --filter "name=unicchat.certbot" --filter "status=running" | grep -q "unicchat.certbot"; then
-        local certbot_health=$(docker inspect --format='{{.State.Health.Status}}' unicchat.certbot 2>/dev/null || echo "none")
+    if docker ps --filter "name=unicchat-certbot" --filter "status=running" | grep -q "unicchat-certbot"; then
+        local certbot_health=$(docker inspect --format='{{.State.Health.Status}}' unicchat-certbot 2>/dev/null || echo "none")
         if [ "$certbot_health" = "healthy" ]; then
             echo "✅ Certbot: запущен (healthy)"
         elif [ "$certbot_health" = "unhealthy" ]; then
@@ -586,7 +586,7 @@ logs_nginx() {
     cd "$SCRIPT_DIR"
     echo "📋 Логи nginx (последние 50 строк):"
     echo ""
-    docker logs --tail 50 unicchat.nginx 2>&1 || echo "Контейнер nginx не найден"
+    docker logs --tail 50 unicchat-nginx 2>&1 || echo "Контейнер nginx не найден"
     echo ""
 }
 
@@ -597,9 +597,9 @@ test_config() {
     fi
 
     cd "$SCRIPT_DIR"
-    if docker ps | grep -q "unicchat.nginx"; then
+    if docker ps | grep -q "unicchat-nginx"; then
         echo "🔍 Проверка конфигурации nginx:"
-        docker exec unicchat.nginx nginx -t
+        docker exec unicchat-nginx nginx -t
     else
         echo "❌ Nginx не запущен"
     fi
