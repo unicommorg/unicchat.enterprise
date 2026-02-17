@@ -1,15 +1,15 @@
 version: '3.8'
 
 services:
-  unicchat.vault:
+  unicchat-vault:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
-    container_name: unicchat.vault
+    container_name: unicchat-vault
     ports:
       - 8200:80
     volumes:
       - vault-data:/vault/file/
     environment:
-      - api.logger.url=http://unicchat.logger:8080/
+      - api.logger.url=http://unicchat-logger:8080/
     env_file:
       - ../vault_creds.env
     cap_add:

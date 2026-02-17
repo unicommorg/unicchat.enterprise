@@ -1,12 +1,12 @@
 version: '3.8'
 
 services:
-  unicchat.documentserver:
+  unicchat-documentserver:
     image: cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
-    container_name: unicchat.documentserver
+    container_name: unicchat-documentserver
     depends_on:
-      - unicchat.postgresql
-      - unicchat.rabbitmq
+      - unicchat-postgresql
+      - unicchat-rabbitmq
     env_file:
       - ../env/documentserver_env.env
     ports:
@@ -24,8 +24,8 @@ services:
       - documentserver_files:/var/www/uniceditor/documentserver-example/public/files
       - /usr/share/fonts
 
-  unicchat.rabbitmq:
-    container_name: unicchat.rabbitmq
+  unicchat-rabbitmq:
+    container_name: unicchat-rabbitmq
     image: cr.yandex/crpst6ndtaf70or2n2bb/rabbitmq:latest
     restart: always
     networks:
@@ -33,8 +33,8 @@ services:
     expose:
       - '5672'
 
-  unicchat.postgresql:
-    container_name: unicchat.postgresql
+  unicchat-postgresql:
+    container_name: unicchat-postgresql
     image: cr.yandex/crpst6ndtaf70or2n2bb/postgres:12
     environment:
       - POSTGRES_DB=dbname

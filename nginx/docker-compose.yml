@@ -1,7 +1,7 @@
 services:
   nginx:
     image: nginx:alpine
-    container_name: unicchat.nginx
+    container_name: unicchat-nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -22,7 +22,7 @@ services:
 
   certbot:
     image: certbot/certbot
-    container_name: unicchat.certbot
+    container_name: unicchat-certbot
     volumes:
       - ./ssl:/etc/letsencrypt
       - ./www:/var/www/certbot

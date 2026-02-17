@@ -9,10 +9,14 @@ dns_config.txt
 mongo_config.txt
 minio_config.txt
 unicchat_config.txt
+vcs.unic.chat.template/local.env
 
 # Логи
 *.log
 unicchat_install.log
+unicchat_logs/
+logs_*/
+log_analysis_report_*.txt
 
 # Backup файлы
 *.backup
@@ -28,6 +32,9 @@ nginx/www/
 # Nginx конфигурация (генерируется автоматически)
 nginx/config/nginx.conf
 nginx/config/*.conf
+
+# Сгенерированные при деплое (env, creds — см. выше)
+multi-server-install/env/
 
 # Docker volumes и данные
 *_data/
