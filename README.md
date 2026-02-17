@@ -266,9 +266,6 @@ git clone https://github.com/unicommorg/unicchat.enterprise.git
 Проект использует модульную архитектуру с отдельными скриптами для каждого компонента:
 - **`unicchat.sh`** — главный скрипт установки UnicChat (основное приложение, MongoDB, Vault, Logger, AppServer, Tasker, MinIO, DocumentServer и др.). **Не вызывает** другие скрипты.
 - **`nginx/generate_ssl.sh`** — скрипт настройки NGINX и SSL (Let's Encrypt). Запускается **отдельно**, не из `unicchat.sh`.
-- **`knowledgebase/deploy_knowledgebase.sh`** — скрипт развертывания только MinIO и DocumentServer (альтернативный вариант). Запускается **отдельно**, не из `unicchat.sh`.
-
-**Важно:** В основном скрипте `unicchat.sh` база знаний (MinIO + DocumentServer) уже входит в общий стек: при выборе пункта [8] Start UnicChat containers запускается `multi-server-install/docker-compose.yml`, где есть и MinIO, и DocumentServer. Скрипт `knowledgebase/deploy_knowledgebase.sh` предназначен для сценариев, когда базу знаний разворачивают отдельно (например, на другом сервере или по другой конфигурации).
 
 ВКС устанавливается отдельным скриптом (см. раздел "Шаг 3. Установка локального медиа сервера для ВКС").
 
@@ -277,7 +274,7 @@ git clone https://github.com/unicommorg/unicchat.enterprise.git
 <!-- TOC --><a name="-unicchatsh"></a>
 ### 1. Скрипт установки UnicChat (`unicchat.sh`)
 
-Интерактивный скрипт с меню. Читает и пишет конфиги в корне проекта (`dns_config.txt`, `mongo_config.txt`, `minio_config.txt`), генерирует файлы в `multi-server-install/` и запускает контейнеры из `multi-server-install/docker-compose.yml`. Другие скрипты (nginx, knowledgebase) не вызывает.
+Интерактивный скрипт с меню. Читает и пишет конфиги в корне проекта (`dns_config.txt`, `mongo_config.txt`, `minio_config.txt`), генерирует файлы в `multi-server-install/` и запускает контейнеры из `multi-server-install/docker-compose.yml`.
 
 <!-- TOC --><a name="-unicchatsh-1"></a>
 #### Запуск
@@ -290,7 +287,7 @@ sudo ./unicchat.sh
 Требуется root (Docker, логи).
 
 <!-- TOC --><a name="--7"></a>
-#### Меню скрипта (описание по пунктам)
+#### Меню скрипта
 
 Текст пунктов меню совпадает с выводом скрипта.
 
@@ -333,7 +330,7 @@ sudo ./generate_ssl.sh
 
 Требуется root (порты 80/443, Docker).
 
-#### Меню скрипта (описание по пунктам)
+#### Меню скрипта
 
 Текст пунктов совпадает с выводом в терминале.
 
