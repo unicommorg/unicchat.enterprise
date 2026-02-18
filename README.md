@@ -1398,57 +1398,133 @@ sudo ufw status
 <!-- TOC --><a name="-9-redminebot"></a>
 ### Шаг 8. Настройка redminebot
 
-Перейдите в redminebot 
+Redminebot - это опциональный сервис для интеграции с системой отслеживания задач Redmine.
+
+#### 8.1 Настройка redminebot
+
+Перейдите в директорию redminebot:
 ```shell
 cd redminebot
 ```
 
-Обратите внимание на переменную окружения Vault__Host
-Возможные способы подключения
- 
-* Vault__Host=http://vault:80  # по имени сервиса и внутреннему порту vault. В случае если они на одном сервере
-* Vault__Host=http://internal_IP:8200 # по внутреннему адресу сервера на котором крутиться vault. пример 10.0.X.X 192.1.X.X
-* Vault__Host=http://domainname:8200 # по  доменному имени и порту. Если 
- 
-  
+Проверьте файл `redminebot.yml`. По умолчанию он настроен для работы с Vault, но **необходимо изменить сеть** на `unicchat-network`:
 
-
-Запустите redminebot.yml
-```bash
-docker compose  -f redminebot.yml  up -d
-```
-
-10. Подключение к unicchat к redminebot и unicvault
-Перейдите в директорию с unicchat
-```
-cd multi-server-install/
-```
-```
-nano unic.chat.appserver.yml
-```
-
-Добавьте  переменные окружения в envirioment
-``` yml
-version: "3"
+```yaml
+version: "3.7"
+networks:
+  unicchat-network:
+    external: true
 services:
-  unic.chat.appserver:
-    container_name: unic.chat.appserver
-    image: 
-    restart: 
-    volumes:
-      - chat_data:/app/uploads
+  ucredminebot:
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatbotredmine:prod
+    container_name: ucredminebot
+    ports:
+      - 8201:8080
+    environment:
+      - Vault__Host=http://unicchat-vault:80
+    restart: always
+    networks:
+      - unicchat-network
+```
+
+**Настройка переменной окружения Vault__Host:**
+
+Возможные варианты подключения к Vault:
+
+1. **По имени сервиса Docker** (если redminebot и Vault в одной сети):
+   ```
+   Vault__Host=http://unicchat-vault:80
+   ```
+
+2. **По внутреннему IP-адресу сервера** (если на разных серверах):
+   ```
+   Vault__Host=http://10.0.X.X:8200
+   ```
+   где `10.0.X.X` - IP-адрес сервера с Vault
+
+3. **По доменному имени** (если настроен DNS):
+   ```
+   Vault__Host=http://vault.example.com:8200
+   ```
+
+Отредактируйте файл при необходимости:
+```shell
+nano redminebot.yml
+```
+
+Запустите redminebot:
+```bash
+docker compose -f redminebot.yml up -d
+```
+
+Проверьте запуск:
+```bash
+docker ps | grep ucredminebot
+docker logs ucredminebot
+```
+
+#### 8.2 Подключение UnicChat к redminebot
+
+Если redminebot запущен, необходимо добавить его адрес в конфигурацию AppServer.
+
+Отредактируйте файл `multi-server-install/docker-compose.yml`:
+```bash
+cd ../multi-server-install/
+nano docker-compose.yml
+```
+
+Найдите секцию `unicchat-appserver` и добавьте переменную окружения `REDMINE_BOT_HOST`:
+
+```yaml
+  unicchat-appserver:
+    container_name: unicchat-appserver
+    image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.1.83-1
+    restart: on-failure
+    depends_on:
+      unicchat-mongodb:
+        condition: service_healthy
+      unicchat-vault:
+        condition: service_started
     ports:
       - "8080:3000"
-    envirioment:
-	# ---
-      - VAULT__HOST=http://internal_IP:8200
-      - REDMINE_BOT_HOST=http://internal_IP:8201
+    environment:
+      - MONGODB_HOST=unicchat-mongodb
+      - MONGODB_PORT=27017
+      - REDMINE_BOT_HOST=http://ucredminebot:8080  # Добавьте эту строку
+    env_file:
+      - appserver.env
+      - appserver_creds.env
+    volumes:
+      - chat_data:/app/uploads
     networks:
-      - unicchat-frontend
+      - unicchat-network
 ```
-Перезапустите unic.chat.appserver
+
+**Возможные значения REDMINE_BOT_HOST:**
+
+1. **Если redminebot в той же Docker-сети:**
+   ```yaml
+   - REDMINE_BOT_HOST=http://ucredminebot:8080
+   ```
+
+2. **Если на другом сервере (по IP):**
+   ```yaml
+   - REDMINE_BOT_HOST=http://10.0.X.X:8201
+   ```
+
+3. **Если по доменному имени:**
+   ```yaml
+   - REDMINE_BOT_HOST=http://redminebot.example.com:8201
+   ```
+
+Перезапустите AppServer:
+```bash
+docker compose -f docker-compose.yml restart unicchat-appserver
 ```
-docker compose -f unic.chat.appserver.yml up -d
+
+Проверьте логи:
+```bash
+docker logs unicchat-appserver | grep -i redmine
 ```
 <!-- TOC --><a name="--22"></a>
 ### Важные замечания
