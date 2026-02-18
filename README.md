@@ -378,155 +378,270 @@ sudo ./generate_ssl.sh
 <!-- TOC --><a name="2-"></a>
 ## 2. Ручная настройка 
 
+В этом разделе описана полностью ручная установка всех компонентов UnicChat без использования автоматизированных скриптов. Все действия выполняются системным администратором.
+
 <!-- TOC --><a name="21-docker"></a>
 ### 2.1 Установите Docker
 
 Установите Docker и Docker Compose согласно официальной документации:
 https://docs.docker.com/engine/install/
 
-Убедитесь, что Docker Compose установлен:
+Убедитесь, что Docker и Docker Compose установлены:
 ```shell
+docker --version
 docker compose version
 ```
 
-<!-- TOC --><a name="22-nginx"></a>
-### 2.2 Провести настройку Nginx
-
-Настройка Nginx и Let's Encrypt выполняется через Docker Compose. Все конфигурационные файлы и сертификаты хранятся в директории `nginx/docker/`.
-
-Перейдите в директорию nginx для выполнения всех команд этого раздела:
+Запустите Docker daemon:
 ```shell
-cd nginx
+sudo systemctl start docker
+sudo systemctl enable docker
 ```
 
-
-<!-- TOC --><a name="222-ssl-certbot"></a>
-#### 2.2.2 Получение SSL сертификатов через Certbot
-
-
-Для ручного получения сертификатов:
-
-
-
-2. **Сгенерируйте DH параметры** (если еще не созданы):
+Проверьте, что Docker работает:
 ```shell
-openssl dhparam -out docker/certbot/conf/ssl-dhparams.pem 2048
+docker info
 ```
 
-3. **Получите сертификаты** (замените `your-email@example.com` на ваш реальный email адрес):
-```shell
-docker compose run --rm --service-ports certbot certonly \
-  --standalone \
-  --non-interactive \
-  --agree-tos \
-  --email your-email@example.com \
-  -d myapp.unic.chat \
-  -d myedt.unic.chat \
-  -d myminio.unic.chat
-```
+<!-- TOC --><a name="22-avx"></a>
+### 2.2 Проверка поддержки AVX процессором
 
-**Важно**: Используйте действительный email адрес! Let's Encrypt требует валидный email для регистрации аккаунта. Не используйте заглушки типа `your-email@example.com`.
-
-Сертификаты будут сохранены в `docker/certbot/conf/live/<домен>/`.
-
-<!-- TOC --><a name="223-nginx-unicchat-"></a>
-#### 2.2.3 Генерация конфигурации Nginx для UnicChat и Базы знаний
-
-Конфигурационные файлы генерируются автоматически скриптом `unicchat.sh` (пункт меню 12 - `generate_nginx_conf`).
-
-Конфигурации создаются в директории `nginx/docker/conf.d/` для следующих доменов:
-
-Порты по умолчанию:
-* для myapp.unic.chat - 8080
-* для myedt.unic.chat - 8880
-* для myminio.unic.chat - 9000
-
-Каждый конфигурационный файл содержит:
-- Upstream блок с адресом сервера и портом
-- HTTP сервер (порт 80) с редиректом на HTTPS
-- HTTPS сервер (порт 443) с SSL сертификатами и проксированием на upstream
-
-**Для ручной настройки:**
-
-1. В директории `nginx/` находятся шаблоны конфигурационных файлов:
-   - `myapp.unic.chat` - шаблон для основного приложения
-   - `myedt.unic.chat` - шаблон для Document Server
-   - `myminio.unic.chat` - шаблон для MinIO
-
-2. Отредактируйте эти файлы под свою конфигурацию:
-   - Замените доменные имена (`myapp.unic.chat`, `myedt.unic.chat`, `myminio.unic.chat`) на ваши реальные домены
-   - В upstream блоке замените `127.0.0.1` на IP-адрес вашего сервера (если сервисы запущены на другом хосте)
-   - Убедитесь, что порты (8080, 8880, 9000) соответствуют портам ваших сервисов
-
-3. Скопируйте отредактированные файлы в директорию `docker/conf.d/` с расширением `.conf`:
-```shell
-cp myapp.unic.chat docker/conf.d/myapp.unic.chat.conf
-cp myedt.unic.chat docker/conf.d/myedt.unic.chat.conf
-cp myminio.unic.chat docker/conf.d/myminio.unic.chat.conf
-```
-
-Или переименуйте файлы напрямую в директории `nginx/docker/conf.d/` после редактирования.
-
-<!-- TOC --><a name="224-nginx"></a>
-#### 2.2.4 Запуск и активация Nginx
-
-После получения SSL сертификатов и создания конфигураций запустите Nginx:
-
-**Автоматически через скрипт:**
-Используйте скрипт `unicchat.sh`:
-- Пункт меню 13 - `deploy_nginx_conf` (развертывание конфигураций)
-- Пункт меню 16 - `activate_nginx` (активация и перезагрузка)
-
-**Вручную:**
-
-1. **Запустите Nginx контейнер**:
-```shell
-docker compose up -d nginx
-```
-
-2. **Проверьте конфигурацию**:
-```shell
-docker compose exec nginx nginx -t
-```
-
-
-Проверка конфигурации должна показать:
-```
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-```
-
-3. **Если проверка успешна, перезагрузите Nginx**:
-```shell
-docker compose exec nginx nginx -s reload
-```
-
-
-
-<!-- TOC --><a name="226-certbot"></a>
-#### 2.2.6 Настройка автоматического обновления сертификатов Certbot
-
-Для автоматического обновления сертификатов добавьте задачу в cron:
+MongoDB версии 5.x и выше требуют поддержки инструкций AVX процессором. Проверьте наличие AVX:
 
 ```shell
-# Редактировать crontab
-crontab -e
-
-# Добавить строку (обновление в 7:00 каждый день)
-0 7 * * * cd /path/to/unicchat.enterprise/nginx && docker compose run --rm --service-ports certbot renew --non-interactive && docker compose exec nginx nginx -s reload
+grep avx /proc/cpuinfo
 ```
 
-Или создайте файл `/etc/cron.daily/certbot-renew`:
-```bash
-#!/bin/bash
-cd /path/to/unicchat.enterprise/nginx
-docker compose run --rm --service-ports certbot renew --non-interactive
-docker compose exec nginx nginx -s reload
-```
+**Результат проверки:**
+- Если команда выводит строки с `avx` - используйте MongoDB 5.x или выше
+- Если вывода нет - используйте MongoDB 4.4 или ниже
 
-Сделайте файл исполняемым:
+<!-- TOC --><a name="23-dns"></a>
+### 2.3 Настройка DNS имён
+
+Подготовьте DNS-имена для ваших сервисов. Вам потребуется минимум 3 домена:
+
+1. **APP_DNS** - основное приложение UnicChat (например, `myapp.unic.chat`)
+2. **EDT_DNS** - сервер документов DocumentServer (например, `myedt.unic.chat`)
+3. **MINIO_DNS** - объектное хранилище MinIO (например, `myminio.unic.chat`)
+
+Убедитесь, что DNS-записи настроены и указывают на IP-адрес вашего сервера. Проверьте разрешение имён:
+
 ```shell
-chmod +x /etc/cron.daily/certbot-renew
+dig +short myapp.unic.chat
+dig +short myedt.unic.chat
+dig +short myminio.unic.chat
+```
+
+Если DNS ещё не настроен публично, но вы хотите продолжить установку, добавьте записи в `/etc/hosts`:
+
+```shell
+sudo nano /etc/hosts
+```
+
+Добавьте строки (замените IP на адрес вашего сервера):
+```
+<IP_СЕРВЕРА> myapp.unic.chat
+<IP_СЕРВЕРА> myedt.unic.chat
+<IP_СЕРВЕРА> myminio.unic.chat
+```
+
+<!-- TOC --><a name="24-network"></a>
+### 2.4 Создание Docker-сети
+
+Создайте Docker-сеть для связи между контейнерами:
+
+```shell
+docker network create unicchat-network
+```
+
+Проверьте создание сети:
+```shell
+docker network ls | grep unicchat-network
+```
+
+<!-- TOC --><a name="25-"></a>
+### 2.5 Подготовка конфигурационных файлов
+
+Перейдите в директорию `multi-server-install/`:
+```shell
+cd multi-server-install/
+```
+
+#### 2.5.1 Конфигурация MongoDB
+
+Создайте файл `mongo.env` для настройки MongoDB Replica Set:
+
+```shell
+nano mongo.env
+```
+
+Содержимое файла:
+```ini
+# Replica Set Configuration
+MONGODB_REPLICA_SET_MODE=primary
+MONGODB_REPLICA_SET_NAME=rs0
+MONGODB_REPLICA_SET_KEY=rs0key
+MONGODB_PORT_NUMBER=27017
+MONGODB_INITIAL_PRIMARY_HOST=unicchat-mongodb
+MONGODB_INITIAL_PRIMARY_PORT_NUMBER=27017
+MONGODB_ADVERTISED_HOSTNAME=unicchat-mongodb
+MONGODB_ENABLE_JOURNAL=true
+```
+
+**Важно:** Если MongoDB будет установлена на отдельном сервере, замените значения `MONGODB_INITIAL_PRIMARY_HOST` и `MONGODB_ADVERTISED_HOSTNAME` на IP-адрес или DNS-имя сервера БД.
+
+Создайте файл `mongo_creds.env` с учётными данными:
+
+```shell
+nano mongo_creds.env
+```
+
+Содержимое файла (замените пароли на свои):
+```ini
+# MongoDB Authentication
+MONGODB_ROOT_PASSWORD=rootpass_change_me
+MONGODB_USERNAME=unicchat_admin
+MONGODB_PASSWORD=secure_password_change_me
+MONGODB_DATABASE=unicchat_db
+```
+
+Установите ограниченные права доступа:
+```shell
+chmod 600 mongo_creds.env
+```
+
+#### 2.5.2 Конфигурация AppServer
+
+Создайте файл `appserver.env`:
+
+```shell
+nano appserver.env
+```
+
+Содержимое файла (замените домены на свои):
+```ini
+# UnicChat AppServer Configuration
+ROOT_URL=https://myapp.unic.chat
+DOCUMENT_SERVER_HOST=https://myedt.unic.chat
+LICENSE_HOST=https://push1.unic.chat/
+PORT=3000
+DEPLOY_METHOD=docker
+DB_COLLECTIONS_PREFIX=unicchat_
+MONGODB_HOST=unicchat-mongodb
+MONGODB_PORT=27017
+```
+
+Создайте файл `appserver_creds.env` с подключением к MongoDB:
+
+```shell
+nano appserver_creds.env
+```
+
+Содержимое файла (используйте данные из `mongo_creds.env`):
+```ini
+# UnicChat AppServer Credentials
+MONGO_URL=mongodb://unicchat_admin:secure_password_change_me@unicchat-mongodb:27017/unicchat_db?replicaSet=rs0
+MONGO_OPLOG_URL=mongodb://unicchat_admin:secure_password_change_me@unicchat-mongodb:27017/local
+```
+
+Установите ограниченные права:
+```shell
+chmod 600 appserver_creds.env
+```
+
+#### 2.5.3 Конфигурация Logger
+
+Создайте файл `logger.env`:
+
+```shell
+nano logger.env
+```
+
+Содержимое:
+```ini
+# Logger API URL (internal)
+api.logger.url=http://unicchat-logger:8080/
+```
+
+Создайте файл `logger_creds.env` (замените пароль):
+
+```shell
+nano logger_creds.env
+```
+
+Содержимое:
+```ini
+# MongoDB connection for logger service
+MongoCS="mongodb://logger_user:logger_pass_change_me@unicchat-mongodb:27017/logger_db?directConnection=true&authSource=logger_db&authMechanism=SCRAM-SHA-256"
+```
+
+Установите права:
+```shell
+chmod 600 logger_creds.env
+```
+
+#### 2.5.4 Конфигурация Vault
+
+Создайте файл `vault_creds.env`:
+
+```shell
+nano vault_creds.env
+```
+
+Содержимое:
+```ini
+# MongoDB connection for vault service
+MongoCS="mongodb://vault_user:vault_pass_change_me@unicchat-mongodb:27017/vault_db?directConnection=true&authSource=vault_db&authMechanism=SCRAM-SHA-256"
+```
+
+Установите права:
+```shell
+chmod 600 vault_creds.env
+```
+
+#### 2.5.5 Конфигурация MinIO
+
+Создайте директорию для конфигов MinIO:
+```shell
+mkdir -p env
+```
+
+Создайте файл `env/minio_env.env`:
+
+```shell
+nano env/minio_env.env
+```
+
+Содержимое (замените учётные данные и домен):
+```ini
+# MinIO Configuration
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin_pass_change_me
+MINIO_BROWSER=on
+MINIO_DOMAIN=myminio.unic.chat
+```
+
+#### 2.5.6 Конфигурация DocumentServer
+
+Создайте файл `env/documentserver_env.env`:
+
+```shell
+nano env/documentserver_env.env
+```
+
+Содержимое:
+```ini
+# DocumentServer Configuration
+JWT_ENABLED=true
+JWT_SECRET=your_jwt_secret_change_me
+JWT_HEADER=Authorization
+DB_TYPE=postgres
+DB_HOST=unicchat-postgresql
+DB_PORT=5432
+DB_NAME=dbname
+DB_USER=dbuser
+AMQP_URI=amqp://guest:guest@unicchat-rabbitmq
 ```
 
 Вернитесь в корневую директорию проекта:
@@ -534,223 +649,720 @@ chmod +x /etc/cron.daily/certbot-renew
 cd ..
 ```
 
-<!-- TOC --><a name="23-"></a>
-### 2.3 Открыть доступы до внутренних ресурсов
+<!-- TOC --><a name="26-registry"></a>
+### 2.6 Авторизация в Container Registry
 
-<!-- TOC --><a name="-unicchat-2"></a>
-#### Входящие соединения на стороне сервера UnicChat:
-
-Открыть порты:
-
-- 8080/TCP - по-умолчанию, сервер запускается на 8080 порту и доступен http://localhost:8080, где localhost - это IP адрес сервера UnicChat;
-- 443/TCP - порт будет нужен, если вы настроили nginx с сертификатом HTTPS;
-
-<!-- TOC --><a name="-unicchat-push"></a>
-#### Исходящие соединения на стороне сервера UnicChat на push:
-
-* Открыть доступ для Push-шлюза:
- * 443/TCP, на хост **push1.unic.chat**;
-
-<!-- TOC --><a name="-unicchat-"></a>
-#### Исходящие соединения на стороне сервера UnicChat на ВКС:
-Примечание **lk-yc.unic.chat** адрес внешней ВКС компании `Unicomm`, при развертывание локального медиа сервера используйте свой адрес.
-* Открыть доступ для ВКС сервера:
- * 443/TCP, на хост **lk-yc.unic.chat**;
- * 7881/TCP, 7882/UDP
- * (50000 - 60000)/UDP (диапазон этих портов может быть изменён при развертывании лицензионной версии непосредственно владельцем лицензии)
-
-* Открыть доступ до внутренних ресурсов: LDAP, SMTP, DNS при необходимости использования этого функционала
-
-<!-- TOC --><a name="-3-"></a>
-## Шаг 3. Установка локального медиа сервера для ВКС
-Подробная инструкция также доступна в **веб-версии** или **в репозитории**:
-*   🔗 **Веб:** [github.com/unicommorg/unicchat.enterprise/blob/main/vcs.unic.chat.template/readme.first.md](https://github.com/unicommorg/unicchat.enterprise/blob/main/vcs.unic.chat.template/readme.first.md)
-*   📁 **Локальный путь:** `./vcs.unic.chat.template/readme.first.md`
-
----
-
-
-<!-- TOC --><a name="-4-unicchat"></a>
-## Шаг 4. Развертывание базы знаний для UNICCHAT
-<!-- TOC --><a name="44-minio-s3"></a>
-### 4.4 Развертывание MinIO S3
-
-<!-- TOC --><a name="441-"></a>
-#### 4.4.1 Создание переменных окружения для Базы Знаний
-
-Перейдите в директорию ./knowledgebase/minio/ .
-Скопируйте файл minio_env.env.example в minio_env.env .
-Отредактируйте minio_env.env.
+Выполните вход в Yandex Container Registry для доступа к образам:
 
 ```shell
-cd knowledgebase/minio/
-cp minio_env.env.example minio_env.env
-nano minio_env.env
+docker login --username oauth \
+  --password y0_AgAAAAB3muX6AATuwQAAAAEawLLRAAB9TQHeGyxGPZXkjVDHF1ZNJcV8UQ \
+  cr.yandex
 ```
 
-<!-- TOC --><a name="442-"></a>
-#### 4.4.2 Запустите Базу Знаний
+<!-- TOC --><a name="27-unicchat"></a>
+### 2.7 Запуск сервисов UnicChat
+
+Запустите все сервисы из корневой директории проекта:
+
+```shell
+docker compose -f multi-server-install/docker-compose.yml up -d
+```
+
+Проверьте запуск контейнеров:
+```shell
+docker ps
+```
+
+Вы должны увидеть следующие контейнеры:
+- `unicchat-mongodb`
+- `unicchat-appserver`
+- `unicchat-vault`
+- `unicchat-logger`
+- `unicchat-tasker`
+- `unicchat-minio`
+- `unicchat-documentserver`
+- `unicchat-rabbitmq`
+- `unicchat-postgresql`
+
+Дождитесь полного запуска всех сервисов (это может занять 1-2 минуты). Проверьте логи:
+```shell
+docker logs unicchat-mongodb
+docker logs unicchat-appserver
+```
+
+<!-- TOC --><a name="28-mongodb"></a>
+### 2.8 Настройка пользователей MongoDB
+
+После запуска MongoDB необходимо создать пользователей для служб Logger и Vault.
+
+#### 2.8.1 Проверка готовности MongoDB
+
+Подождите, пока MongoDB полностью запустится (15-30 секунд). Проверьте готовность:
+
+```shell
+docker exec unicchat-mongodb mongosh -u root -p "rootpass_change_me" --quiet --eval "db.adminCommand('ping')"
+```
+
+Если команда возвращает `{ ok: 1 }`, MongoDB готов к работе.
+
+#### 2.8.2 Создание пользователя Logger
+
+Подключитесь к MongoDB:
+
+```shell
+docker exec -it unicchat-mongodb mongosh -u root -p "rootpass_change_me" --authenticationDatabase admin
+```
+
+В консоли MongoDB выполните:
+
+```javascript
+use admin
+db = db.getSiblingDB('logger_db')
+db.createUser({
+  user: 'logger_user',
+  pwd: 'logger_pass_change_me',
+  roles: [{ role: 'readWrite', db: 'logger_db' }]
+})
+```
+
+Если пользователь уже существует, обновите пароль:
+```javascript
+db.changeUserPassword('logger_user', 'logger_pass_change_me')
+```
+
+#### 2.8.3 Создание пользователя Vault
+
+В той же консоли MongoDB выполните:
+
+```javascript
+use admin
+db = db.getSiblingDB('vault_db')
+db.createUser({
+  user: 'vault_user',
+  pwd: 'vault_pass_change_me',
+  roles: [{ role: 'readWrite', db: 'vault_db' }]
+})
+```
+
+Если пользователь уже существует:
+```javascript
+db.changeUserPassword('vault_user', 'vault_pass_change_me')
+```
+
+Выйдите из консоли:
+```javascript
+exit
+```
+
+<!-- TOC --><a name="29-vault"></a>
+### 2.9 Настройка секретов Vault для KBT
+
+Сервис KBT (Knowledge Base Tasker) использует Vault для хранения конфигурации подключения к MongoDB и MinIO.
+
+#### 2.9.1 Установка curl в контейнер Vault (если требуется)
+
+Проверьте наличие curl в контейнере:
+
+```shell
+docker exec unicchat-vault bash -c "command -v curl"
+```
+
+Если curl отсутствует, установите его:
+
+```shell
+docker exec -u root unicchat-vault bash -c "apt-get update && apt-get install -y curl"
+```
+
+#### 2.9.2 Получение токена доступа к Vault
+
+Подождите, пока Vault полностью запустится (10-15 секунд). Получите JWT токен:
+
+```shell
+VAULT_TOKEN=$(docker exec unicchat-vault bash -c "curl -s 'http://localhost:80/api/token/0f8e160416b94225a73f86ac23b9118b?username=KBTservice'")
+echo "Token: $VAULT_TOKEN"
+```
+
+Токен должен иметь формат JWT (три части, разделённые точками).
+
+#### 2.9.3 Создание секрета KBTConfigs
+
+Создайте секрет с конфигурацией MongoDB и MinIO. Замените значения на ваши реальные данные:
+
+```shell
+docker exec unicchat-vault bash -c "curl -X POST 'http://localhost:80/api/Secrets' \
+  -H 'Authorization: Bearer $VAULT_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -H 'accept: text/plain' \
+  -d '{
+    \"id\": \"KBTConfigs\",
+    \"name\": \"KBTConfigs\",
+    \"type\": \"Password\",
+    \"data\": \"All info in META\",
+    \"metadata\": {
+      \"MongoCS\": \"mongodb://logger_user:logger_pass_change_me@unicchat-mongodb:27017/logger_db?directConnection=true&authSource=logger_db&authMechanism=SCRAM-SHA-256\",
+      \"MinioHost\": \"myminio.unic.chat\",
+      \"MinioUser\": \"minioadmin\",
+      \"MinioPass\": \"minioadmin_pass_change_me\"
+    },
+    \"tags\": [\"KB\", \"Tasker\", \"Mongo\", \"Minio\"],
+    \"expiresAt\": \"2030-12-31T23:59:59.999Z\"
+  }'"
+```
+
+Проверьте создание секрета:
+
+```shell
+docker exec unicchat-vault bash -c "curl -s -X GET 'http://localhost:80/api/Secrets/KBTConfigs' \
+  -H 'Authorization: Bearer $VAULT_TOKEN'" | grep KBTConfigs
+```
+
+Если в выводе присутствует `KBTConfigs`, секрет успешно создан.
+
+<!-- TOC --><a name="210-nginx"></a>
+### 2.10 Настройка Nginx и SSL сертификатов
+
+#### 2.10.1 Подготовка директорий
+
+Перейдите в директорию nginx:
+```shell
+cd nginx
+```
+
+Создайте необходимые директории:
+```shell
+mkdir -p ssl www config
+chmod 755 ssl www
+```
+
+Файл `ssl/options-ssl-nginx.conf` должен присутствовать в репозитории. Проверьте его наличие:
+```shell
+ls -la ssl/options-ssl-nginx.conf
+```
+
+#### 2.10.2 Генерация DH параметров
+
+Сгенерируйте параметры Диффи-Хеллмана для усиления SSL:
+
+```shell
+openssl dhparam -out ssl/ssl-dhparams.pem 2048
+```
+
+Эта операция может занять несколько минут.
+
+#### 2.10.3 Остановка сервисов на портах 80/443
+
+Перед получением сертификатов убедитесь, что порты 80 и 443 свободны:
+
+```shell
+sudo ss -tulpn | grep -E ':(80|443) '
+```
+
+Если nginx уже запущен, остановите его:
+```shell
+docker stop unicchat-nginx 2>/dev/null || true
+docker rm unicchat-nginx 2>/dev/null || true
+```
+
+#### 2.10.4 Получение SSL сертификатов через Let's Encrypt
+
+Запустите Certbot для получения сертификатов. Замените `your-email@example.com` на ваш реальный email и домены на ваши:
+
+```shell
+docker run --rm \
+  --network unicchat-network \
+  -p 80:80 \
+  -p 443:443 \
+  -v "$(pwd)/ssl:/etc/letsencrypt" \
+  certbot/certbot certonly \
+  --standalone \
+  --preferred-challenges http \
+  --email your-email@example.com \
+  --agree-tos \
+  --no-eff-email \
+  --non-interactive \
+  --verbose \
+  -d myapp.unic.chat \
+  -d myedt.unic.chat \
+  -d myminio.unic.chat
+```
+
+**Важно:** 
+- Используйте действительный email! Let's Encrypt требует валидный email для уведомлений.
+- Убедитесь, что DNS-записи настроены и указывают на ваш сервер.
+- Порты 80 и 443 должны быть доступны из интернета.
+
+Сертификаты будут сохранены в `ssl/live/myapp.unic.chat/`.
+
+#### 2.10.5 Создание конфигурации Nginx
+
+Создайте конфигурационный файл Nginx:
+
+```shell
+nano config/nginx.conf
+```
+
+Вставьте следующее содержимое (замените `myapp.unic.chat`, `myedt.unic.chat`, `myminio.unic.chat` на ваши домены):
+
+```nginx
+# Nginx configuration for UnicChat Enterprise
+
+# Upstream для App Server
+upstream app_server {
+    server unicchat-appserver:3000;
+}
+
+# Upstream для Document Server  
+upstream doc_server {
+    server unicchat-documentserver:80;
+}
+
+# Upstream для MinIO
+upstream minio_server {
+    server unicchat-minio:9000;
+}
+
+upstream minio_console {
+    server unicchat-minio:9002;
+}
+
+# ============================================================================
+# App Server (UnicChat Application)
+# ============================================================================
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name myapp.unic.chat;
+
+    client_max_body_size 200M;
+
+    error_log /var/log/nginx/app.error.log;
+    access_log /var/log/nginx/app.access.log;
+
+    # CORS headers
+    add_header Access-Control-Allow-Origin * always;
+    add_header Access-Control-Allow-Credentials true;
+    add_header "Access-Control-Allow-Methods" "GET, POST, OPTIONS, HEAD, PUT, DELETE";
+    add_header "Access-Control-Allow-Headers" "Authorization, Origin, X-Requested-With, Content-Type, Accept";
+
+    # Preflight requests
+    if ($request_method = OPTIONS) {
+        return 204;
+    }
+
+    location / {
+        proxy_pass http://app_server;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Nginx-Proxy true;
+
+        proxy_redirect off;
+    }
+
+    ssl_certificate /etc/letsencrypt/live/myapp.unic.chat/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/myapp.unic.chat/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    listen 80;
+    server_name myapp.unic.chat;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ============================================================================
+# Document Server (OnlyOffice)
+# ============================================================================
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name myedt.unic.chat;
+
+    client_max_body_size 200M;
+
+    error_log /var/log/nginx/edt.error.log;
+    access_log /var/log/nginx/edt.access.log;
+
+    location / {
+        proxy_pass http://doc_server;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        proxy_redirect off;
+    }
+
+    ssl_certificate /etc/letsencrypt/live/myapp.unic.chat/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/myapp.unic.chat/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    listen 80;
+    server_name myedt.unic.chat;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ============================================================================
+# MinIO S3 API
+# ============================================================================
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name myminio.unic.chat;
+
+    client_max_body_size 500M;
+
+    error_log /var/log/nginx/minio.error.log;
+    access_log /var/log/nginx/minio.access.log;
+
+    # Disable buffering for large files
+    proxy_buffering off;
+    proxy_request_buffering off;
+
+    location / {
+        proxy_pass http://minio_server;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        # MinIO-specific headers
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-NginX-Proxy true;
+
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+        proxy_read_timeout 300;
+        send_timeout 300;
+    }
+
+    ssl_certificate /etc/letsencrypt/live/myapp.unic.chat/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/myapp.unic.chat/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    listen 80;
+    server_name myminio.unic.chat;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ============================================================================
+# MinIO Console (Web UI) - port 9002
+# ============================================================================
+server {
+    listen 9002 ssl;
+    http2 on;
+    server_name myminio.unic.chat;
+
+    error_log /var/log/nginx/minio-console.error.log;
+    access_log /var/log/nginx/minio-console.access.log;
+
+    location / {
+        proxy_pass http://minio_console;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        proxy_redirect off;
+    }
+
+    ssl_certificate /etc/letsencrypt/live/myapp.unic.chat/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/myapp.unic.chat/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+```
+
+Сохраните файл (Ctrl+O, Enter, Ctrl+X).
+
+#### 2.10.6 Запуск Nginx
+
+Запустите контейнер Nginx:
+
+```shell
+docker compose up -d nginx
+```
+
+Дождитесь запуска контейнера (2-3 секунды):
+```shell
+sleep 3
+```
+
+Проверьте статус:
+```shell
+docker ps | grep unicchat-nginx
+```
+
+#### 2.10.7 Проверка конфигурации
+
+Проверьте корректность конфигурации Nginx:
+
+```shell
+docker exec unicchat-nginx nginx -t
+```
+
+Вывод должен содержать:
+```
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+```
+
+Если есть ошибки, проверьте файл `config/nginx.conf` и исправьте их.
+
+#### 2.10.8 Настройка автоматического обновления сертификатов
+
+Для автоматического продления сертификатов запустите контейнер Certbot в фоновом режиме:
+
+```shell
+docker compose up -d certbot
+```
+
+Certbot будет автоматически проверять и обновлять сертификаты каждые 12 часов.
+
+Также рекомендуется добавить задачу в cron для перезагрузки Nginx после обновления:
+
+```shell
+crontab -e
+```
+
+Добавьте строку:
+```
+0 7 * * * cd /path/to/unicchat.enterprise/nginx && docker compose run --rm certbot renew --non-interactive && docker restart unicchat-nginx
+```
+
+Замените `/path/to/unicchat.enterprise` на абсолютный путь к директории проекта.
 
 Вернитесь в корневую директорию проекта:
 ```shell
-cd ../../
-```
-Создайте сеть для minio
-```bash
-docker network create minio
-```
-Запустите контейнеры из корня проекта:
-```bash
-docker compose -f knowledgebase/minio/docker-compose.yml up -d && docker compose -f knowledgebase/Docker-DocumentServer/docker-compose.yml up -d  
+cd ..
 ```
 
-<!-- TOC --><a name="443-minio"></a>
-#### 4.4.3 Доступ к MinIO:
+<!-- TOC --><a name="211-"></a>
+### 2.11 Настройка /etc/hosts для MinIO и DocumentServer
 
-http://<hostname minio>:9002
-логин и пароль указан в ` minio_env.env` файле
+**Важно:** Для корректной работы проксирования через NGINX необходимо на серверах с сервисами MinIO и DocumentServer добавить DNS-записи в файл `/etc/hosts`.
 
-<!-- TOC --><a name="444-bucket"></a>
-#### 4.4.4 Создание bucket
+Отредактируйте файл `/etc/hosts`:
+```shell
+sudo nano /etc/hosts
+```
 
-Создайте bucket `uc.onlyoffice.docs` и в настройках bucket назначьте Access Policy:public.
+Добавьте следующие строки (замените `<IP_NGINX_SERVER>` на IP-адрес сервера с NGINX):
+```
+<IP_NGINX_SERVER> myminio.unic.chat
+<IP_NGINX_SERVER> myedt.unic.chat
+```
 
-Есть два варианта создания bucket
-1. Через веб-интерфейс
-2. Через консольную утилиту mc
+Сохраните файл и перезапустите сетевую службу:
+```shell
+sudo systemctl restart systemd-resolved
+```
 
-Способ 1. Через веб-интерфейс
-Авторизуйтесь по http://<hostname minio>:9002
+<!-- TOC --><a name="212-minio"></a>
+### 2.12 Создание bucket в MinIO
 
-Создайте новый bucket `uc.onlyoffice.docs`.
-В настройках отредактируйте права `Access Policy` на `public`
-![](./assets/minio.png "Права bucket")
+После запуска всех сервисов необходимо создать bucket для хранения документов.
 
-Способ 2. Через mc
-Скачайте mc
+Откройте консоль MinIO в браузере:
+```
+https://myminio.unic.chat:9002
+```
+
+Используйте учётные данные из `multi-server-install/env/minio_env.env`:
+- Username: `minioadmin`
+- Password: `minioadmin_pass_change_me`
+
+Создайте bucket с именем `uc.onlyoffice.docs`:
+
+**Вариант 1: Через веб-интерфейс**
+1. Нажмите "Create Bucket"
+2. Введите имя: `uc.onlyoffice.docs`
+3. Нажмите "Create"
+4. Откройте настройки bucket
+5. Установите "Access Policy" на `public`
+
+**Вариант 2: Через утилиту mc**
+
+Установите MinIO Client:
 ```shell
 wget https://dl.min.io/client/mc/release/linux-amd64/mc
 chmod +x mc
 sudo mv mc /usr/local/bin/
 ```
 
+Настройте подключение:
+```shell
+mc alias set myminio https://myminio.unic.chat minioadmin minioadmin_pass_change_me
+```
+
+Создайте bucket и установите публичный доступ:
 ```shell
 mc mb myminio/uc.onlyoffice.docs
 mc anonymous set public myminio/uc.onlyoffice.docs
 ```
-<!-- TOC --><a name="445-dns-"></a>
-#### 4.4.5 Настройка DNS записей для проксирования
 
-**Внимание**: Для корректной работы проксирования через NGINX необходимо на серверах с сервисами `myminio.unic.chat` и `myedt.unic.chat` добавить DNS записи в файл `/etc/hosts`.
+<!-- TOC --><a name="213-"></a>
+### 2.13 Настройка прав доступа MongoDB для AppServer
 
-1. Отредактируйте файл `/etc/hosts`:
-```bash
-sudo nano /etc/hosts
-```
+После первого запуска UnicChat необходимо настроить права доступа для основного пользователя приложения в MongoDB.
 
-2. Добавьте следующие строки (замените `10.0.XX.XX` на IP-адрес сервера с NGINX):
-```bash
-10.0.XX.XX myminio.unic.chat
-10.0.XX.XX myedt.unic.chat
-```
-
-**Где**:
-- `10.0.XX.XX` — IP-адрес сервера с NGINX, на котором настроено проксирование
-- Записи указывают, что домены должны разрешаться на NGINX сервер
-
-3. Сохраните файл и перезапустите сетевой сервис:
-```bash
-sudo systemctl restart systemd-resolved
-```
-<!-- TOC --><a name="-5-unicchat"></a>
-## Шаг 5. Установка UnicChat
-
-<!-- TOC --><a name="51-unicchat"></a>
-### 5.1 Настройка Unic.Chat
-
-1. [Linux] На сервере БД выполните команду `grep avx /proc/cpuinfo`. Если в ответе вы не видите AVX, то вам лучше выбрать версию mongodb < 5.х, например, 4.4
- если AVX на вашем сервере поддерживается, рекомендуется выбрать версию mongodb > 5.х.
-2. ВАЖНО! Если вы планируете запустить БД и сервер UnicChat на разных виртуальных серверах, то в параметрах `MONGODB_INITIAL_PRIMARY_HOST` и `MONGODB_ADVERTISED_HOSTNAME` вам нужно указать адрес (DNS или IP) вашего сервера, где запускается БД.
+Подключитесь к MongoDB:
 
 ```shell
-docker network create unicchat-backend
-docker network create unicchat-frontend
-```
-3. Создайте .env файлы. Перейдите в директорию `multi-server-install/`:
-```shell
-cd multi-server-install/
+docker exec -it unicchat-mongodb mongosh -u root -p "rootpass_change_me"
 ```
 
-В этой директории находятся примеры файлов:
-* `solid.env.example` - пример для solid сервиса
-* `appserver.env.example` - пример для appserver сервиса
-* `mongo.env.example` - пример для MongoDB
-
-Скопируйте примеры и отредактируйте под свою конфигурацию:
-```shell
-cp solid.env.example solid.env
-cp appserver.env.example appserver.env
-cp mongo.env.example mongo.env
-
-# Отредактируйте файлы под свою конфигурацию
-nano mongo.env
-nano appserver.env
-nano solid.env
-
-```
-
-Вернитесь в корневую директорию проекта:
-```shell
-cd ..
-```
-
-4. Запустите контейнеры из корневой директории проекта:
-```shell
-docker compose -f multi-server-install/mongodb.yml up -d && docker compose -f multi-server-install/unic.chat.solid.yml up -d && docker compose -f multi-server-install/unic.chat.appserver.yml up -d
-```
-
-<!-- TOC --><a name="52-"></a>
-### 5.2 Раздать права пользователю для подключения к базе
-
-1. После того как база успешно запустилась, подключимся к контейнеру с запущенной БД. Для этого на сервере, где запущен docker контейнер c базой, выполните
-
-```shell
-docker exec -it unic.chat.db.mongo mongosh -u root -p "rootpassword"
-```
-где `unic.chat.db.mongo` - имя нашего контейнера, указанного в `multi-server-install/mongodb.yml`, пароль MONGODB_ROOT_PASSWORD  в `multi-server-install/mongodb_env.env`
-
+Проверьте наличие базы данных:
 ```javascript
-// проверьте наличие вашей базы данных
 show databases
 ```
 
+Перейдите в базу данных UnicChat и проверьте пользователей:
 ```javascript
-// Перейдите на вашу базу данных и проверьте пользователя
 use unicchat_db
 show users
 ```
 
+Обновите права пользователя `unicchat_admin`:
+
 ```javascript
-db.updateUser( "unicchat_admin",
-{
-roles: [
-{role: "readWrite", db: "local"},
-{role: "readWrite", db: "unicchat_db"},
-{role: "dbAdmin", db: "unicchat_db"},
-{role: "clusterMonitor", db: "admin"}
-]
+db.updateUser("unicchat_admin", {
+  roles: [
+    {role: "readWrite", db: "local"},
+    {role: "readWrite", db: "unicchat_db"},
+    {role: "dbAdmin", db: "unicchat_db"},
+    {role: "clusterMonitor", db: "admin"}
+  ]
 })
 ```
 
+Проверьте права:
 ```javascript
-// Перейдите на вашу базу данных и проверьте права пользователя
-use unicchat_db
 show users
 ```
 
+Выйдите из консоли:
+```javascript
+exit
+```
 
-Сайт открывается https://myapp.unic.chat
-Если сайт сразу не открывается, то для сброса кеша использовать очистку кеша и cookie браузера, ctrl+R или использовать безопасный режим браузера.
+<!-- TOC --><a name="214-"></a>
+### 2.14 Проверка работы установки
+
+Откройте в браузере адрес вашего приложения:
+```
+https://myapp.unic.chat
+```
+
+Если сайт не открывается сразу:
+- Очистите кеш браузера (Ctrl+Shift+Del)
+- Используйте режим инкогнито
+- Выполните жёсткую перезагрузку страницы (Ctrl+F5)
+
+При первом входе создайте пользователя администратора (см. "Шаг 6. Создание пользователя администратора").
+
+Проверьте доступность других сервисов:
+- Document Server: `https://myedt.unic.chat`
+- MinIO Console: `https://myminio.unic.chat:9002`
+
+<!-- TOC --><a name="215-"></a>
+### 2.15 Открытие сетевых доступов и портов
+
+Для корректной работы UnicChat необходимо открыть следующие порты и доступы:
+
+#### Входящие соединения на сервере UnicChat
+
+Откройте порты в firewall:
+
+```shell
+# Для HTTP/HTTPS (Nginx)
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# Для MinIO Console
+sudo ufw allow 9002/tcp
+
+# Для ВКС (если устанавливается локальный медиа-сервер)
+sudo ufw allow 7881/tcp
+sudo ufw allow 7882/udp
+sudo ufw allow 50000:60000/udp
+```
+
+Проверьте статус firewall:
+```shell
+sudo ufw status
+```
+
+#### Исходящие соединения
+
+Убедитесь, что сервер UnicChat может устанавливать исходящие соединения:
+
+**Для Push-шлюза:**
+- 443/TCP на хост **push1.unic.chat**
+
+**Для ВКС-сервера:**
+Примечание: **lk-yc.unic.chat** — адрес внешней ВКС компании Unicomm. При развертывании локального медиа-сервера используйте свой адрес.
+- 443/TCP на хост **lk-yc.unic.chat**
+- 7881/TCP, 7882/UDP
+- (50000-60000)/UDP (диапазон портов может быть изменён при развертывании лицензионной версии)
+
+**Для опциональных компонентов:**
+- LDAP (обычно 389/TCP или 636/TCP для LDAPS)
+- SMTP (обычно 25/TCP, 465/TCP или 587/TCP)
+- DNS (53/TCP и 53/UDP)
+
+<!-- TOC --><a name="-3-"></a>
+## Шаг 3. Установка локального медиа сервера для ВКС
+
+Подробная инструкция также доступна в **веб-версии** или **в репозитории**:
+*   🔗 **Веб:** [github.com/unicommorg/unicchat.enterprise/blob/main/vcs.unic.chat.template/readme.first.md](https://github.com/unicommorg/unicchat.enterprise/blob/main/vcs.unic.chat.template/readme.first.md)
+*   📁 **Локальный путь:** `./vcs.unic.chat.template/readme.first.md`
+
+---
 
 <!-- TOC --><a name="-6-"></a>
 ## Шаг 6. Создание пользователя администратора
