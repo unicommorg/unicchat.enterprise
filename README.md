@@ -384,12 +384,6 @@ sudo ./generate_ssl.sh
 Установите Docker и Docker Compose согласно официальной документации:
 https://docs.docker.com/engine/install/
 
-Для Ubuntu/Debian можно использовать скрипт установки:
-```shell
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-```
-
 Убедитесь, что Docker Compose установлен:
 ```shell
 docker compose version
@@ -405,40 +399,14 @@ docker compose version
 cd nginx
 ```
 
-<!-- TOC --><a name="221-"></a>
-#### 2.2.1 Подготовка структуры директорий
-
-Скрипт `unicchat.sh` автоматически подготовит необходимую структуру директорий. 
-
-Структура директорий:
-```
-nginx/
-├── docker-compose.yml          # Docker Compose конфигурация
-└── docker/
-    ├── conf.d/                  # Конфигурационные файлы Nginx
-    └── certbot/
-        ├── conf/                # Сертификаты Let's Encrypt
-        ├── work/                # Рабочие файлы Certbot
-        └── logs/                # Логи Certbot
-```
-
-Убедитесь, что директории созданы (скрипт `unicchat.sh` создаст их автоматически).
 
 <!-- TOC --><a name="222-ssl-certbot"></a>
 #### 2.2.2 Получение SSL сертификатов через Certbot
 
-SSL сертификаты получаются автоматически через Docker контейнер Certbot. Скрипт `unicchat.sh` (пункт меню 15 - `setup_ssl`) выполнит:
-
-1. Копирование файла `options-ssl-nginx.conf` в `docker/certbot/conf/`
-2. Генерацию DH параметров (`ssl-dhparams.pem`)
-3. Получение сертификатов для всех доменов через Certbot контейнер (в режиме standalone, nginx не требуется)
 
 Для ручного получения сертификатов:
 
-1. **Скопируйте файл `options-ssl-nginx.conf`** в директорию certbot:
-```shell
-cp options-ssl-nginx.conf docker/certbot/conf/
-```
+
 
 2. **Сгенерируйте DH параметры** (если еще не созданы):
 ```shell
