@@ -1392,52 +1392,11 @@ sudo ufw status
 
 <!-- TOC --><a name="--21"></a>
 ## Опциональные компоненты
-<!-- TOC --><a name="-8-unicvault"></a>
-### Шаг 8. Настройка unicvault
 
-8.1. Подключитесь к mongodb c root правами
-``` shell
-docker exec -it unic.chat.db.mongo mongosh -u root -p "$MONGODB_ROOT_PASSWORD"
-```
-
-8.2. Создайте базу данных для unicvault:
-```javascript
-use vault_db
-```
-8.3. Создайте пользователя с правами на базу данных:
-```javascript
-db.createUser({
-  user: "vault_user",
-  pwd: "your_secure_password",
-  roles: [
-    { role: "readWrite", db: "vault_db" },
-    { role: "readWrite", db: "admin" }  // или другая база для аутентификации
-  ]
-})
-```
-8.4 Перейдите в директорию unicvault
-``` shell
-cd unicvault
-```
-Создайте файл `.env` с переменными окружения:
-
-```bash
-# Замените значения на ваши реальные данные:
-# username - имя пользователя MongoDB
-# password - пароль пользователя
-# 10.0.X.X - IP-адрес сервера MongoDB
-# dbname - имя базы данных для Vault
-# authdbname - база данных для аутентификации
-
-MongoCS="mongodb://username:password@10.0.X.X/dbname?directConnection=true&authSource=authdbname&authMechanism=SCRAM-SHA-1"
-```
-Запустите unicvault.yml
-```bash
-docker compose -f unicvault.yml up -d
-```
+**Примечание:** Vault уже настроен в разделе "2.9 Настройка секретов Vault для KBT" основной инструкции.
 
 <!-- TOC --><a name="-9-redminebot"></a>
-### Шаг 9. Настройка redminebot
+### Шаг 8. Настройка redminebot
 
 Перейдите в redminebot 
 ```shell
