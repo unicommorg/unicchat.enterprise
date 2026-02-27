@@ -48,7 +48,7 @@ services:
   # 2. Vault - хранилище секретов
   # ================================================================================
   unicchat-vault:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:dev
     container_name: unicchat-vault
     ports:
       - 8200:80
