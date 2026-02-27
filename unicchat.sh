@@ -497,10 +497,23 @@ EOL
 setup_mongodb_users() {
   echo -e "\n🔐 Setting up MongoDB users for services…"
   local dir="multi-server-install"
+  local container="unicchat-mongodb"
   
-  # Check MongoDB is running
-  if ! docker ps | grep -q "unicchat-mongodb"; then
-    log_warning "MongoDB container is not running. Start services first."
+  # Wait for MongoDB container to appear (docker compose may report before container is in ps)
+  local wait_attempts=15
+  local w=0
+  while [ $w -lt $wait_attempts ]; do
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+      break
+    fi
+    w=$((w + 1))
+    if [ $w -lt $wait_attempts ]; then
+      echo "   ⏳ Waiting for MongoDB container... ($w/$wait_attempts)"
+      sleep 3
+    fi
+  done
+  if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+    log_warning "MongoDB container is not running. Start services first (option 8)."
     return 1
   fi
   
@@ -512,7 +525,6 @@ setup_mongodb_users() {
   fi
   
   local root_password=$(grep '^MONGODB_ROOT_PASSWORD=' "$mongo_creds_file" | cut -d '=' -f2- | tr -d '\r')
-  local container="unicchat-mongodb"
   
   if [ -z "$root_password" ]; then
     log_error "MONGODB_ROOT_PASSWORD not found in $mongo_creds_file"
@@ -660,10 +672,22 @@ setup_vault_secrets() {
   echo -e "\n🔐 Setting up Vault secrets for KBT service…"
   local dir="multi-server-install"
   
-  # Check Vault is running
   local container="unicchat-vault"
-  if ! docker ps | grep -q "$container"; then
-    log_warning "Vault container is not running. Start services first."
+  # Wait for Vault container to be running (may need time after depends_on)
+  local wait_attempts=12
+  local w=0
+  while [ $w -lt $wait_attempts ]; do
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+      break
+    fi
+    w=$((w + 1))
+    if [ $w -lt $wait_attempts ]; then
+      echo "   ⏳ Waiting for Vault container... ($w/$wait_attempts)"
+      sleep 3
+    fi
+  done
+  if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+    log_warning "Vault container is not running. Start services first (option 8)."
     return 1
   fi
   
@@ -903,10 +927,13 @@ EOF
 
 login_yandex() {
   echo -e "\n🔑 Logging into Yandex Container Registry…"
-  docker login --username oauth \
-    --password y0_AgAAAAB3muX6AATuwQAAAAEawLLRAAB9TQHeGyxGPZXkjVDHF1ZNJcV8UQ \
-    cr.yandex
-  log_success "Logged in to Yandex CR"
+  if docker login --username oauth \
+    --password-stdin \
+    cr.yandex <<< "y0_AgAAAAB3muX6AATuwQAAAAEawLLRAAB9TQHeGyxGPZXkjVDHF1ZNJcV8UQ"; then
+    log_success "Logged in to Yandex CR"
+  else
+    log_warning "Could not connect to Yandex CR "
+  fi
 }
 
 create_network() {
@@ -923,8 +950,33 @@ start_unicchat() {
   echo -e "\n🚀 Starting UnicChat services…"
   local dir="multi-server-install"
   create_network
-  (cd "$dir" && docker_compose -f docker-compose.yml up -d)
-  log_success "Services started (containers are starting in background)"
+
+  echo -e "\n📥 Pulling all images…"
+  (cd "$dir" && docker_compose -f docker-compose.yml pull) || true
+
+  echo -e "\n📦 Starting all services (with --wait)…"
+  (cd "$dir" && docker_compose -f docker-compose.yml up -d --wait)
+
+  echo -e "\n📦 MinIO init: creating bucket uc.onlyoffice.docs…"
+  docker pull cr.yandex/crpst6ndtaf70or2n2bb/minio-mc:latest 2>/dev/null || true
+  if [ -f "$dir/env/minio_env.env" ]; then
+    . "$dir/env/minio_env.env"
+    sleep 5
+    mc_vol="unicchat-mc-init-$$"
+    docker run --rm --network unicchat-network -v "${mc_vol}:/root/.mc" \
+      --env-file "$dir/env/minio_env.env" \
+      cr.yandex/crpst6ndtaf70or2n2bb/minio-mc:latest \
+      alias set myminio "http://unicchat-minio:9000" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" 2>/dev/null && \
+    docker run --rm --network unicchat-network -v "${mc_vol}:/root/.mc" \
+      cr.yandex/crpst6ndtaf70or2n2bb/minio-mc:latest \
+      mb --ignore-existing myminio/uc.onlyoffice.docs 2>/dev/null && \
+    docker run --rm --network unicchat-network -v "${mc_vol}:/root/.mc" \
+      cr.yandex/crpst6ndtaf70or2n2bb/minio-mc:latest \
+      anonymous set public myminio/uc.onlyoffice.docs 2>/dev/null
+    docker volume rm "${mc_vol}" 2>/dev/null || true
+  fi
+
+  log_success "All services started"
 }
 
 restart_unicchat() {
