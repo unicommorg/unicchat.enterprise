@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  unicchat-minio:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/minio:RELEASE.2024-12-18T13-15-44Z
+    hostname: minio
+    container_name: unicchat-minio
+    command: server --console-address ":9002" /data
+    ports:
+      - "9000:9000"  # S3 API
+      - "9002:9002"  # Web Console
+    volumes:
+      - minio_data:/data
+    env_file:
+      - ../env/minio_env.env
+    networks:
+      - unicchat-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  unicchat-minio-init:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/minio-mc:latest
+    container_name: unicchat-minio-init
+    depends_on:
+      unicchat-minio:
+        condition: service_healthy
+    env_file:
+      - ../env/minio_env.env
+    networks:
+      - unicchat-network
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO to be ready...';
+      sleep 5;
+      /usr/bin/mc alias set myminio http://unicchat-minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb --ignore-existing myminio/uc.onlyoffice.docs;
+      /usr/bin/mc anonymous set public myminio/uc.onlyoffice.docs;
+      echo 'MinIO bucket uc.onlyoffice.docs created successfully';
+      exit 0;
+      "
+    restart: "no"
+
+volumes:
+  minio_data:
+    driver: local
+
+networks:
+  unicchat-network:
+    external: true

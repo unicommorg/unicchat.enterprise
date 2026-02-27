@@ -1,0 +1,271 @@
+version: '3.8'
+
+# ================================================================================
+# UnicChat Enterprise - Docker Compose Configuration
+# ================================================================================
+#
+# Порядок запуска сервисов:
+#
+#   1. MongoDB (первым, с healthcheck)
+#       ├─→ 2. Vault (после MongoDB healthy)
+#       ├─→ 2. Logger (после MongoDB healthy)
+#       └─→ 6. MinIO (независимо, параллельно)
+#            └─→ 6.1. MinIO Init (создание bucket)
+#
+#   3. AppServer (после MongoDB healthy + Vault started)
+#
+#   5. Tasker (после MongoDB + Vault + AppServer + Logger)
+#
+#   7. DocumentServer + RabbitMQ + PostgreSQL (независимо, параллельно)
+#
+# ================================================================================
+
+services:
+  # ================================================================================
+  # 1. MongoDB - база данных (Replica Set)
+  # ================================================================================
+  unicchat-mongodb:
+    image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
+    container_name: unicchat-mongodb
+    restart: on-failure
+    volumes:
+      - mongodb_data:/bitnami/mongodb
+    env_file:
+      - mongo.env
+      - mongo_creds.env
+    ports:
+      - "27017:27017"
+    networks:
+      - unicchat-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ================================================================================
+  # 2. Vault - хранилище секретов
+  # ================================================================================
+  unicchat-vault:
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:dev
+    container_name: unicchat-vault
+    ports:
+      - 8200:80
+    volumes:
+      - vault-data:/vault/file/
+    environment:
+      - api.logger.url=http://unicchat-logger:8080/
+    env_file:
+      - vault_creds.env
+    cap_add:
+      - IPC_LOCK
+    command: server
+    restart: always
+    networks:
+      - unicchat-network
+    depends_on:
+      unicchat-mongodb:
+        condition: service_healthy
+
+  # ================================================================================
+  # 3. AppServer - главное приложение UnicChat
+  # ================================================================================
+  unicchat-appserver:
+    container_name: unicchat-appserver
+    image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.1.85
+    restart: on-failure
+    depends_on:
+      unicchat-mongodb:
+        condition: service_healthy
+      unicchat-vault:
+        condition: service_started
+    ports:
+      - "8080:3000"
+    environment:
+      - MONGODB_HOST=unicchat-mongodb
+      - MONGODB_PORT=27017
+    env_file:
+      - appserver.env
+      - appserver_creds.env
+    volumes:
+      - chat_data:/app/uploads
+    networks:
+      - unicchat-network
+
+  # ================================================================================
+  # 4. Logger - сервис логирования
+  # ================================================================================
+  unicchat-logger:
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/uniclogger:prod
+    container_name: unicchat-logger
+    ports:
+      - '8082:8080'
+    networks:
+      - unicchat-network
+    restart: unless-stopped
+    env_file:
+      - logger.env
+      - logger_creds.env
+    depends_on:
+      unicchat-mongodb:
+        condition: service_healthy
+
+  # ================================================================================
+  # 5. Tasker - Knowledge Base и задачи
+  # ================================================================================
+  unicchat-tasker:
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatkbasetasker:prod
+    container_name: unicchat-tasker
+    restart: unless-stopped
+    depends_on:
+      unicchat-mongodb:
+        condition: service_healthy
+      unicchat-vault:
+        condition: service_started
+      unicchat-appserver:
+        condition: service_started
+      unicchat-logger:
+        condition: service_started
+    ports:
+      - 8881:8080
+    environment:
+      - api.vault.url=http://unicchat-vault:80/
+      - api.logger.url=http://unicchat-logger:8080/
+    networks:
+      - unicchat-network
+
+  # ================================================================================
+  # 6. MinIO - S3-совместимое объектное хранилище
+  # ================================================================================
+  unicchat-minio:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/minio:RELEASE.2024-12-18T13-15-44Z
+    hostname: minio
+    container_name: unicchat-minio
+    command: server --console-address ":9002" /data
+    ports:
+      - "9000:9000"  # S3 API
+      - "9002:9002"  # Web Console
+    volumes:
+      - minio_data:/data
+    env_file:
+      - env/minio_env.env
+    networks:
+      - unicchat-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ================================================================================
+  # 6.1. MinIO Init - автоматическое создание bucket при установке
+  # ================================================================================
+  unicchat-minio-init:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/minio-mc:latest
+    container_name: unicchat-minio-init
+    depends_on:
+      unicchat-minio:
+        condition: service_healthy
+    env_file:
+      - env/minio_env.env
+    networks:
+      - unicchat-network
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO to be ready...';
+      sleep 5;
+      /usr/bin/mc alias set myminio http://unicchat-minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb --ignore-existing myminio/uc.onlyoffice.docs;
+      /usr/bin/mc anonymous set public myminio/uc.onlyoffice.docs;
+      echo 'MinIO bucket uc.onlyoffice.docs created and configured as public';
+      exit 0;
+      "
+    restart: "no"
+
+  # ================================================================================
+  # 7. DocumentServer - OnlyOffice Document Server
+  # ================================================================================
+  unicchat-documentserver:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
+    container_name: unicchat-documentserver
+    depends_on:
+      - unicchat-postgresql
+      - unicchat-rabbitmq
+    env_file:
+      - env/documentserver_env.env
+    ports:
+      - '8880:80'
+      - '8443:443'
+    stdin_open: true
+    restart: always
+    stop_grace_period: 60s
+    networks:
+      - unicchat-network
+    volumes:
+      - documentserver_data:/var/www/uniceditor/Data
+      - documentserver_log:/var/log/uniceditor
+      - documentserver_cache:/var/lib/uniceditor/documentserver/App_Data/cache/files
+      - documentserver_files:/var/www/uniceditor/documentserver-example/public/files
+      - /usr/share/fonts
+
+  # ================================================================================
+  # 7.1. RabbitMQ - для DocumentServer
+  # ================================================================================
+  unicchat-rabbitmq:
+    container_name: unicchat-rabbitmq
+    image: cr.yandex/crpst6ndtaf70or2n2bb/rabbitmq:latest
+    restart: always
+    networks:
+      - unicchat-network
+    expose:
+      - '5672'
+
+  # ================================================================================
+  # 7.2. PostgreSQL - для DocumentServer
+  # ================================================================================
+  unicchat-postgresql:
+    container_name: unicchat-postgresql
+    image: cr.yandex/crpst6ndtaf70or2n2bb/postgres:12
+    environment:
+      - POSTGRES_DB=dbname
+      - POSTGRES_USER=dbuser
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    restart: always
+    networks:
+      - unicchat-network
+    expose:
+      - '5432'
+    volumes:
+      - postgresql_data:/var/lib/postgresql
+
+# ================================================================================
+# Volumes
+# ================================================================================
+volumes:
+  mongodb_data:
+    driver: local
+  vault-data:
+    driver: local
+  chat_data:
+    driver: local
+  minio_data:
+    driver: local
+  documentserver_data:
+    driver: local
+  documentserver_log:
+    driver: local
+  documentserver_cache:
+    driver: local
+  documentserver_files:
+    driver: local
+  postgresql_data:
+    driver: local
+
+# ================================================================================
+# Network
+# ================================================================================
+networks:
+  unicchat-network:
+    external: true

@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  unicchat-mongodb:
+    image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
+    container_name: unicchat-mongodb
+    restart: on-failure
+    volumes:
+      - mongodb_data:/bitnami/mongodb
+    env_file:
+      - ../mongo.env
+      - ../mongo_creds.env
+    ports:
+      - "27017:27017"
+    networks:
+      - unicchat-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  unicchat-network:
+    external: true
