@@ -608,7 +608,7 @@ test_config() {
 
 main_menu() {
     # Загружаем конфигурацию
-    if load_config 2>/dev/null; then
+    if load_config; then
         :
     else
         APP_DNS=""
