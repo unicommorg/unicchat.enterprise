@@ -411,6 +411,7 @@ DEPLOY_METHOD=docker
 DB_COLLECTIONS_PREFIX=unicchat_
 MONGODB_HOST=$MONGODB_INITIAL_PRIMARY_HOST
 MONGODB_PORT=$MONGODB_PORT_NUMBER
+UNIC_SOLID_HOST=http://unicchat-tasker:8080
 EOL
   log_success "Generated $dir/appserver.env"
   
