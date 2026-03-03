@@ -13,4 +13,4 @@ services:
       - Vault__Host=http://unicchat-vault:80
     restart: always
     networks:
-      - unicchat-frontend
+      -   unicchat-network
