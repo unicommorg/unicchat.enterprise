@@ -10,7 +10,7 @@ services:
     ports:
       - 8201:8080
     environment:
-      - Vault__Host=http://vault:80
+      - Vault__Host=http://unicchat-vault:80
     restart: always
     networks:
       - unicchat-frontend
