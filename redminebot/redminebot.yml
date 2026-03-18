@@ -1,16 +1,15 @@
-version: "3.7"
-networks:
-  unicchat-frontend:
-    driver: bridge
-    external: true
 services:
   ucredminebot:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatbotredmine:prod
     container_name: ucredminebot
     ports:
-      - 8201:8080
+      - "8201:8080"
     environment:
-      - Vault__Host=http://unicchat-vault:80
+      Vault__Host: "http://unicchat-vault:80"
     restart: always
     networks:
-      -   unicchat-network
+      - unicchat-network
+
+networks:
+  unicchat-network:
+    external: true
