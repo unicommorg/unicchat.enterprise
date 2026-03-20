@@ -85,6 +85,8 @@ services:
       - MONGODB_HOST=unicchat-mongodb
       - MONGODB_PORT=27017
       - UniCommLicenseData=${UniCommLicenseData:-default_license_data}
+      - VAULT__HOST=http://unicchat-vault:80
+      - REDMINE_BOT_HOST=http://ucredminebot:8080
     env_file:
       - appserver.env
       - appserver_creds.env
