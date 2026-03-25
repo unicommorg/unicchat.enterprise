@@ -48,7 +48,7 @@ UNIC_SOLID_HOST=http://unicchat-tasker:8080
 
 ### Откуда брать значения
 
-- `HOST_IP`: `hostname -I` (или ваш известный адрес), затем подставить в `ROOT_URL` и `DOCUMENT_SERVER_HOST`.
+- `HOST_IP`: hostname -I | awk '{print $1}' (или ваш известный адрес), затем подставить в `ROOT_URL` и `DOCUMENT_SERVER_HOST`.
 - Порты: см. `multi-server-install/docker-compose.yml`.
 
 ---
