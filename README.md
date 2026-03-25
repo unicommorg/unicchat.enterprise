@@ -3,7 +3,7 @@
 <!-- TOC --><a name="-unicchat"></a>
 # Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat
 
-версия документа 1.7
+версия документа 1.8
 
 <!-- TOC --><a name=""></a>
 ## Оглавление
@@ -35,6 +35,7 @@
    * [Инструкция по скрипту установки unicchat.sh](#-unicchatsh)
       + [Запуск скрипта unicchat.sh](#-unicchatsh-1)
    * [Описание скрипта](#--7)
+      + [Основные функции в unicchat.sh](#unicchatsh-functions)
       + [Основные функции в меню](#--8)
          - [Установка компонентов](#--9)
          - [Настройка конфигурации](#--10)
@@ -50,6 +51,7 @@
       + [Особенности работы](#--17)
       + [Рекомендуемая последовательность](#--18)
 - [2. Ручная настройка ](#2-)
+   * [2.0 Локальная установка по HTTP (без nginx)](#20-http-nginx)
    * [2.1 Установите Docker](#21-docker)
    * [2.2 Провести настройку Nginx](#22-nginx)
       + [2.2.1 Подготовка структуры директорий](#221-)
@@ -332,8 +334,43 @@ sudo ./unicchat.sh
 | **10** | Setup Vault secrets for KBT service | Обращается к API контейнера Vault, получает токен и создаёт секрет KBTConfigs (MongoDB, MinIO) для сервиса KBT. Имеет смысл после [8] и [9]. |
 | **11** | Restart all services | Выполняет `docker compose -f multi-server-install/docker-compose.yml restart`. |
 | **99** | 🚀 Full automatic setup | Последовательно: check_avx, setup_dns_names, update_mongo_config, update_minio_config, create_network, prepare_all_envs, login_yandex, start_unicchat; пауза 15 сек; setup_mongodb_users; пауза 10 сек; setup_vault_secrets. В конце выводит URL по APP_DNS, EDT_DNS, MINIO_DNS. |
+| **101** | Patch env for local HTTP (AppServer + DocumentServer) | Функция `prepare_local_http_envs`: после пункта [5] переписывает `multi-server-install/appserver.env` (`ROOT_URL`, `DOCUMENT_SERVER_HOST` на `http://<LAN-IP>:8080` / `:8880`, `UNIC_SOLID_HOST` на tasker) и `multi-server-install/env/documentserver_env.env` (`JWT_ENABLED=false`, `ALLOW_PRIVATE_IP_ADDRESS` / `ALLOW_META_IP_ADDRESS` для доступа DocumentServer к MinIO в docker-сети). |
+| **102** | Setup Vault KBTConfigs (local HTTP MinIO) | Функция `setup_vault_secrets_local`: как [10], но секрет `KBTConfigs` с `MinioHost=unicchat-minio:9000`, `MinioSecure="false"` (HTTP), при необходимости удаляет старый секрет перед созданием. |
+| **103** | 🚀 Full automatic setup (локальный HTTP) | Функция `local_http_auto_setup`: полная цепочка без nginx/HTTPS — [1]→[3]→[4]→[5]→[101]→[6]→[7]→[8]→[9]→[102]→[11] (с паузами для MongoDB и Vault). |
 | **100** | 🗑️ Cleanup (remove containers & volumes) | Запрос подтверждения (`yes`). Затем: `docker compose -f multi-server-install/docker-compose.yml down -v`, удаление образов (unicchat, unic, uniceditor, minio, mongodb, rabbitmq, postgres), удаление сети `unicchat-network`, удаление сгенерированных .env в `multi-server-install/`. Каталоги не удаляет. |
 | **0** | Exit | Выход из скрипта. |
+
+После пункта **[99]** в том же меню выводится блок **«Локальная установка по HTTP (без HTTPS / nginx)»**: номера **[1]**, **[3]**–**[9]**, **[11]** вызывают **те же действия**, что и в верхней части меню; блок напоминает рекомендуемый порядок шагов для HTTP-only стенда. Перед каждым показом меню вызывается `ensure_local_dns_placeholder` — если нет `dns_config.txt`, создаётся заглушка (можно обойтись без пункта **[2]** до генерации .env). Дополнительно см. раздел **[2.0](#20-http-nginx)** в этом README.
+
+<!-- TOC --><a name="unicchatsh-functions"></a>
+#### Основные функции в `unicchat.sh`
+
+Ниже — внутренние функции скрипта (имена совпадают с кодом). Пункты меню **[1]**–**[11]**, **[99]**, **[100]** вызывают их напрямую или через цепочки.
+
+| Функция | Назначение |
+|---------|------------|
+| `check_docker` | Проверка наличия Docker и Compose перед запуском меню. |
+| `docker_compose` | Вызов `docker compose` или fallback на `docker-compose`. |
+| `log_info` / `log_success` / `log_warning` / `log_error` | Сообщения в консоль и в `unicchat_install.log`. |
+| `load_dns_config` | Загрузка `dns_config.txt` при старте `main_menu`. |
+| `setup_dns_names` | Интерактивная настройка DNS-имён, запись `dns_config.txt`. |
+| `urlencode` / `urldecode` | Кодирование паролей в строках подключения MongoDB для .env. |
+| `update_mongo_config` | Интерактивное заполнение `mongo_config.txt`. |
+| `update_minio_config` | Интерактивное заполнение `minio_config.txt`. |
+| `prepare_all_envs` | Генерация `mongo.env`, `mongo_creds.env`, `appserver.env`, `appserver_creds.env`, `logger.env`, `logger_creds.env`, `vault_creds.env`, `env/minio_env.env`, `env/documentserver_env.env` в `multi-server-install/`. |
+| `setup_mongodb_users` | Создание БД и пользователей MongoDB для Logger и Vault по `logger_creds.env` / `vault_creds.env`. |
+| `setup_vault_secrets` | Ожидание Vault, получение JWT, создание секрета `KBTConfigs` (MongoCS из logger, MinIO из DNS-конфига). |
+| `ensure_local_dns_placeholder` | Если нет `dns_config.txt` — создаёт минимальный файл для прохождения `prepare_all_envs` без пункта [2]. |
+| `prepare_local_http_envs` | Правка env под локальный HTTP (см. пункт меню [101]). |
+| `setup_vault_secrets_local` | Секрет `KBTConfigs` для HTTP и внутреннего MinIO (см. пункт [102]). |
+| `local_http_auto_setup` | Полный автоматический сценарий локального HTTP (см. пункт [103]). |
+| `login_yandex` | `docker login` в Yandex Container Registry. |
+| `create_network` | Создание внешней сети `unicchat-network`. |
+| `start_unicchat` | `docker compose up -d` в `multi-server-install/`, инициализация bucket MinIO для OnlyOffice. |
+| `restart_unicchat` | Перезапуск всех сервисов compose. |
+| `cleanup_all` | Остановка, удаление томов и сгенерированных env (п. [100]). |
+| `auto_setup` | Полная автоматическая установка для сценария с DNS и HTTPS-URL в .env (п. [99]). |
+| `main_menu` | Главный цикл меню и обработка выбора. |
 
 <!-- TOC --><a name="--16"></a>
 #### Что использует скрипт
@@ -390,6 +427,7 @@ sudo ./generate_ssl.sh
    sudo ./unicchat.sh
    # Выберите [99] - Full automatic setup
    ```
+   Для **локального стенда только по HTTP** (без nginx/HTTPS): раздел **[2.0](#20-http-nginx)** в этом README; в меню `unicchat.sh` — блок «Локальная установка по HTTP» и пункт **[103]** (или шаги **[101]**/**[102]**).
 
 2. **Настройка NGINX и SSL:**
    ```bash
@@ -406,6 +444,16 @@ sudo ./generate_ssl.sh
 ## 2. Ручная настройка 
 
 В этом разделе описана полностью ручная установка всех компонентов UnicChat без использования автоматизированных скриптов. Все действия выполняются системным администратором.
+
+<!-- TOC --><a name="20-http-nginx"></a>
+### 2.0 Локальная установка по HTTP (без nginx и HTTPS)
+
+Для **тестового или внутреннего стенда** можно поднять UnicChat **только по HTTP** (без reverse-proxy nginx и без TLS на DocumentServer/AppServer): порты с хоста задаются в `multi-server-install/docker-compose.yml` (например, приложение `8080`, DocumentServer `8880`, Vault `8200`, MinIO `9000`/`9002`).
+
+- **Через скрипт:** `sudo ./unicchat.sh` — в меню после **[99]** используйте блок **«Локальная установка по HTTP»** и пункты **[101]**–**[103]** (см. таблицу [«Меню скрипта»](#--7) и [«Основные функции в unicchat.sh»](#unicchatsh-functions)).
+- **Пошагово вручную** выполняйте те же действия, что и пункты **[101]**–**[103]** / блок меню после **[99]** в `unicchat.sh` (см. таблицы «Меню скрипта» и «Основные функции» выше).
+
+Промышленный сценарий с публичными доменами и **HTTPS** по-прежнему описан ниже (nginx, Certbot, раздел **2.2**) и в пункте **[99]** скрипта `unicchat.sh`.
 
 <div style="background-color: #ff0000; border: 4px solid #cc0000; padding: 20px; margin: 30px 0; border-radius: 8px; color: #ffffff; font-weight: bold;">
   

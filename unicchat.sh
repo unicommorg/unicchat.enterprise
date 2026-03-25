@@ -924,6 +924,236 @@ EOF
   fi
 }
 
+# === Local HTTP installation helpers ===
+
+ensure_local_dns_placeholder() {
+  if [ -f "$DNS_CONFIG_FILE" ]; then
+    return 0
+  fi
+  log_info "Нет $DNS_CONFIG_FILE — создаём заглушку для шага «Prepare .env» (локальный HTTP, без отдельного пункта 2)."
+  cat > "$DNS_CONFIG_FILE" <<'EOF'
+# Placeholder DNS for local HTTP installs (ROOT_URL/DOCUMENT_SERVER_HOST перезаписываются позже)
+APP_DNS="local-app.local"
+EDT_DNS="local-docs.local"
+MINIO_DNS="unicchat-minio"
+PUSH_DNS="push1.unic.chat"
+EOF
+  log_success "Создан $DNS_CONFIG_FILE"
+}
+
+prepare_local_http_envs() {
+  echo -e "\n🏠 Перенастройка env под локальный HTTP (AppServer + DocumentServer)…"
+  local dir="multi-server-install"
+  local appserver_env="$dir/appserver.env"
+  local ds_env="$dir/env/documentserver_env.env"
+
+  if [ ! -f "$appserver_env" ]; then
+    log_error "Файл $appserver_env не найден. Сначала выполните пункт [5] Prepare .env files."
+    return 1
+  fi
+  if [ ! -f "$ds_env" ]; then
+    log_error "Файл $ds_env не найден. Сначала выполните пункт [5] Prepare .env files."
+    return 1
+  fi
+
+  local default_ip
+  default_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  read -rp "LAN IP хоста для HTTP (ROOT_URL / DocumentServer). Пустой Enter = первый адрес «hostname -I | awk '{print \$1}'» [${default_ip:-вручную}]: " LOCAL_HTTP_HOST_IP
+  LOCAL_HTTP_HOST_IP=${LOCAL_HTTP_HOST_IP:-$default_ip}
+  if [ -z "$LOCAL_HTTP_HOST_IP" ]; then
+    log_error "Не удалось определить IP: задайте адрес вручную или проверьте hostname -I."
+    return 1
+  fi
+  log_info "Используется хост для URL (эта машина): $LOCAL_HTTP_HOST_IP"
+
+  local root_url="http://${LOCAL_HTTP_HOST_IP}:8080"
+  local doc_url="http://${LOCAL_HTTP_HOST_IP}:8880"
+
+  _set_ini_kv() {
+    local file=$1 key=$2 val=$3
+    if grep -q "^${key}=" "$file" 2>/dev/null; then
+      sed -i "s|^${key}=.*|${key}=${val}|" "$file"
+    else
+      echo "${key}=${val}" >> "$file"
+    fi
+  }
+
+  _set_ini_kv "$appserver_env" "ROOT_URL" "$root_url"
+  _set_ini_kv "$appserver_env" "DOCUMENT_SERVER_HOST" "$doc_url"
+  _set_ini_kv "$appserver_env" "UNIC_SOLID_HOST" "http://unicchat-tasker:8080"
+  log_success "Обновлён $appserver_env (ROOT_URL, DOCUMENT_SERVER_HOST, UNIC_SOLID_HOST)"
+
+  _set_ini_kv "$ds_env" "JWT_ENABLED" "false"
+  _set_ini_kv "$ds_env" "ALLOW_PRIVATE_IP_ADDRESS" "true"
+  _set_ini_kv "$ds_env" "ALLOW_META_IP_ADDRESS" "true"
+  log_success "Обновлён $ds_env (JWT off, разрешены private/meta IP для MinIO в docker-сети)"
+
+  echo ""
+  echo "   AppServer:      $root_url"
+  echo "   DocumentServer: $doc_url"
+}
+
+setup_vault_secrets_local() {
+  echo -e "\n🔐 Локальный секрет KBTConfigs (MinIO по HTTP, host unicchat-minio:9000)…"
+  local dir="multi-server-install"
+  local container="unicchat-vault"
+
+  local wait_attempts=12
+  local w=0
+  while [ $w -lt $wait_attempts ]; do
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+      break
+    fi
+    w=$((w + 1))
+    if [ $w -lt $wait_attempts ]; then
+      echo "   ⏳ Ожидание контейнера Vault… ($w/$wait_attempts)"
+      sleep 3
+    fi
+  done
+  if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+    log_warning "Контейнер Vault не запущен. Сначала пункт [8]."
+    return 1
+  fi
+
+  if [ ! -f "$MINIO_CONFIG_FILE" ]; then
+    log_error "Нет $MINIO_CONFIG_FILE. Сначала пункт [4]."
+    return 1
+  fi
+  source "$MINIO_CONFIG_FILE"
+
+  local logger_creds_file="$dir/logger_creds.env"
+  if [ ! -f "$logger_creds_file" ]; then
+    log_error "Нет $logger_creds_file. Сначала пункт [5]."
+    return 1
+  fi
+
+  local mongo_url
+  mongo_url=$(grep '^MongoCS=' "$logger_creds_file" | cut -d '=' -f2- | tr -d '\r' | sed 's/^"//;s/"$//')
+  if [ -z "$mongo_url" ]; then
+    log_error "MongoCS не найден в $logger_creds_file"
+    return 1
+  fi
+
+  echo "🔧 Проверка curl в контейнере Vault…"
+  if ! docker exec "$container" bash -c "command -v curl >/dev/null 2>&1"; then
+    if docker exec -u root "$container" bash -c "apt-get update -qq && apt-get install -y -qq curl" >/dev/null 2>&1; then
+      log_success "curl установлен"
+    elif docker exec "$container" bash -c "apt-get update -qq && apt-get install -y -qq curl" >/dev/null 2>&1; then
+      log_success "curl установлен"
+    else
+      log_error "Не удалось установить curl в контейнере Vault."
+      return 1
+    fi
+  fi
+
+  local vault_url="http://localhost:80"
+  local token_id="0f8e160416b94225a73f86ac23b9118b"
+  local username="KBTservice"
+  local minio_host="unicchat-minio:9000"
+
+  local token_response
+  token_response=$(timeout 30 docker exec "$container" bash -c "curl -s -w '\nHTTP_CODE:%{http_code}' -X GET '$vault_url/api/token/$token_id?username=$username'" 2>&1)
+
+  local response_body
+  response_body=$(echo "$token_response" | grep -v "HTTP_CODE:" | tr -d '\n\r')
+  local token=""
+  if [[ "$response_body" =~ ^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$ ]]; then
+    token="$response_body"
+  elif echo "$response_body" | grep -q '"token"'; then
+    token=$(echo "$response_body" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+  else
+    token="$response_body"
+  fi
+
+  if [ -z "$token" ] || [ "$token" = "null" ]; then
+    log_error "Не удалось получить JWT из Vault."
+    echo "   Ответ: $token_response"
+    return 1
+  fi
+  log_success "JWT получен"
+
+  local secret_payload
+  secret_payload=$(cat <<EOF
+{
+  "id": "KBTConfigs",
+  "name": "KBTConfigs",
+  "type": "Password",
+  "data": "All info in META",
+  "metadata": {
+    "MongoCS": "$mongo_url",
+    "MinioHost": "$minio_host",
+    "MinioUser": "$MINIO_ROOT_USER",
+    "MinioPass": "$MINIO_ROOT_PASSWORD",
+    "MinioSecure": "false"
+  },
+  "tags": ["KB", "Tasker", "Mongo", "Minio"],
+  "expiresAt": "2030-12-31T23:59:59.999Z"
+}
+EOF
+)
+
+  local escaped_payload
+  escaped_payload=$(echo "$secret_payload" | sed 's/"/\\"/g' | tr -d '\n')
+
+  timeout 30 docker exec "$container" bash -c "curl -s -X DELETE '$vault_url/api/Secrets/KBTConfigs' -H 'Authorization: Bearer $token'" >/dev/null 2>&1 || true
+
+  local secret_response
+  secret_response=$(timeout 90 docker exec "$container" bash -c "curl -s --max-time 85 -w '\n%{http_code}' -X POST \
+    '$vault_url/api/Secrets' \
+    -H 'Authorization: Bearer $token' \
+    -H 'accept: text/plain' \
+    -H 'Content-Type: application/json' \
+    -d \"$escaped_payload\"" 2>&1) || secret_response="TIMEOUT"
+
+  if [ "$secret_response" = "TIMEOUT" ]; then
+    log_warning "Таймаут POST. Проверка GET /api/Secrets/KBTConfigs…"
+    local verify_response
+    verify_response=$(timeout 10 docker exec "$container" bash -c "curl -s -X GET '$vault_url/api/Secrets/KBTConfigs' -H 'Authorization: Bearer $token'" 2>&1)
+    if echo "$verify_response" | grep -q "KBTConfigs"; then
+      log_success "Секрет KBTConfigs создан (проверка после таймаута)"
+      return 0
+    fi
+    log_warning "Не удалось подтвердить создание секрета."
+    return 0
+  fi
+
+  local http_code
+  http_code=$(echo "$secret_response" | tail -n1)
+  if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+    log_success "Секрет KBTConfigs создан (локальный HTTP MinIO: $minio_host, MinioSecure=false)"
+  else
+    log_warning "Ответ Vault HTTP=$http_code — проверьте логи и секрет вручную."
+    echo "   Тело (фрагмент): $(echo "$secret_response" | head -n-1 | head -c 300)"
+  fi
+}
+
+local_http_auto_setup() {
+  echo -e "\n🚀 Full automatic setup (local HTTP, без HTTPS/nginx)"
+  echo "   Шаги: [1]→[3]→[4]→[5]→[101]→[6]→[7]→[8]→[9]→[102]→[11]"
+  check_avx
+  ensure_local_dns_placeholder
+  update_mongo_config
+  update_minio_config
+  prepare_all_envs
+  prepare_local_http_envs || return 1
+  login_yandex
+  create_network
+  start_unicchat
+
+  echo -e "\n⏳ Ожидание готовности MongoDB…"
+  sleep 15
+  setup_mongodb_users
+
+  echo -e "\n⏳ Ожидание готовности Vault…"
+  sleep 10
+  setup_vault_secrets_local
+
+  restart_unicchat
+
+  echo -e "\n🎉 Локальная установка по HTTP завершена."
+  echo "   Откройте AppServer по ROOT_URL из multi-server-install/appserver.env"
+}
+
 # === Docker Operations ===
 
 login_yandex() {
@@ -1065,6 +1295,7 @@ main_menu() {
   echo ""
   
   while true; do
+    ensure_local_dns_placeholder
     cat <<MENU
  [1]  Check AVX support
  [2]  Setup DNS names for services (APP, EDT, MinIO)
@@ -1078,6 +1309,21 @@ main_menu() {
 [10]  Setup Vault secrets for KBT service
 [11]  Restart all services
 [99]  🚀 Full automatic setup
+-----------
+Локальная установка по HTTP (без HTTPS / nginx):
+ [1]  Check AVX support
+ [3]  Update MongoDB configuration
+ [4]  Update MinIO configuration
+ [5]  Prepare .env files
+[101]  Patch env for local HTTP (AppServer + DocumentServer)
+ [6]  Login to Yandex registry
+ [7]  Create Docker network
+ [8]  Start UnicChat containers
+ [9]  Setup MongoDB users (separate DB per service)
+[102]  Setup Vault KBTConfigs (local HTTP MinIO)
+[11]  Restart all services
+[103]  🚀 Full automatic setup
+-----------
 [100] 🗑️  Cleanup (remove containers & volumes)
  [0]  Exit
 MENU
@@ -1094,6 +1340,9 @@ MENU
       9) setup_mongodb_users ;;
       10) setup_vault_secrets ;;
       11) restart_unicchat ;;
+      101) prepare_local_http_envs ;;
+      102) setup_vault_secrets_local ;;
+      103) local_http_auto_setup ;;
       100) cleanup_all ;;
       99) auto_setup ;;
       0) echo "👋 Goodbye!" && break ;;
