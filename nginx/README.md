@@ -194,10 +194,6 @@ upstream minio_server {
     server unicchat-minio:9000;
 }
 
-# MinIO Console
-upstream minio_console {
-    server unicchat-minio:9002;
-}
 ```
 
 ### Виртуальные хосты
@@ -207,7 +203,6 @@ upstream minio_console {
 | `app.domain.com` | unicchat-appserver:3000 | 443 | Основное приложение |
 | `edt.domain.com` | unicchat-documentserver:80 | 443 | OnlyOffice DocumentServer |
 | `minio.domain.com` | unicchat-minio:9000 | 443 | MinIO S3 API |
-| `minio.domain.com` | unicchat-minio:9002 | 9002 | MinIO Web Console |
 
 ### Особенности конфигурации
 
