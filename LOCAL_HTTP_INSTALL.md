@@ -48,7 +48,7 @@ UNIC_SOLID_HOST=http://unicchat-tasker:8080
 
 ### Откуда брать значения
 
-- `HOST_IP`: hostname -I | awk '{print $1}' (или ваш известный адрес), затем подставить в `ROOT_URL` и `DOCUMENT_SERVER_HOST`.
+- `HOST_IP`: `hostname -I | awk '{print $1}` (или ваш известный адрес), затем подставить в `ROOT_URL` и `DOCUMENT_SERVER_HOST`.
 - Порты: см. `multi-server-install/docker-compose.yml`.
 
 ---
@@ -104,7 +104,7 @@ docker exec -it unicchat-tasker sh -lc 'getent hosts unicchat-vault || true'
 
 ### 3.1. Откуда взять `VAULT_URL` и `TOKEN`
 
-- `VAULT_URL`: **внешний** адрес Vault на хосте (по compose это `http://<HOST_IP>:8200`)
+- `VAULT_URL`: **внешний** адрес Vault на хосте (по compose это `http://<HOST_IP>:8200`, `hostname -I | awk '{print $1}` )
 - `TOKEN`: root/admin token Vault (**в документе не храним и не коммитим**)
 
 Токен можно получить так же, как это делает `unicchat.sh`: через endpoint выдачи JWT по фиксированному `token_id`.
@@ -117,7 +117,7 @@ docker exec -it unicchat-tasker sh -lc 'getent hosts unicchat-vault || true'
 Команда получения JWT (токена) с хоста:
 
 ```bash
-export VAULT_URL="http://<HOST_IP>:8200"
+export VAULT_URL="http://localhost:8200"  
 TOKEN="$(curl -s "$VAULT_URL/api/token/0f8e160416b94225a73f86ac23b9118b?username=KBTservice")"
 ```
 
