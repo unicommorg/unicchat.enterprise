@@ -183,7 +183,6 @@ generate_ssl() {
     echo "🌐 Проверьте работу:"
     echo "   curl https://$APP_DNS"
     echo "   curl https://$EDT_DNS"
-    echo "   curl https://$MINIO_DNS:9002"
     echo ""
 }
 
@@ -211,10 +210,6 @@ upstream doc_server {
 # Upstream для MinIO
 upstream minio_server {
     server unicchat-minio:9000;
-}
-
-upstream minio_console {
-    server unicchat-minio:9002;
 }
 
 # ============================================================================
@@ -376,36 +371,6 @@ server {
     }
 }
 
-# ============================================================================
-# MinIO Console (Web UI) - port 9002
-# ============================================================================
-server {
-    listen 9002 ssl;
-    http2 on;
-    server_name $MINIO_DNS;
-
-    error_log /var/log/nginx/minio-console.error.log;
-    access_log /var/log/nginx/minio-console.access.log;
-
-    location / {
-        proxy_pass http://minio_console;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$http_host;
-
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-
-        proxy_redirect off;
-    }
-
-    ssl_certificate /etc/letsencrypt/live/$APP_DNS/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$APP_DNS/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-}
 EOF
 
     echo "   ✅ Конфигурация создана: config/nginx.conf"
