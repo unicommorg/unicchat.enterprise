@@ -32,7 +32,7 @@
 
 - `multi-server-install/appserver.env`
 
-Если файла нет в репозитории (часто он генерируется инсталлятором) — **создайте его** по этому пути.
+Этот файл создаётся установочным скриптом. Правки делайте в нём.
 
 ### Что поставить
 
@@ -68,7 +68,7 @@ UNIC_SOLID_HOST=http://unicchat-tasker:8080
 
 - `multi-server-install/env/documentserver_env.env`
 
-Если папки/файла нет — **создайте** `multi-server-install/env/` и сам файл.
+Этот файл создаётся установочным скриптом. Правки делайте в нём.
 
 ### Что поставить
 
@@ -107,16 +107,15 @@ docker exec -it unicchat-tasker sh -lc 'getent hosts unicchat-vault || true'
 - `VAULT_URL`: **внешний** адрес Vault на хосте (по compose это `http://<HOST_IP>:8200`)
 - `TOKEN`: root/admin token Vault (**в документе не храним и не коммитим**)
 
-Источники:
+Значения берите из файлов, которые создаёт установочный скрипт рядом с `multi-server-install/docker-compose.yml`:
 
-- Если у вас есть файл `vault_creds.env` (часто генерируется инсталлятором) — берите оттуда (локально).
-- Иначе смотрите переменные контейнера Vault (локально):
+- `multi-server-install/vault_creds.env` (токен/учётные данные Vault)
+
+Контрольная проверка (что реально прокинуто в контейнер):
 
 ```bash
 docker inspect unicchat-vault --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^VAULT_.*//p'
 ```
-
-Если в образе токен/ключи иначе называются — используйте тот способ, которым вы ранее входили в Vault для создания секретов.
 
 Пример (не настоящий токен), как должны выглядеть переменные в shell:
 
@@ -165,8 +164,11 @@ curl -sS -X POST \
 ### Откуда брать значения (credentials)
 
 - `MongoCS`:
-  - Если у вас есть `logger_creds.env` / `appserver_creds.env` / `mongo_creds.env` (генерируемые файлы) — берите логин/пароль оттуда.
-  - Иначе посмотрите переменные контейнеров:
+  - Логины/пароли берите из файлов, которые создаёт установочный скрипт рядом с `multi-server-install/docker-compose.yml`:
+    - `multi-server-install/logger_creds.env`
+    - `multi-server-install/appserver_creds.env`
+    - `multi-server-install/mongo_creds.env`
+  - Контрольная проверка (что реально прокинуто в контейнеры):
 
 ```bash
 docker inspect unicchat-logger --format '{{range .Config.Env}}{{println .}}{{end}}'
@@ -175,8 +177,8 @@ docker inspect unicchat-mongodb --format '{{range .Config.Env}}{{println .}}{{en
 ```
 
 - `MinioUser` / `MinioPass`:
-  - Если есть `multi-server-install/env/minio_env.env` (или иной env MinIO) — берите из него.
-  - Иначе:
+  - Берите из `multi-server-install/env/minio_env.env` (создаёт установочный скрипт).
+  - Контрольная проверка (что реально прокинуто в контейнер):
 
 ```bash
 docker inspect unicchat-minio --format '{{range .Config.Env}}{{println .}}{{end}}'
@@ -188,8 +190,8 @@ docker inspect unicchat-minio --format '{{range .Config.Env}}{{println .}}{{end}
 
 ### Откуда взять root-credentials
 
-- Если есть `mongo_creds.env` (генерируемый файл) — используйте `MONGODB_ROOT_PASSWORD`.
-- Иначе смотрите переменные `unicchat-mongodb`:
+- Используйте `MONGODB_ROOT_PASSWORD` из `multi-server-install/mongo_creds.env` (создаёт установочный скрипт).
+- Контрольная проверка (что реально прокинуто в контейнер):
 
 ```bash
 docker inspect unicchat-mongodb --format '{{range .Config.Env}}{{println .}}{{end}}'
