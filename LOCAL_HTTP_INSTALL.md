@@ -107,11 +107,21 @@ docker exec -it unicchat-tasker sh -lc 'getent hosts unicchat-vault || true'
 - `VAULT_URL`: **внешний** адрес Vault на хосте (по compose это `http://<HOST_IP>:8200`)
 - `TOKEN`: root/admin token Vault (**в документе не храним и не коммитим**)
 
-Значения берите из файлов, которые создаёт установочный скрипт рядом с `multi-server-install/docker-compose.yml`:
+Токен можно получить так же, как это делает `unicchat.sh`: через endpoint выдачи JWT по фиксированному `token_id`.
 
-- `multi-server-install/vault_creds.env` (токен/учётные данные Vault)
+В `unicchat.sh` зашито:
 
-Контрольная проверка (что реально прокинуто в контейнер):
+- `token_id`: `0f8e160416b94225a73f86ac23b9118b`
+- `username`: `KBTservice`
+
+Команда получения JWT (токена) с хоста:
+
+```bash
+export VAULT_URL="http://<HOST_IP>:8200"
+TOKEN="$(curl -s "$VAULT_URL/api/token/0f8e160416b94225a73f86ac23b9118b?username=KBTservice")"
+```
+
+Контрольная проверка (что Vault контейнер поднят и слушает):
 
 ```bash
 docker inspect unicchat-vault --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^VAULT_.*//p'
@@ -124,7 +134,53 @@ export VAULT_URL="http://<HOST_IP>:8200"
 export TOKEN="<PASTE_VAULT_ROOT_TOKEN_HERE>"
 ```
 
-### 3.2. Удалить старый `KBTConfigs`
+### 3.2. Пересоздать `KBTConfigs` одной связкой команд (как в скрипте, но HTTP-only)
+
+Эта связка:
+
+- берёт `MongoCS` из `multi-server-install/logger_creds.env`
+- берёт MinIO креды из `multi-server-install/env/minio_env.env`
+- получает JWT через `token_id` (как в `unicchat.sh`)
+- удаляет старый `KBTConfigs`
+- создаёт новый `KBTConfigs` с `MinioHost=unicchat-minio:9000` и `MinioSecure="false"`
+
+Запускать из корня репозитория:
+
+```bash
+set -euo pipefail
+
+export HOST_IP="<HOST_IP>"
+export VAULT_URL="http://$HOST_IP:8200"
+
+MONGO_CS="$(grep '^MongoCS=' multi-server-install/logger_creds.env | cut -d= -f2- | tr -d '\r' | sed 's/^"//;s/"$//')"
+. multi-server-install/env/minio_env.env
+
+TOKEN="$(curl -s "$VAULT_URL/api/token/0f8e160416b94225a73f86ac23b9118b?username=KBTservice")"
+
+curl -sS -X DELETE -H "Authorization: Bearer $TOKEN" "$VAULT_URL/api/secrets/KBTConfigs" >/dev/null || true
+
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  "$VAULT_URL/api/secrets" \
+  -d "{
+    \"id\":\"KBTConfigs\",
+    \"name\":\"KBTConfigs\",
+    \"type\":\"Password\",
+    \"data\":\"All info in META\",
+    \"metadata\":{
+      \"MongoCS\":\"$MONGO_CS\",
+      \"MinioHost\":\"unicchat-minio:9000\",
+      \"MinioUser\":\"$MINIO_ROOT_USER\",
+      \"MinioPass\":\"$MINIO_ROOT_PASSWORD\",
+      \"MinioSecure\":\"false\"
+    },
+    \"tags\":[\"KB\",\"Tasker\",\"Mongo\",\"Minio\"],
+    \"expiresAt\":\"2030-12-31T23:59:59.999Z\"
+  }"
+```
+
+### 3.3. Удалить старый `KBTConfigs` (ручной вариант)
 
 ```bash
 curl -sS -X DELETE \
@@ -132,7 +188,7 @@ curl -sS -X DELETE \
   "$VAULT_URL/api/secrets/KBTConfigs"
 ```
 
-### 3.3. Создать новый `KBTConfigs` (HTTP для MinIO)
+### 3.4. Создать новый `KBTConfigs` (ручной вариант, HTTP для MinIO)
 
 Важно:
 
