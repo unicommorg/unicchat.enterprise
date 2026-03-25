@@ -364,7 +364,7 @@ sudo ./generate_ssl.sh
 | № | Пункт меню | Что делает |
 |---|------------|------------|
 | **1** | 🔐 Генерация SSL сертификатов (Let's Encrypt) | Загружает `../dns_config.txt` и при необходимости email из `../unicchat_config.txt`. Проверяет наличие `ssl/options-ssl-nginx.conf`; при отсутствии генерирует `ssl/ssl-dhparams.pem` (DH 2048). Создаёт сеть `unicchat-network` при необходимости. Останавливает контейнер nginx, проверяет занятость портов 80/443. Запускает контейнер Certbot (standalone), получает сертификаты для APP_DNS, EDT_DNS, MINIO_DNS. Генерирует `config/nginx.conf` и запускает nginx. |
-| **2** | 📝 Генерация/обновление конфигурации nginx | Читает `../dns_config.txt` и записывает один файл `config/nginx.conf`: upstream app_server (unicchat-appserver:3000), doc_server (unicchat-documentserver:80), minio_server (9000), minio_console (9002); виртуальные хосты для APP_DNS, EDT_DNS, MINIO_DNS (HTTPS 443 + HTTP 80 с редиректом, для MinIO ещё порт 9002). Подключение к сертификатам в `ssl/live/$APP_DNS/`. |
+| **2** | 📝 Генерация/обновление конфигурации nginx | Читает `../dns_config.txt` и записывает один файл `config/nginx.conf`: upstream app_server (unicchat-appserver:3000), doc_server (unicchat-documentserver:80), minio_server (9000); виртуальные хосты для APP_DNS, EDT_DNS, MINIO_DNS (HTTPS 443 + HTTP 80 с редиректом). Подключение к сертификатам в `ssl/live/$APP_DNS/`. |
 | **3** | 🌐 Запуск nginx | Проверяет сеть `unicchat-network`, при наличии сертификатов в `ssl/live/$APP_DNS/` вызывает генерацию конфига и выполняет `docker compose up -d nginx`. Проверяет, что контейнер запущен и `nginx -t` успешен. |
 | **4** | 🛑 Остановка nginx | `docker compose stop nginx` или `docker stop unicchat-nginx`. |
 | **5** | 🔄 Перезапуск nginx | При наличии сертификатов обновляет `config/nginx.conf`, затем перезапускает контейнер nginx. |
@@ -975,10 +975,6 @@ upstream minio_server {
     server unicchat-minio:9000;
 }
 
-upstream minio_console {
-    server unicchat-minio:9002;
-}
-
 # ============================================================================
 # App Server (UnicChat Application)
 # ============================================================================
@@ -1138,36 +1134,6 @@ server {
     }
 }
 
-# ============================================================================
-# MinIO Console (Web UI) - port 9002
-# ============================================================================
-server {
-    listen 9002 ssl;
-    http2 on;
-    server_name myminio.unic.chat;
-
-    error_log /var/log/nginx/minio-console.error.log;
-    access_log /var/log/nginx/minio-console.access.log;
-
-    location / {
-        proxy_pass http://minio_console;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $http_host;
-
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-
-        proxy_redirect off;
-    }
-
-    ssl_certificate /etc/letsencrypt/live/myapp.unic.chat/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/myapp.unic.chat/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-}
 ```
 
 Сохраните файл (Ctrl+O, Enter, Ctrl+X).
