@@ -10,86 +10,97 @@
 
 <!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
 
+- [Описание продукта](#-)
 - [Скачать инструкции в PDF ](#-pdf)
-- [Архитектура установки](#-)
+- [Архитектура установки](#--1)
    * [Установка на 1-м сервере](#-1-)
    * [Установка на 2-х серверах (рекомендуется для промышленного использования)](#-2-)
-- [Обязательные компоненты](#--1)
+- [Обязательные компоненты](#--2)
       + [Push шлюз](#push-)
-      + [ВКС шлюз](#--2)
+      + [ВКС шлюз](#--3)
       + [Приложения UnicChat](#-unicchat-1)
-- [Опциональные компоненты](#--3)
+- [Опциональные компоненты](#--4)
       + [SMTP сервер](#smtp-)
       + [LDAP сервер](#ldap-)
 - [Шаг 1. Подготовка окружения](#-1--1)
    * [1.1 Требования к конфигурации](#11-)
       + [Требования к конфигурации на 20 пользователей. Приложение и БД устанавливаются на 1-й виртуальной машине](#-20-1-)
-      + [Конфигурация виртуальной машины](#--4)
+      + [Конфигурация виртуальной машины](#--5)
       + [Требования к конфигурации на 20-50 пользователей. Приложение и БД устанавливаются на разные виртуальные машины](#-20-50-)
-      + [Конфигурация виртуальной машины для приложения](#--5)
-      + [Конфигурация виртуальной машины для БД](#--6)
+      + [Конфигурация виртуальной машины для приложения](#--6)
+      + [Конфигурация виртуальной машины для БД](#--7)
    * [1.2. Запрос лицензии для Unicchat Solid Core](#12-unicchat-solid-core)
    * [1.3. Клонирование репозитория](#13-)
    * [1.4 Зарегистрировать DNS имена](#14-dns-)
 - [Автоматическая настройка для NGINX, базы знаний для UNICCHAT, UNICCHAT](#-nginx-unicchat-unicchat)
-   * [Инструкция по скрипту установки unicchat.sh](#-unicchatsh)
-      + [Запуск скрипта unicchat.sh](#-unicchatsh-1)
-   * [Описание скрипта](#--7)
-      + [Основные функции в меню](#--8)
-         - [Установка компонентов](#--9)
-         - [Настройка конфигурации](#--10)
-         - [Настройка веб-сервера](#--11)
-         - [Запуск сервисов](#--12)
-         - [Автоматизация](#-1)
-      + [Детальное описание ключевых функций](#--13)
-         - [Линковка сервисов](#--14)
-         - [DNS конфигурация](#dns-)
-         - [SSL настройка](#ssl-)
-         - [Конфигурация баз данных](#--15)
-      + [Файлы конфигурации](#--16)
-      + [Особенности работы](#--17)
-      + [Рекомендуемая последовательность](#--18)
+   * [🚨 КРИТИЧЕСКИ ВАЖНО: ЛИЦЕНЗИЯ ОБЯЗАТЕЛЬНА ПЕРЕД УСТАНОВКОЙ](#--8)
+   * [1. Скрипт установки UnicChat (`unicchat.sh`)](#1-unicchat-unicchatsh)
+      + [Запуск](#-1)
+      + [Меню скрипта](#--9)
+      + [Что использует скрипт](#--10)
+   * [2. Скрипт развёртки NGINX (`nginx/generate_ssl.sh`)](#2-nginx-nginxgenerate_sslsh)
+      + [Запуск](#-2)
+      + [Меню скрипта](#--11)
+      + [Что использует скрипт](#--12)
+      + [Рекомендуемая последовательность полной установки](#--13)
 - [2. Ручная настройка ](#2-)
+   * [🚨 КРИТИЧЕСКИ ВАЖНО: ЛИЦЕНЗИЯ ОБЯЗАТЕЛЬНА ПЕРЕД УСТАНОВКОЙ](#--14)
    * [2.1 Установите Docker](#21-docker)
-   * [2.2 Провести настройку Nginx](#22-nginx)
-      + [2.2.1 Подготовка структуры директорий](#221-)
-      + [2.2.2 Получение SSL сертификатов через Certbot](#222-ssl-certbot)
-      + [2.2.3 Генерация конфигурации Nginx для UnicChat и Базы знаний](#223-nginx-unicchat-)
-      + [2.2.4 Запуск и активация Nginx](#224-nginx)
-      + [2.2.6 Настройка автоматического обновления сертификатов Certbot](#226-certbot)
-   * [2.3 Открыть доступы до внутренних ресурсов](#23-)
-      + [Входящие соединения на стороне сервера UnicChat:](#-unicchat-2)
-      + [Исходящие соединения на стороне сервера UnicChat на push:](#-unicchat-push)
-      + [Исходящие соединения на стороне сервера UnicChat на ВКС:](#-unicchat-)
+   * [2.2 Проверка поддержки AVX процессором](#22-avx-)
+   * [2.3 Настройка DNS имён](#23-dns-)
+   * [2.4 Создание Docker-сети](#24-docker-)
+   * [2.5 Подготовка конфигурационных файлов](#25-)
+      + [2.5.1 Конфигурация MongoDB](#251-mongodb)
+      + [2.5.2 Конфигурация AppServer](#252-appserver)
+      + [2.5.3 Конфигурация Logger](#253-logger)
+      + [2.5.4 Конфигурация Vault](#254-vault)
+      + [2.5.5 Конфигурация MinIO](#255-minio)
+      + [2.5.6 Конфигурация DocumentServer](#256-documentserver)
+   * [2.6 Авторизация в Container Registry](#26-container-registry)
+   * [2.7 Запуск сервисов UnicChat](#27-unicchat)
+   * [2.8 Настройка пользователей MongoDB](#28-mongodb)
+      + [2.8.1 Проверка готовности MongoDB](#281-mongodb)
+      + [2.8.2 Создание пользователя Logger](#282-logger)
+      + [2.8.3 Создание пользователя Vault](#283-vault)
+   * [2.9 Настройка секретов Vault для KBT](#29-vault-kbt)
+      + [2.9.1 Установка curl в контейнер Vault (если требуется)](#291-curl-vault-)
+      + [2.9.2 Получение токена доступа к Vault](#292-vault)
+      + [2.9.3 Создание секрета KBTConfigs](#293-kbtconfigs)
+   * [2.10 Настройка Nginx и SSL сертификатов](#210-nginx-ssl-)
+      + [2.10.1 Подготовка директорий](#2101-)
+      + [2.10.2 Генерация DH параметров](#2102-dh-)
+      + [2.10.3 Остановка сервисов на портах 80/443](#2103-80443)
+      + [2.10.4 Получение SSL сертификатов через Let's Encrypt](#2104-ssl-lets-encrypt)
+      + [2.10.5 Создание конфигурации Nginx](#2105-nginx)
+      + [2.10.6 Запуск Nginx](#2106-nginx)
+      + [2.10.7 Проверка конфигурации](#2107-)
+      + [2.10.8 Настройка автоматического обновления сертификатов](#2108-)
+   * [2.11 Настройка /etc/hosts для MinIO и DocumentServer](#211-etchosts-minio-documentserver)
+   * [2.12 Создание bucket в MinIO](#212-bucket-minio)
+   * [2.13 Настройка прав доступа MongoDB для AppServer](#213-mongodb-appserver)
+   * [2.14 Проверка работы установки](#214-)
+   * [2.15 Открытие сетевых доступов и портов](#215-)
+      + [Входящие соединения на сервере UnicChat](#-unicchat-2)
+      + [Исходящие соединения](#--15)
 - [Шаг 3. Установка локального медиа сервера для ВКС](#-3-)
-   * [3.1 Порядок установки сервера](#31-)
-   * [3.2 Проверка открытия портов](#32-)
-      + [Обязательные порты](#--19)
-         - [TCP порты:](#tcp-)
-         - [UDP порты:](#udp-)
-         - [Опциональные порты](#--20)
-- [Шаг 4. Развертывание базы знаний для UNICCHAT](#-4-unicchat)
-   * [4.4 Развертывание MinIO S3](#44-minio-s3)
-      + [4.4.1 Создание переменных окружения для Базы Знаний](#441-)
-      + [4.4.2 Запустите Базу Знаний](#442-)
-      + [4.4.3 Доступ к MinIO:](#443-minio)
-      + [4.4.4 Создание bucket](#444-bucket)
-      + [4.4.5 Настройка DNS записей для проксирования](#445-dns-)
-- [Шаг 5. Установка UnicChat](#-5-unicchat)
-   * [5.1 Настройка Unic.Chat](#51-unicchat)
-   * [5.2 Раздать права пользователю для подключения к базе](#52-)
 - [Шаг 6. Создание пользователя администратора](#-6-)
 - [Шаг 7. Настройка push-уведомлений](#-7-push-)
-- [Опциональные компоненты](#--21)
-   * [Шаг 8. Настройка unicvault](#-8-unicvault)
-   * [Шаг 9. Настройка redminebot](#-9-redminebot)
-   * [Важные замечания](#--22)
-- [Клиентские приложения](#--23)
+- [Опциональные компоненты](#--16)
+   * [Шаг 8. Настройка redminebot](#-8-redminebot)
+      + [8.1 Настройка redminebot](#81-redminebot)
+      + [8.2 Подключение UnicChat к redminebot](#82-unicchat-redminebot)
+   * [Важные замечания](#--17)
+- [Клиентские приложения](#--18)
 
 <!-- TOC end -->
 
 
-
+<!-- TOC --><a name="-"></a>
+## Описание продукта
+* [Описание архитектуры UnicChat.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5%20%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D1%8B%20UnicChat.pdf)
+* [Описание архитектуры UnicChat.docx](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5%20%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D1%8B%20UnicChat.docx)
+* [UnicChat Описание продукта.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/UnicChat%20%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5%20%D0%BF%D1%80%D0%BE%D0%B4%D1%83%D0%BA%D1%82%D0%B0.pdf)
+* [UnicChat Описание продукта.docx](https://github.com/unicommorg/unicchat.enterprise/blob/6b4b0d010ff633b9bdb9899a9a4d088150fd7f80/docs/UnicChat%20%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5%20%D0%BF%D1%80%D0%BE%D0%B4%D1%83%D0%BA%D1%82%D0%B0.docx)
 <!-- TOC --><a name="-pdf"></a>
 ## Скачать инструкции в PDF 
 
@@ -98,11 +109,8 @@
 * [Инструкция пользователя UnicChat.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%98%D0%BD%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%86%D0%B8%D1%8F%20%D0%BF%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8F%20UnicChat.pdf)
 * [Инструкция_по_администрированию_UnicChat.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%98%D0%BD%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%86%D0%B8%D1%8F_%D0%BF%D0%BE_%D0%B0%D0%B4%D0%BC%D0%B8%D0%BD%D0%B8%D1%81%D1%82%D1%80%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D1%8E_UnicChat.pdf)
 * [Инструкция_по_лицензированию_UnicChat.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%98%D0%BD%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%86%D0%B8%D1%8F_%D0%BF%D0%BE_%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D1%8E_UnicChat.pdf)
-* [Описание архитектуры UnicChat.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5%20%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D1%8B%20UnicChat.pdf)
-* [Описание архитектуры UnicChat.docx](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5%20%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D1%8B%20UnicChat.docx)
-* [UnicChat Описание продукта.pdf](https://github.com/unicommorg/unicchat.enterprise/blob/main/docs/UnicChat%20%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5%20%D0%BF%D1%80%D0%BE%D0%B4%D1%83%D0%BA%D1%82%D0%B0.pdf)
-* [UnicChat Описание продукта.docx](https://github.com/unicommorg/unicchat.enterprise/blob/6b4b0d010ff633b9bdb9899a9a4d088150fd7f80/docs/UnicChat%20%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5%20%D0%BF%D1%80%D0%BE%D0%B4%D1%83%D0%BA%D1%82%D0%B0.docx)
-<!-- TOC --><a name="-"></a>
+
+<!-- TOC --><a name="--1"></a>
 ## Архитектура установки
 
 ___
@@ -117,7 +125,7 @@ ___
 
 ![](./assets/2vm-unicchat-install-scheme.jpg "Архитектура установки на 2-х серверах")
 
-<!-- TOC --><a name="--1"></a>
+<!-- TOC --><a name="--2"></a>
 ## Обязательные компоненты
 
 ___
@@ -128,7 +136,7 @@ ___
 Публичный сервис компании Unicomm. Подключение к нему необходимо для отправки push-сообщений на мобильные платформы Apple и Google.
 Расположен во внешнем периметре на серверах компании. Серверу UnicChat требуются исходящие соединения к этому сервису и не требуются входящие соединения.
 
-<!-- TOC --><a name="--2"></a>
+<!-- TOC --><a name="--3"></a>
 #### ВКС шлюз
 
 Публичный сервис компании Unicomm. Подключение к нему необходимо для работы аудио и видео конференций, а также аудио-звонков.
@@ -142,7 +150,7 @@ ___
 Основное взаимодействие осуществляется через протокол HTTPS (443/TCP).
 Для работы видео- и аудиозвонков необходимы протоколы STUN и TURN: входящие соединения на порты 7881/TCP и 7882/UDP, а также входящий и исходящий трафик UDP по портам 50000-60000 (RTP-трафик).
 
-<!-- TOC --><a name="--3"></a>
+<!-- TOC --><a name="--4"></a>
 ## Опциональные компоненты
 
 ___
@@ -169,7 +177,7 @@ ___
 <!-- TOC --><a name="-20-1-"></a>
 #### Требования к конфигурации на 20 пользователей. Приложение и БД устанавливаются на 1-й виртуальной машине
 
-<!-- TOC --><a name="--4"></a>
+<!-- TOC --><a name="--5"></a>
 #### Конфигурация виртуальной машины
 
 ```
@@ -181,7 +189,7 @@ RAM 8 Gb;
 <!-- TOC --><a name="-20-50-"></a>
 #### Требования к конфигурации на 20-50 пользователей. Приложение и БД устанавливаются на разные виртуальные машины
 
-<!-- TOC --><a name="--5"></a>
+<!-- TOC --><a name="--6"></a>
 #### Конфигурация виртуальной машины для приложения
 
 ```
@@ -190,7 +198,7 @@ RAM 8 Gb;
 200 Gb HDD\SSD
 ```
 
-<!-- TOC --><a name="--6"></a>
+<!-- TOC --><a name="--7"></a>
 #### Конфигурация виртуальной машины для БД
 
 ```
@@ -273,6 +281,7 @@ git clone https://github.com/unicommorg/unicchat.enterprise.git
 
 <div style="background-color: #ff0000; border: 4px solid #cc0000; padding: 20px; margin: 30px 0; border-radius: 8px; color: #ffffff; font-weight: bold;">
   
+<!-- TOC --><a name="--8"></a>
 ### 🚨 КРИТИЧЕСКИ ВАЖНО: ЛИЦЕНЗИЯ ОБЯЗАТЕЛЬНА ПЕРЕД УСТАНОВКОЙ
 
 **⚠️ ВНИМАНИЕ! Перед началом установки UnicChat Enterprise ОБЯЗАТЕЛЬНО необходимо:**
@@ -300,12 +309,12 @@ export UniCommLicenseData="ваша_лицензия_здесь"
 
 ---
 
-<!-- TOC --><a name="-unicchatsh"></a>
+<!-- TOC --><a name="1-unicchat-unicchatsh"></a>
 ### 1. Скрипт установки UnicChat (`unicchat.sh`)
 
 Интерактивный скрипт с меню. Читает и пишет конфиги в корне проекта (`dns_config.txt`, `mongo_config.txt`, `minio_config.txt`), генерирует файлы в `multi-server-install/` и запускает контейнеры из `multi-server-install/docker-compose.yml`.
 
-<!-- TOC --><a name="-unicchatsh-1"></a>
+<!-- TOC --><a name="-1"></a>
 #### Запуск
 
 ```shell
@@ -315,7 +324,7 @@ sudo ./unicchat.sh
 
 Требуется root (Docker, логи).
 
-<!-- TOC --><a name="--7"></a>
+<!-- TOC --><a name="--9"></a>
 #### Меню скрипта
 
 Текст пунктов меню совпадает с выводом скрипта.
@@ -337,7 +346,7 @@ sudo ./unicchat.sh
 | **100** | 🗑️ Cleanup (remove containers & volumes) | Запрос подтверждения (`yes`). Затем: `docker compose -f multi-server-install/docker-compose.yml down -v`, удаление образов (unicchat, unic, uniceditor, minio, mongodb, rabbitmq, postgres), удаление сети `unicchat-network`, удаление сгенерированных .env в `multi-server-install/`. Каталоги не удаляет. |
 | **0** | Exit | Выход из скрипта. |
 
-<!-- TOC --><a name="--16"></a>
+<!-- TOC --><a name="--10"></a>
 #### Что использует скрипт
 
 - **В корне проекта:** `dns_config.txt`, `mongo_config.txt`, `minio_config.txt` (создаются/обновляются пунктами 2–4); `unicchat_install.log` (лог).
@@ -345,11 +354,12 @@ sudo ./unicchat.sh
 
 ---
 
-<!-- TOC --><a name="-nginx-ssl"></a>
+<!-- TOC --><a name="2-nginx-nginxgenerate_sslsh"></a>
 ### 2. Скрипт развёртки NGINX (`nginx/generate_ssl.sh`)
 
 Скрипт для управления SSL (Let's Encrypt) и контейнером nginx. Читает домены из `../dns_config.txt` (должен быть создан, например, через `unicchat.sh`). Работает из каталога `nginx/`: использует локальный `docker-compose.yml`, создаёт `config/nginx.conf`, сертификаты в `ssl/`. Не вызывается из `unicchat.sh` — запускается отдельно.
 
+<!-- TOC --><a name="-2"></a>
 #### Запуск
 
 ```shell
@@ -359,6 +369,7 @@ sudo ./generate_ssl.sh
 
 Требуется root (порты 80/443, Docker).
 
+<!-- TOC --><a name="--11"></a>
 #### Меню скрипта
 
 Текст пунктов совпадает с выводом в терминале.
@@ -376,13 +387,14 @@ sudo ./generate_ssl.sh
 | **99** | 🚀 Полная автоустановка (SSL + nginx) | По шагам: генерация SSL (п. 1), запуск nginx (п. 3), `docker compose up -d certbot`, вывод статуса (п. 6). |
 | **0** | 🚪 Выход | Выход из скрипта. |
 
+<!-- TOC --><a name="--12"></a>
 #### Что использует скрипт
 
 - **Конфиг:** `../dns_config.txt` (APP_DNS, EDT_DNS, MINIO_DNS); при первом запросе email — `../unicchat_config.txt`.
 - **В каталоге `nginx/`:** `docker-compose.yml` (сервисы nginx и certbot), генерируемый `config/nginx.conf`, каталог `ssl/` (в т.ч. `options-ssl-nginx.conf`, `ssl-dhparams.pem`, `live/<домен>/` от Certbot). Сертификаты общие для всех трёх доменов (один мультидоменный от Let's Encrypt).
 
 
-<!-- TOC --><a name="--18"></a>
+<!-- TOC --><a name="--13"></a>
 #### Рекомендуемая последовательность полной установки
 
 **Для полной установки всех компонентов:**
@@ -411,6 +423,7 @@ sudo ./generate_ssl.sh
 
 <div style="background-color: #ff0000; border: 4px solid #cc0000; padding: 20px; margin: 30px 0; border-radius: 8px; color: #ffffff; font-weight: bold;">
   
+<!-- TOC --><a name="--14"></a>
 ### 🚨 КРИТИЧЕСКИ ВАЖНО: ЛИЦЕНЗИЯ ОБЯЗАТЕЛЬНА ПЕРЕД УСТАНОВКОЙ
 
 **⚠️ ВНИМАНИЕ! Перед началом установки UnicChat Enterprise ОБЯЗАТЕЛЬНО необходимо:**
@@ -458,7 +471,7 @@ sudo systemctl enable docker
 docker info
 ```
 
-<!-- TOC --><a name="22-avx"></a>
+<!-- TOC --><a name="22-avx-"></a>
 ### 2.2 Проверка поддержки AVX процессором
 
 MongoDB версии 5.x и выше требуют поддержки инструкций AVX процессором. Проверьте наличие AVX:
@@ -471,7 +484,7 @@ grep avx /proc/cpuinfo
 - Если команда выводит строки с `avx` - используйте MongoDB 5.x или выше
 - Если вывода нет - используйте MongoDB 4.4 или ниже
 
-<!-- TOC --><a name="23-dns"></a>
+<!-- TOC --><a name="23-dns-"></a>
 ### 2.3 Настройка DNS имён
 
 Подготовьте DNS-имена для ваших сервисов. Вам потребуется минимум 3 домена:
@@ -501,7 +514,7 @@ sudo nano /etc/hosts
 <IP_СЕРВЕРА> myminio.unic.chat
 ```
 
-<!-- TOC --><a name="24-network"></a>
+<!-- TOC --><a name="24-docker-"></a>
 ### 2.4 Создание Docker-сети
 
 Создайте Docker-сеть для связи между контейнерами:
@@ -523,6 +536,7 @@ docker network ls | grep unicchat-network
 cd multi-server-install/
 ```
 
+<!-- TOC --><a name="251-mongodb"></a>
 #### 2.5.1 Конфигурация MongoDB
 
 Создайте файл `mongo.env` для настройки MongoDB Replica Set:
@@ -566,6 +580,7 @@ MONGODB_DATABASE=unicchat_db
 chmod 600 mongo_creds.env
 ```
 
+<!-- TOC --><a name="252-appserver"></a>
 #### 2.5.2 Конфигурация AppServer
 
 Создайте файл `appserver.env`:
@@ -605,6 +620,7 @@ MONGO_OPLOG_URL=mongodb://unicchat_admin:secure_password_change_me@unicchat-mong
 chmod 600 appserver_creds.env
 ```
 
+<!-- TOC --><a name="253-logger"></a>
 #### 2.5.3 Конфигурация Logger
 
 Создайте файл `logger.env`:
@@ -636,6 +652,7 @@ MongoCS="mongodb://logger_user:logger_pass_change_me@unicchat-mongodb:27017/logg
 chmod 600 logger_creds.env
 ```
 
+<!-- TOC --><a name="254-vault"></a>
 #### 2.5.4 Конфигурация Vault
 
 Создайте файл `vault_creds.env`:
@@ -655,6 +672,7 @@ MongoCS="mongodb://vault_user:vault_pass_change_me@unicchat-mongodb:27017/vault_
 chmod 600 vault_creds.env
 ```
 
+<!-- TOC --><a name="255-minio"></a>
 #### 2.5.5 Конфигурация MinIO
 
 Создайте директорию для конфигов MinIO:
@@ -677,6 +695,7 @@ MINIO_BROWSER=on
 MINIO_DOMAIN=myminio.unic.chat
 ```
 
+<!-- TOC --><a name="256-documentserver"></a>
 #### 2.5.6 Конфигурация DocumentServer
 
 Создайте файл `env/documentserver_env.env`:
@@ -704,7 +723,7 @@ AMQP_URI=amqp://guest:guest@unicchat-rabbitmq
 cd ..
 ```
 
-<!-- TOC --><a name="26-registry"></a>
+<!-- TOC --><a name="26-container-registry"></a>
 ### 2.6 Авторизация в Container Registry
 
 Выполните вход в Yandex Container Registry для доступа к образам:
@@ -751,6 +770,7 @@ docker logs unicchat-appserver
 
 После запуска MongoDB необходимо создать пользователей для служб Logger и Vault.
 
+<!-- TOC --><a name="281-mongodb"></a>
 #### 2.8.1 Проверка готовности MongoDB
 
 Подождите, пока MongoDB полностью запустится (15-30 секунд). Проверьте готовность:
@@ -761,6 +781,7 @@ docker exec unicchat-mongodb mongosh -u root -p "rootpass_change_me" --quiet --e
 
 Если команда возвращает `{ ok: 1 }`, MongoDB готов к работе.
 
+<!-- TOC --><a name="282-logger"></a>
 #### 2.8.2 Создание пользователя Logger
 
 Подключитесь к MongoDB:
@@ -786,6 +807,7 @@ db.createUser({
 db.changeUserPassword('logger_user', 'logger_pass_change_me')
 ```
 
+<!-- TOC --><a name="283-vault"></a>
 #### 2.8.3 Создание пользователя Vault
 
 В той же консоли MongoDB выполните:
@@ -810,11 +832,12 @@ db.changeUserPassword('vault_user', 'vault_pass_change_me')
 exit
 ```
 
-<!-- TOC --><a name="29-vault"></a>
+<!-- TOC --><a name="29-vault-kbt"></a>
 ### 2.9 Настройка секретов Vault для KBT
 
 Сервис KBT (Knowledge Base Tasker) использует Vault для хранения конфигурации подключения к MongoDB и MinIO.
 
+<!-- TOC --><a name="291-curl-vault-"></a>
 #### 2.9.1 Установка curl в контейнер Vault (если требуется)
 
 Проверьте наличие curl в контейнере:
@@ -829,6 +852,7 @@ docker exec unicchat-vault bash -c "command -v curl"
 docker exec -u root unicchat-vault bash -c "apt-get update && apt-get install -y curl"
 ```
 
+<!-- TOC --><a name="292-vault"></a>
 #### 2.9.2 Получение токена доступа к Vault
 
 Подождите, пока Vault полностью запустится (10-15 секунд). Получите JWT токен:
@@ -840,6 +864,7 @@ echo "Token: $VAULT_TOKEN"
 
 Токен должен иметь формат JWT (три части, разделённые точками).
 
+<!-- TOC --><a name="293-kbtconfigs"></a>
 #### 2.9.3 Создание секрета KBTConfigs
 
 Создайте секрет с конфигурацией MongoDB и MinIO. Замените значения на ваши реальные данные:
@@ -874,9 +899,10 @@ docker exec unicchat-vault bash -c "curl -s -X GET 'http://localhost:80/api/Secr
 
 Если в выводе присутствует `KBTConfigs`, секрет успешно создан.
 
-<!-- TOC --><a name="210-nginx"></a>
+<!-- TOC --><a name="210-nginx-ssl-"></a>
 ### 2.10 Настройка Nginx и SSL сертификатов
 
+<!-- TOC --><a name="2101-"></a>
 #### 2.10.1 Подготовка директорий
 
 Перейдите в директорию nginx:
@@ -895,6 +921,7 @@ chmod 755 ssl www
 ls -la ssl/options-ssl-nginx.conf
 ```
 
+<!-- TOC --><a name="2102-dh-"></a>
 #### 2.10.2 Генерация DH параметров
 
 Сгенерируйте параметры Диффи-Хеллмана для усиления SSL:
@@ -905,6 +932,7 @@ openssl dhparam -out ssl/ssl-dhparams.pem 2048
 
 Эта операция может занять несколько минут.
 
+<!-- TOC --><a name="2103-80443"></a>
 #### 2.10.3 Остановка сервисов на портах 80/443
 
 Перед получением сертификатов убедитесь, что порты 80 и 443 свободны:
@@ -919,6 +947,7 @@ docker stop unicchat-nginx 2>/dev/null || true
 docker rm unicchat-nginx 2>/dev/null || true
 ```
 
+<!-- TOC --><a name="2104-ssl-lets-encrypt"></a>
 #### 2.10.4 Получение SSL сертификатов через Let's Encrypt
 
 Запустите Certbot для получения сертификатов. Замените `your-email@example.com` на ваш реальный email и домены на ваши:
@@ -949,6 +978,7 @@ docker run --rm \
 
 Сертификаты будут сохранены в `ssl/live/myapp.unic.chat/`.
 
+<!-- TOC --><a name="2105-nginx"></a>
 #### 2.10.5 Создание конфигурации Nginx
 
 Создайте конфигурационный файл Nginx:
@@ -1140,6 +1170,7 @@ server {
 
 Сохраните файл (Ctrl+O, Enter, Ctrl+X).
 
+<!-- TOC --><a name="2106-nginx"></a>
 #### 2.10.6 Запуск Nginx
 
 Запустите контейнер Nginx:
@@ -1158,6 +1189,7 @@ sleep 3
 docker ps | grep unicchat-nginx
 ```
 
+<!-- TOC --><a name="2107-"></a>
 #### 2.10.7 Проверка конфигурации
 
 Проверьте корректность конфигурации Nginx:
@@ -1174,6 +1206,7 @@ nginx: configuration file /etc/nginx/nginx.conf test is successful
 
 Если есть ошибки, проверьте файл `config/nginx.conf` и исправьте их.
 
+<!-- TOC --><a name="2108-"></a>
 #### 2.10.8 Настройка автоматического обновления сертификатов
 
 Для автоматического продления сертификатов запустите контейнер Certbot в фоновом режиме:
@@ -1202,7 +1235,7 @@ crontab -e
 cd ..
 ```
 
-<!-- TOC --><a name="211-"></a>
+<!-- TOC --><a name="211-etchosts-minio-documentserver"></a>
 ### 2.11 Настройка /etc/hosts для MinIO и DocumentServer
 
 **Важно:** Для корректной работы проксирования через NGINX необходимо на серверах с сервисами MinIO и DocumentServer добавить DNS-записи в файл `/etc/hosts`.
@@ -1223,7 +1256,7 @@ sudo nano /etc/hosts
 sudo systemctl restart systemd-resolved
 ```
 
-<!-- TOC --><a name="212-minio"></a>
+<!-- TOC --><a name="212-bucket-minio"></a>
 ### 2.12 Создание bucket в MinIO
 
 После запуска всех сервисов необходимо создать bucket для хранения документов.
@@ -1266,7 +1299,7 @@ mc mb myminio/uc.onlyoffice.docs
 mc anonymous set public myminio/uc.onlyoffice.docs
 ```
 
-<!-- TOC --><a name="213-"></a>
+<!-- TOC --><a name="213-mongodb-appserver"></a>
 ### 2.13 Настройка прав доступа MongoDB для AppServer
 
 После первого запуска UnicChat необходимо настроить права доступа для основного пользователя приложения в MongoDB.
@@ -1335,6 +1368,7 @@ https://myapp.unic.chat
 
 Для корректной работы UnicChat необходимо открыть следующие порты и доступы:
 
+<!-- TOC --><a name="-unicchat-2"></a>
 #### Входящие соединения на сервере UnicChat
 
 Откройте порты в firewall:
@@ -1358,6 +1392,7 @@ sudo ufw allow 50000:60000/udp
 sudo ufw status
 ```
 
+<!-- TOC --><a name="--15"></a>
 #### Исходящие соединения
 
 Убедитесь, что сервер UnicChat может устанавливать исходящие соединения:
@@ -1411,16 +1446,17 @@ sudo ufw status
 
 Приложение Unicchat работает с внешним push сервером для доставки push-уведомлений в приложение Unicchat на мобильные устройства.
 
-<!-- TOC --><a name="--21"></a>
+<!-- TOC --><a name="--16"></a>
 ## Опциональные компоненты
 
 **Примечание:** Vault уже настроен в разделе "2.9 Настройка секретов Vault для KBT" основной инструкции.
 
-<!-- TOC --><a name="-9-redminebot"></a>
+<!-- TOC --><a name="-8-redminebot"></a>
 ### Шаг 8. Настройка redminebot
 
 Redminebot - это опциональный сервис для интеграции с системой отслеживания задач Redmine.
 
+<!-- TOC --><a name="81-redminebot"></a>
 #### 8.1 Настройка redminebot
 
 Перейдите в директорию redminebot:
@@ -1484,6 +1520,7 @@ docker ps | grep ucredminebot
 docker logs ucredminebot
 ```
 
+<!-- TOC --><a name="82-unicchat-redminebot"></a>
 #### 8.2 Подключение UnicChat к redminebot
 
 Если redminebot запущен, необходимо добавить его адрес в конфигурацию AppServer.
@@ -1547,14 +1584,14 @@ docker compose -f docker-compose.yml restart unicchat-appserver
 ```bash
 docker logs unicchat-appserver | grep -i redmine
 ```
-<!-- TOC --><a name="--22"></a>
+<!-- TOC --><a name="--17"></a>
 ### Важные замечания
 
 - Убедитесь, что все IP-адреса и учетные данные заменены на реальные значения
 - Убедитесь, что порты 8201 и 8200 не заняты другими приложениями
 - Убедитесь, что пользователь MongoDB имеет необходимые права доступа к созданной базе данных
 
-<!-- TOC --><a name="--23"></a>
+<!-- TOC --><a name="--18"></a>
 ## Клиентские приложения
 
 * [Репозитории клиентских приложений]
