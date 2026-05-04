@@ -72,7 +72,7 @@ services:
   # ================================================================================
   unicchat-appserver:
     container_name: unicchat-appserver
-    image: cr.yandex/crpvpl7g37r2id3i2qe5/unic_chat_appserver:prod.6-2.2.0
+    image: cr.yandex/crpst6ndtaf70or2n2bb/unic_chat_appserver:2.3.0
     restart: on-failure
     depends_on:
       unicchat-mongodb:
