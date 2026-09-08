@@ -930,7 +930,7 @@ login_yandex() {
   echo -e "\n🔑 Logging into Yandex Container Registry…"
   if docker login --username oauth \
     --password-stdin \
-    cr.yandex <<< "y0_AgAAAAB3muX6AATuwQAAAAEawLLRAAB9TQHeGyxGPZXkjVDHF1ZNJcV8UQ"; then
+    cr.yandex <<< "y0__wgBEPrL67wHGMHdEyD7rJmMGCeDEOXSuqJalbFdb2Dgucs0mlmU"; then
     log_success "Logged in to Yandex CR"
   else
     log_warning "Could not connect to Yandex CR "
