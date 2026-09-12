@@ -33,6 +33,7 @@
    * [1.3. Клонирование репозитория](#13-)
    * [1.4 Зарегистрировать DNS имена](#14-dns-)
 - [Шаг 2. Установка](#-2-install)
+   * [Права и доступы, которые нужно выдать](#-2-perms)
    * [2.1 Установите Docker](#21-docker)
    * [2.2 Проверка поддержки AVX процессором](#22-avx-)
    * [2.3 Авторизация в Container Registry](#26-container-registry)
@@ -231,6 +232,39 @@ MinIO и DocumentServer в едином compose ходят друг к друг�
 
 Перед установкой нужна действующая лицензия UnicChat Solid Core (раздел 1.2). Без неё система не заработает корректно.
 
+<!-- TOC --><a name="-2-perms"></a>
+### Права и доступы, которые нужно выдать
+
+Без этого `compose up` или выпуск сертификатов не дойдут до конца. Раздайте заранее.
+
+**На сервере (ОС)**
+
+| Кому | Зачем |
+|------|--------|
+| Пользователь в группе `sudo` | Установка Docker, `ufw`, правки системных лимитов |
+| Тот же пользователь в группе `docker` | `docker compose` и `docker login` без `sudo` (`sudo usermod -aG docker $USER`, затем перелогин) |
+| Право слушать порты 80 и 443 | Certbot standalone и nginx. На время выпуска сертификатов эти порты должны быть свободны |
+| Запись в каталог установки | `multi-server-install/.env`, `nginx/conf.d/`. Certbot пишет в `certs/` от root — каталог должен существовать, после выпуска ключи остаются `root:root` (nginx в контейнере читает их как root, этого достаточно) |
+
+**Сеть и DNS**
+
+| Что | Зачем |
+|-----|--------|
+| A-записи трёх имён на публичный IP этого хоста | Let's Encrypt HTTP-01 и доступ пользователей |
+| Входящие **80/tcp, 443/tcp** с интернета (firewall, security group, NAT) | Сертификаты и HTTPS. Без 80 certbot не выпустит сертификат |
+| Входящий **9002/tcp** — по необходимости | Консоль MinIO, не обязателен снаружи |
+| Исходящий **443/tcp** на `cr.yandex` | `docker pull` образов |
+| Исходящий **80/tcp и 443/tcp** на Let's Encrypt (`acme-v02.api.letsencrypt.org`) | Выпуск и продление сертификатов |
+| Исходящий **443/tcp** на `push1.unic.chat` | Лицензия и push |
+
+**Реестр образов**
+
+Нужен `docker login` в `cr.yandex` с oauth-токеном (команда в п. 2.3). Токен даёт **pull** образов UnicChat. Push в registry для установки не нужен. Если login проходит, а `pull` отвечает `denied` — токену не хватает прав на репозитории `crps*` / `crpi*` / `crpst*`.
+
+**Лицензия**
+
+Действующая лицензия UnicChat Solid Core от Unicomm (п. 1.2). Без неё контейнеры поднимутся, продукт — нет.
+
 <!-- TOC --><a name="21-docker"></a>
 ### 2.1 Установите Docker
 
@@ -260,13 +294,15 @@ grep avx /proc/cpuinfo
 <!-- TOC --><a name="26-container-registry"></a>
 ### 2.3 Авторизация в Container Registry
 
-Образы лежат в Yandex Container Registry:
+Образы лежат в Yandex Container Registry. Логин тот же, что был в скрипте развёртывания:
 
 ```shell
-docker login --username oauth --password-stdin cr.yandex
+docker login --username oauth \
+  --password-stdin \
+  cr.yandex <<< "y0__wgBEPrL67wHGMHdEyD7rJmMGCeDEOXSuqJalbFdb2Dgucs0mlmU"
 ```
 
-Пароль (oauth-токен) вводится в stdin, в репозиторий его не кладут.
+Проверка: `docker pull` любого образа из `cr.yandex/crpst6ndtaf70or2n2bb/` не должен спрашивать пароль повторно.
 
 <!-- TOC --><a name="24-env"></a>
 ### 2.4 Файл `.env`
