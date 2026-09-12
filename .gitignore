@@ -25,6 +25,7 @@ log_analysis_report_*.txt
 # SSL сертификаты и ключи
 nginx/ssl/
 nginx/www/
+certs/
 *.pem
 *.key
 *.crt
@@ -32,6 +33,8 @@ nginx/www/
 # Nginx конфигурация (генерируется автоматически)
 nginx/config/nginx.conf
 nginx/config/*.conf
+# Рендер envsubst из multi-server-install/nginx/templates/
+multi-server-install/nginx/conf.d/*.conf
 
 # Сгенерированные при деплое (env, creds — см. выше)
 multi-server-install/env/

@@ -1,237 +1,482 @@
-# ================================================================================
-# UnicChat Enterprise - Docker Compose Configuration
-# ================================================================================
-#
-# Порядок запуска сервисов:
-#
-#   1. MongoDB (первым, с healthcheck)
-#       ├─→ 2. Vault (после MongoDB healthy)
-#       ├─→ 2. Logger (после MongoDB healthy)
-#       └─→ 6. MinIO (независимо, параллельно)
-#       
-#
-#   3. AppServer (после MongoDB healthy + Vault started)
-#
-#   5. Tasker (после MongoDB + Vault + AppServer + Logger)
-#
-#   7. DocumentServer + RabbitMQ + PostgreSQL (независимо, параллельно)
-#
-# ================================================================================
-
 services:
-  # ================================================================================
-  # 1. MongoDB - база данных (Replica Set)
-  # ================================================================================
+  # 1. MongoDB - база данных, должна быть готова до других сервисов
   unicchat-mongodb:
     image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
     container_name: unicchat-mongodb
-    restart: on-failure
+    restart: always
+    environment:
+      MONGODB_REPLICA_SET_MODE: ${MONGODB_REPLICA_SET_MODE}
+      MONGODB_REPLICA_SET_NAME: ${MONGODB_REPLICA_SET_NAME}
+      MONGODB_REPLICA_SET_KEY: ${MONGODB_REPLICA_SET_KEY}
+      MONGODB_PORT_NUMBER: ${MONGODB_PORT_NUMBER}
+      # MONGODB_INITIAL_PRIMARY_HOST: ${MONGODB_INITIAL_PRIMARY_HOST}
+      # MONGODB_INITIAL_PRIMARY_PORT_NUMBER: ${MONGODB_INITIAL_PRIMARY_PORT_NUMBER}
+      MONGODB_ADVERTISED_HOSTNAME: ${MONGODB_ADVERTISED_HOSTNAME}
+      MONGODB_ENABLE_JOURNAL: ${MONGODB_ENABLE_JOURNAL}
+      MONGODB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+      MONGODB_USERNAME: ${MONGODB_USERNAME}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD}
+      MONGODB_DATABASE: ${MONGODB_DATABASE}
     volumes:
       - mongodb_data:/bitnami/mongodb
-    env_file:
-      - mongo.env
-      - mongo_creds.env
-    ports:
-      - "27017:27017"
     networks:
       - unicchat-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet || exit 1
+      test: echo 'db.hello().isWritablePrimary || db.hello().ismaster' | mongosh localhost:27017/test --quiet | grep true || exit 1
       interval: 30s
       timeout: 10s
-      retries: 10
+      retries: 3
       start_period: 40s
 
-  # ================================================================================
-  # 2. Vault - хранилище секретов
-  # ================================================================================
+  # 2. Vault - зависит от mongodb
   unicchat-vault:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
     container_name: unicchat-vault
-    ports:
-      - 8200:80
+    restart: always
+    depends_on:
+      unicchat-mongodb:
+        condition: service_healthy
+    command: server
+    environment:
+      MongoCS: "mongodb://${VAULT_DB_USER}:${VAULT_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${VAULT_DB_NAME}?directConnection=true&authSource=${VAULT_DB_NAME}&replicaSet=${MONGODB_REPLICA_SET_NAME}&authMechanism=SCRAM-SHA-256"
+      api.logger.url: http://unicchat-logger:8080/
     volumes:
       - vault-data:/vault/file/
-    environment:
-      - api.logger.url=http://unicchat-logger:8080/
-      - UniCommLicenseData=${UniCommLicenseData:-default_license_data}
-    env_file:
-      - vault_creds.env
-    cap_add:
-      - IPC_LOCK
-    command: server
-    restart: always
     networks:
       - unicchat-network
-    depends_on:
-      unicchat-mongodb:
-        condition: service_healthy
+    cap_add:
+      - IPC_LOCK
 
-  # ================================================================================
-  # 3. AppServer - главное приложение UnicChat
-  # ================================================================================
-  unicchat-appserver:
-    container_name: unicchat-appserver
-    image: cr.yandex/crpst6ndtaf70or2n2bb/unic_chat_appserver:2.3.0
-    restart: on-failure
+  vault-mongo-init:
+    image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
+    container_name: vault-mongo-init
+    restart: "no"
     depends_on:
       unicchat-mongodb:
         condition: service_healthy
+    command:
+      - /bin/bash
+      - -ec
+      - |
+          until mongosh "mongodb://root:$${MONGODB_ROOT_PASSWORD}@unicchat-mongodb:27017/admin?replicaSet=$${MONGODB_REPLICA_SET_NAME}&authSource=admin" \
+            --eval "db.hello().isWritablePrimary || db.hello().ismaster" --quiet | grep true >/dev/null 2>&1
+          do
+            echo "Waiting for MongoDB primary..."
+            sleep 5
+          done
+
+          echo "Checking if Vault user exists..."
+
+          mongosh "mongodb://root:$${MONGODB_ROOT_PASSWORD}@unicchat-mongodb:27017/admin?replicaSet=$${MONGODB_REPLICA_SET_NAME}&authSource=admin" --eval "
+            const dbName = '$${VAULT_DB_NAME}';
+            const userName = '$${VAULT_DB_USER}';
+            const password = '$${VAULT_DB_PASSWORD}';
+
+            const dbx = db.getSiblingDB(dbName);
+
+            if (!dbx.getUser(userName)) {
+              print('User does not exist, creating...');
+
+              dbx.createUser({
+                user: userName,
+                pwd: password,
+                roles: [
+                  { role: 'readWrite', db: dbName }
+                ]
+              });
+
+              print('Vault user created');
+            } else {
+              print('Vault user already exists, skipping');
+            }
+          "
+
+          echo "Checking if Tasker user exists..."
+
+          mongosh "mongodb://root:$${MONGODB_ROOT_PASSWORD}@unicchat-mongodb:27017/admin?replicaSet=$${MONGODB_REPLICA_SET_NAME}&authSource=admin" --eval "
+            const dbName = '$${TASKER_DB_NAME}';
+            const userName = '$${TASKER_DB_USER}';
+            const password = '$${TASKER_DB_PASSWORD}';
+
+            const dbx = db.getSiblingDB(dbName);
+
+            if (!dbx.getUser(userName)) {
+              print('User does not exist, creating...');
+
+              dbx.createUser({
+                user: userName,
+                pwd: password,
+                roles: [
+                  { role: 'readWrite', db: dbName }
+                ]
+              });
+
+              print('Tasker user created');
+            } else {
+              print('Tasker user already exists, skipping');
+            }
+          "
+          echo "Checking if Logger user exists..."
+
+          mongosh "mongodb://root:$${MONGODB_ROOT_PASSWORD}@unicchat-mongodb:27017/admin?replicaSet=$${MONGODB_REPLICA_SET_NAME}&authSource=admin" --eval "
+            const dbName = '$${LOGGER_DB}';
+            const userName = '$${LOGGER_DB_USER}';
+            const password = '$${LOGGER_DB_PASSWORD}';
+
+            const dbx = db.getSiblingDB(dbName);
+
+            if (!dbx.getUser(userName)) {
+              print('User does not exist, creating...');
+
+              dbx.createUser({
+                user: userName,
+                pwd: password,
+                roles: [
+                  { role: 'readWrite', db: dbName }
+                ]
+              });
+
+              print('Logger user created');
+            } else {
+              print('Logger user already exists, skipping');
+            }
+          "
+          echo "Done."
+    environment:
+      VAULT_DB_USER: ${VAULT_DB_USER}
+      VAULT_DB_PASSWORD: ${VAULT_DB_PASSWORD}
+      VAULT_DB_NAME: ${VAULT_DB_NAME}
+      TASKER_DB_USER: ${TASKER_DB_USER}
+      TASKER_DB_PASSWORD: ${TASKER_DB_PASSWORD}
+      TASKER_DB_NAME: ${TASKER_DB_NAME}
+      LOGGER_DB_USER: ${LOGGER_DB_USER}
+      LOGGER_DB_PASSWORD: ${LOGGER_DB_PASSWORD}
+      LOGGER_DB: ${LOGGER_DB}
+      MONGODB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+      MONGODB_REPLICA_SET_NAME: ${MONGODB_REPLICA_SET_NAME}
+    networks:
+      - unicchat-network
+
+  vault-init:
+    image: curlimages/curl:8.8.0
+    container_name: vault-init
+    restart: "no"
+    depends_on:
       unicchat-vault:
         condition: service_started
-    ports:
-      - "8080:3000"
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+          echo "Waiting for Vault..."
+          until VAULT_TOKEN="$$(curl -fsS "$${VAULT_URL}$${VAULT_TOKEN_PATH}?username=$${VAULT_TOKEN_USERNAME}")" && [ -n "$${VAULT_TOKEN}" ]; do
+            sleep 5
+          done
+
+          echo "Vault token received."
+          ATTEMPT=1
+
+          while [ "$${ATTEMPT}" -le "$${VAULT_INIT_RETRIES}" ]; do
+            echo "Checking KBTConfigs secret... attempt $${ATTEMPT}/$${VAULT_INIT_RETRIES}"
+
+            RESPONSE_BODY="$$(mktemp)"
+            HTTP_CODE="$$(curl -sS -o "$${RESPONSE_BODY}" -w "%{http_code}" \
+              -H "Authorization: Bearer $${VAULT_TOKEN}" \
+              "$${VAULT_URL}api/Secrets/KBTConfigs/data" || true)"
+
+            if [ "$${HTTP_CODE}" = "200" ]; then
+              rm -f "$${RESPONSE_BODY}"
+              echo "KBTConfigs secret already exists, skipping."
+              exit 0
+            fi
+
+            rm -f "$${RESPONSE_BODY}"
+            echo "Creating KBTConfigs secret..."
+
+            RESPONSE_BODY="$$(mktemp)"
+            HTTP_CODE="$$(curl -sS -o "$${RESPONSE_BODY}" -w "%{http_code}" -X POST "$${VAULT_URL}api/Secrets" \
+              -H "Authorization: Bearer $${VAULT_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -H "accept: text/plain" \
+              -d "{
+                \"id\": \"KBTConfigs\",
+                \"name\": \"KBTConfigs\",
+                \"type\": \"Password\",
+                \"data\": \"All info in META\",
+                \"metadata\": {
+                  \"MongoCS\": \"mongodb://$${TASKER_DB_USER}:$${TASKER_DB_PASSWORD}@unicchat-mongodb:27017/$${TASKER_DB_NAME}?directConnection=true&authSource=$${TASKER_DB_NAME}&authMechanism=SCRAM-SHA-256&replicaSet=$${MONGODB_REPLICA_SET_NAME}\",
+                  \"MinioHost\": \"$${MINIO_HOST}\",
+                  \"MinioUser\": \"$${MINIO_USER}\",
+                  \"MinioPass\": \"$${MINIO_PASSWORD}\"
+                },
+                \"tags\": [\"KB\", \"Tasker\", \"Mongo\", \"Minio\"],
+                \"expiresAt\": \"2030-12-31T23:59:59.999Z\"
+              }" || true)"
+
+            if [ "$${HTTP_CODE}" -ge 200 ] && [ "$${HTTP_CODE}" -lt 300 ]; then
+              rm -f "$${RESPONSE_BODY}"
+              echo "KBTConfigs secret created."
+              exit 0
+            fi
+
+            echo "Vault is not ready to create KBTConfigs yet. HTTP $${HTTP_CODE}:"
+            cat "$${RESPONSE_BODY}"
+            rm -f "$${RESPONSE_BODY}"
+
+            ATTEMPT="$$(($${ATTEMPT} + 1))"
+            sleep "$${VAULT_INIT_RETRY_DELAY}"
+          done
+
+          echo "Failed to create KBTConfigs secret after $${VAULT_INIT_RETRIES} attempts."
+          exit 1
     environment:
-      - MONGODB_HOST=unicchat-mongodb
-      - MONGODB_PORT=27017
-      - UniCommLicenseData=${UniCommLicenseData:-default_license_data}
-      - VAULT__HOST=http://unicchat-vault:80
-      - REDMINE_BOT_HOST=http://ucredminebot:8080
-    env_file:
-      - appserver.env
-      - appserver_creds.env
+      VAULT_URL: ${API_VAULT_URL}
+      VAULT_TOKEN_PATH: api/token/0f8e160416b94225a73f86ac23b9118b
+      VAULT_TOKEN_USERNAME: KBTservice
+      TASKER_DB_USER: ${TASKER_DB_USER}
+      TASKER_DB_PASSWORD: ${TASKER_DB_PASSWORD}
+      TASKER_DB_NAME: ${TASKER_DB_NAME}
+      MINIO_HOST: unicchat-minio:9000
+      MINIO_USER: ${MINIO_ROOT_USER}
+      MINIO_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MONGODB_REPLICA_SET_NAME: ${MONGODB_REPLICA_SET_NAME}
+      VAULT_INIT_RETRIES: 10
+      VAULT_INIT_RETRY_DELAY: 5
+    networks:
+      - unicchat-network
+
+  # 3. Appserver - зависит от mongodb
+  unicchat-appserver:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/unic_chat_appserver:2.4.3
+    container_name: unicchat-appserver
+    restart: always
+    depends_on:
+      unicchat-mongodb:
+        condition: service_healthy
+    environment:
+      CREATE_TOKENS_FOR_USERS: true
+      MONGODB_HOST: ${MONGODB_HOST}
+      MONGODB_PORT: ${MONGODB_PORT_NUMBER}
+      DB_COLLECTIONS_PREFIX: ${DB_COLLECTIONS_PREFIX}
+      UNIC_SOLID_HOST: ${UNIC_SOLID_HOST}
+      PORT: ${PORT}
+      DEPLOY_METHOD: ${DEPLOY_METHOD}
+      MONGO_URL: mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${MONGODB_DATABASE}?replicaSet=${MONGODB_REPLICA_SET_NAME}
+      MONGO_OPLOG_URL: mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/local
+      ROOT_URL: ${ROOT_URL}
+      DOCUMENT_SERVER_HOST: https://${DOCUMENTSERVER_SERVER_NAME}
+      LICENSE_HOST: ${LICENSE_HOST}
     volumes:
       - chat_data:/app/uploads
     networks:
       - unicchat-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/health', (r) => { let d=''; r.on('data', c => d+=c); r.on('end', () => process.exit(r.statusCode === 200 && d.includes('ok') ? 0 : 1)); }).on('error', () => process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
 
-  # ================================================================================
-  # 4. Logger - сервис логирования
-  # ================================================================================
+  # 4. Logger - зависит от mongodb
   unicchat-logger:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/uniclogger:prod
     container_name: unicchat-logger
-    ports:
-      - '8082:8080'
-    networks:
-      - unicchat-network
-    restart: unless-stopped
-    env_file:
-      - logger.env
-      - logger_creds.env
-    environment:
-      - UniCommLicenseData=${UniCommLicenseData:-default_license_data}
+    restart: always
     depends_on:
       unicchat-mongodb:
         condition: service_healthy
+    environment:
+      MongoCS: "mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@unicchat-mongodb:27017/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}"
+      api.logger.url: ${API_LOGGER_URL}
+    networks:
+      - unicchat-network
 
-  # ================================================================================
-  # 5. Tasker - Knowledge Base и задачи
-  # ================================================================================
+  # 5. Tasker - зависит от mongodb
   unicchat-tasker:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatkbasetasker:prod
     container_name: unicchat-tasker
-    restart: unless-stopped
+    restart: always
     depends_on:
       unicchat-mongodb:
         condition: service_healthy
-      unicchat-vault:
-        condition: service_started
-      unicchat-appserver:
-        condition: service_started
-      unicchat-logger:
-        condition: service_started
-    ports:
-      - 8881:8080
+    # ports:
+    #   - 8881:8080
     environment:
-      - api.vault.url=http://unicchat-vault:80/
-      - api.logger.url=http://unicchat-logger:8080/
-      - UniCommLicenseData=${UniCommLicenseData:-default_license_data}
-
+      api.vault.url: ${API_VAULT_URL}
+      api.logger.url: ${API_LOGGER_URL}
     networks:
       - unicchat-network
 
-  # ================================================================================
+  unicchat-nginx:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/nginx:2.4.1
+    container_name: unicchat-nginx
+    restart: always
+    depends_on:
+      unicchat-appserver:
+        condition: service_healthy
+    environment:
+      ROOT_URL: ${ROOT_URL}
+      APP_SERVER_NAME: ${APP_SERVER_NAME}
+      UNICCHAT_HOST: ${UNICCHAT_HOST}
+      PORT: ${PORT}
+      SSL_CERT: ${SSL_CERT}
+      SSL_KEY: ${SSL_KEY}
+      # SSL_CERTIFICATE_FILE_IN_BASE64: ${SSL_CERTIFICATE_FILE_IN_BASE64}
+      # SSL_CERTIFICATE_KEY_FILE_IN_BASE64: ${SSL_CERTIFICATE_KEY_FILE_IN_BASE64}
+      DOCUMENTSERVER_PROXY_ENABLE: ${DOCUMENTSERVER_PROXY_ENABLE}
+      DOCUMENTSERVER_SERVER_NAME: ${DOCUMENTSERVER_SERVER_NAME}
+      DOCUMENT_SERVER_PROXY: ${DOCUMENT_SERVER_PROXY}
+      DOCUMENTSERVER_SSL_CERT: ${DOCUMENTSERVER_SSL_CERT}
+      DOCUMENTSERVER_SSL_KEY: ${DOCUMENTSERVER_SSL_KEY}
+      MINIO_PROXY_ENABLE: ${MINIO_PROXY_ENABLE}
+      MINIO_SERVER_NAME: ${MINIO_SERVER_NAME}
+      MINIO_HOST: ${MINIO_HOST}
+      MINIO_PORT: ${MINIO_PORT}
+      MINIO_SSL_CERT: ${MINIO_SSL_CERT}
+      MINIO_SSL_KEY: ${MINIO_SSL_KEY}
+    volumes:
+      - ./certs:/certs
+      # Свой каталог шаблонов поверх вендорского:
+      # - default.conf.tpl — заглушка, без неё кастомный jinja2-entrypoint падает
+      # - *.conf.template — три vhost, их рендерит штатный envsubst
+      - ./nginx/templates:/etc/nginx/templates:ro
+      # Отрендеренные конфиги видны и правятся с хоста, применяются через nginx -s reload
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - unicchat-network
+
   # 6. MinIO - S3-совместимое объектное хранилище
-  # ================================================================================
   unicchat-minio:
     image: cr.yandex/crpst6ndtaf70or2n2bb/minio:RELEASE.2024-12-18T13-15-44Z
-    hostname: minio
     container_name: unicchat-minio
+    restart: always
     command: server --console-address ":9002" /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER: ${MINIO_BROWSER}
+      # MINIO_DOMAIN: ${MINIO_DOMAIN}
+    volumes:
+      - minio_data:/data
     ports:
       - "9000:9000"  # S3 API
       - "9002:9002"  # Web Console
-    volumes:
-      - minio_data:/data
-    env_file:
-      - env/minio_env.env
     networks:
       - unicchat-network
-    restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # MinIO Init (создание bucket) выполняется в unicchat.sh после запуска всех сервисов
+  minio-init:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/minio-mc:latest
+    container_name: minio-init
+    restart: "no"
+    depends_on:
+      unicchat-minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+          mc alias set local "http://unicchat-minio:9000" "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+
+          echo "Creating bucket $${MINIO_BUCKET}..."
+          mc mb --ignore-existing "local/$${MINIO_BUCKET}"
+
+          # DocumentServer stores rendered documents here and reads them anonymously
+          echo "Creating bucket $${MINIO_DOCS_BUCKET}..."
+          mc mb --ignore-existing "local/$${MINIO_DOCS_BUCKET}"
+          mc anonymous set public "local/$${MINIO_DOCS_BUCKET}"
+
+          echo "Done."
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-unicchat-files}
+      MINIO_DOCS_BUCKET: ${MINIO_DOCS_BUCKET:-uc.onlyoffice.docs}
+    networks:
+      - unicchat-network
 
   # ================================================================================
-  # 7. DocumentServer - OnlyOffice Document Server
+  # 7. DocumentServer - Document Server
   # ================================================================================
   unicchat-documentserver:
     image: cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
     container_name: unicchat-documentserver
+    restart: always
     depends_on:
       - unicchat-postgresql
       - unicchat-rabbitmq
-    env_file:
-      - env/documentserver_env.env
-    ports:
-      - '8880:80'
-      - '8443:443'
-    stdin_open: true
-    restart: always
-    stop_grace_period: 60s
-    networks:
-      - unicchat-network
+    environment:
+      ALLOW_META_IP_ADDRESS: true
+      JWT_ENABLED: ${JWT_ENABLED}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_HEADER: ${JWT_HEADER}
+      DB_TYPE: ${DB_TYPE}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      AMQP_URI: ${AMQP_URI}
+      ALLOW_PRIVATE_IP_ADDRESS: ${ALLOW_PRIVATE_IP_ADDRESS}
     volumes:
       - documentserver_data:/var/www/uniceditor/Data
       - documentserver_log:/var/log/uniceditor
       - documentserver_cache:/var/lib/uniceditor/documentserver/App_Data/cache/files
       - documentserver_files:/var/www/uniceditor/documentserver-example/public/files
-      - /usr/share/fonts
+      - documentserver_fonts:/usr/share/fonts
+    networks:
+      - unicchat-network
+    stdin_open: true
+    stop_grace_period: 60s
 
   # ================================================================================
   # 7.1. RabbitMQ - для DocumentServer
   # ================================================================================
   unicchat-rabbitmq:
-    container_name: unicchat-rabbitmq
     image: cr.yandex/crpst6ndtaf70or2n2bb/rabbitmq:latest
+    container_name: unicchat-rabbitmq
     restart: always
+    expose:
+      - "5672"
     networks:
       - unicchat-network
-    expose:
-      - '5672'
 
   # ================================================================================
   # 7.2. PostgreSQL - для DocumentServer
   # ================================================================================
   unicchat-postgresql:
-    container_name: unicchat-postgresql
     image: cr.yandex/crpst6ndtaf70or2n2bb/postgres:12
-    environment:
-      - POSTGRES_DB=dbname
-      - POSTGRES_USER=dbuser
-      - POSTGRES_HOST_AUTH_METHOD=trust
+    container_name: unicchat-postgresql
     restart: always
-    networks:
-      - unicchat-network
-    expose:
-      - '5432'
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - postgresql_data:/var/lib/postgresql
+    expose:
+      - "5432"
+    networks:
+      - unicchat-network
 
-# ================================================================================
-# Volumes
-# ================================================================================
+networks:
+  unicchat-network:
+    name: unicchat-network
+
 volumes:
   mongodb_data:
     driver: local
-  vault-data:
-    driver: local
   chat_data:
+    driver: local
+  vault-data:
     driver: local
   minio_data:
     driver: local
@@ -243,12 +488,7 @@ volumes:
     driver: local
   documentserver_files:
     driver: local
+  documentserver_fonts:
+    driver: local
   postgresql_data:
     driver: local
-
-# ================================================================================
-# Network
-# ================================================================================
-networks:
-  unicchat-network:
-    external: true
