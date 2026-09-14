@@ -105,7 +105,7 @@ ___
 <!-- TOC --><a name="--variants"></a>
 ### Варианты состава стека (A–D)
 
-Шаг 2 по умолчанию — **вариант A** (всё в одном `docker-compose.yml`). Варианты B–D не требуют править основной compose: к нему подключаются override-файлы из `multi-server-install/`. Состав и границы отказа лучше держать в файлах, а не в устных договорённостях ([Infrastructure as Code, Morris, Chapter 3]; [SRE Book, Google, Chapter 6]).
+Шаг 2 по умолчанию — **вариант A** (всё в одном `docker-compose.yml`). Варианты B–D не требуют править основной compose: к нему подключаются override-файлы из `multi-server-install/`.
 
 <!-- TOC --><a name="-a-unified"></a>
 #### A. Единый compose
@@ -331,10 +331,6 @@ git clone https://github.com/unicommorg/unicchat.enterprise.git
 | Исходящий **80/tcp и 443/tcp** на Let's Encrypt (`acme-v02.api.letsencrypt.org`) | Выпуск и продление сертификатов |
 | Исходящий **443/tcp** на `push1.unic.chat` | Лицензия и push |
 
-**Реестр образов**
-
-Нужен `docker login` в `cr.yandex` с oauth-токеном (команда в п. 2.3). Токен даёт **pull** образов UnicChat. Push в registry для установки не нужен. Если login проходит, а `pull` отвечает `denied` — токену не хватает прав на репозитории `crps*` / `crpi*` / `crpst*`.
-
 **Лицензия**
 
 Действующая лицензия UnicChat Solid Core от Unicomm (п. 1.2). Без неё контейнеры поднимутся, продукт — нет.
@@ -376,8 +372,6 @@ docker login --username oauth \
   cr.yandex <<< "y0__wgBEPrL67wHGMHdEyD7rJmMGCeDEOXSuqJalbFdb2Dgucs0mlmU"
 ```
 
-Проверка: `docker pull` любого образа из `cr.yandex/crpst6ndtaf70or2n2bb/` не должен спрашивать пароль повторно.
-
 <!-- TOC --><a name="24-env"></a>
 ### 2.4 Файл `.env`
 
@@ -386,12 +380,12 @@ cd unicchat.enterprise/multi-server-install
 cp .env.example .env
 ```
 
-Значения `change_me_*` из `.env.example` — **не для продакшена**. Перед запуском сгенерируйте свои пароли (п. ниже) и подставьте их в `.env`. Файл в git не коммитится.
+Значения `change_me_*` из `.env.example` замените своими паролями (п. ниже) и подставьте их в `.env`.
 
 <!-- TOC --><a name="24-secrets"></a>
 #### Свои секреты и учётные данные
 
-Каждый контур заказчика живёт на **своих** паролях, ключах и именах служебных пользователей. Не копируйте значения из документации, с соседнего стенда и из `.env.example` ([SRE Book, Google, Chapter 6 — credentials are part of the failure domain; do not share them across environments]).
+Задайте **свои** пароли и имена служебных пользователей. Не оставляйте значения из `.env.example` и не используйте одни и те же пароли на разных площадках.
 
 Обязательно замените:
 
@@ -439,8 +433,6 @@ echo "MINIO_ROOT_PASSWORD=$(gen)"
 - `MINIO_HOST` / `MINIO_PORT` — upstream встроенного nginx, не путать с `KBT_MINIO_HOST`.
 
 Секрет `KBTConfigs` создаёт `vault-init` **один раз**. Если секрет уже есть, смена `KBT_MINIO_HOST` / `KBT_MONGO_HOST` в `.env` его не перезапишет — обновите секрет в Vault вручную или удалите и перезапустите `vault-init`.
-
-Файл `.env` в git не коммитится.
 
 <!-- TOC --><a name="25-certbot"></a>
 ### 2.5 SSL-сертификаты (Certbot)
