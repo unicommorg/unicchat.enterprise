@@ -1,29 +1,24 @@
-# Один docker-compose.yml на все варианты установки.
-# По умолчанию поднимайте всё: docker compose up -d --wait
+# Один docker-compose.yml.
+# На одном сервере: docker compose up -d --wait
 #
-# Блоки (какие сервисы можно вынести — README §2.10–2.12):
+# На отдельных серверах — тот же файл, запускайте только свои сервисы
+# (docker compose up -d --no-deps <сервисы>). Порты раскомментируйте
+# там, где сервис должен быть доступен с других машин.
 #
-#   Ядро (хост приложения):
-#     unicchat-mongodb, vault-mongo-init, unicchat-vault, vault-init,
-#     unicchat-appserver, unicchat-logger
+#   MongoDB:        unicchat-mongodb, vault-mongo-init
+#   Vault:          unicchat-vault, vault-init, unicchat-logger
+#   MinIO:          unicchat-minio, minio-init
+#   Tasker:         unicchat-tasker
+#   Knowledgebase:  unicchat-documentserver, unicchat-postgresql, unicchat-rabbitmq
+#   AppServer:      unicchat-appserver, unicchat-nginx
 #
-#   Reverse proxy (можно заменить nginx+certbot на хосте или другой VM):
-#     unicchat-nginx
-#     Не запускайте этот сервис, если 80/443 занимает ваш nginx.
-#     Тогда раскомментируйте ports у appserver (3000) и documentserver (8081).
-#
-#   База знаний и файлы (можно целиком на отдельный хост):
-#     unicchat-tasker, unicchat-minio, minio-init,
-#     unicchat-documentserver, unicchat-postgresql, unicchat-rabbitmq
-#     На хосте приложения эти сервисы не запускайте.
-#     На втором хосте — тот же файл, запускайте только этот блок
-#     (у tasker: docker compose up -d --no-deps ..., иначе compose
-#     потянет mongodb с ядра). Раскомментируйте ports у mongodb/vault/logger
-#     на хосте приложения и у tasker/documentserver на хосте KB.
-#     В .env: UNIC_SOLID_HOST, API_VAULT_URL, API_LOGGER_URL, KBT_*.
+# Адреса между серверами — в .env (MONGODB_HOST, UNIC_SOLID_HOST,
+# API_VAULT_URL, API_LOGGER_URL, KBT_MONGO_HOST, KBT_MINIO_HOST,
+# DOCUMENT_SERVER_PROXY, MINIO_HOST). Секрет Vault KBTConfigs —
+# см. README шаг 2a.
 
 services:
-  # --- Ядро: MongoDB (остаётся на хосте приложения) ---
+  # --- MongoDB ---
   unicchat-mongodb:
     image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
     container_name: unicchat-mongodb
@@ -51,11 +46,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    # Вариант C: tasker на другом хосте — раскомментируйте
+    # На отдельных серверах — раскомментируйте
     # ports:
     #   - "27017:27017"
 
-  # --- Ядро: Vault ---
+  # --- Vault ---
   unicchat-vault:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
     container_name: unicchat-vault
@@ -73,7 +68,7 @@ services:
       - unicchat-network
     cap_add:
       - IPC_LOCK
-    # Вариант C: tasker на другом хосте — раскомментируйте
+    # На отдельных серверах — раскомментируйте
     # ports:
     #   - "8200:80"
 
@@ -277,7 +272,7 @@ services:
     networks:
       - unicchat-network
 
-  # --- Ядро: AppServer ---
+  # --- AppServer ---
   unicchat-appserver:
     image: cr.yandex/crpst6ndtaf70or2n2bb/unic_chat_appserver:2.4.3
     container_name: unicchat-appserver
@@ -308,11 +303,11 @@ services:
       timeout: 5s
       retries: 10
       start_period: 90s
-    # Вариант B: nginx снаружи — раскомментируйте
+    # Внешний nginx / отдельные серверы — раскомментируйте
     # ports:
     #   - "3000:3000"
 
-  # --- Ядро: Logger ---
+  # --- Logger (обычно с Vault) ---
   unicchat-logger:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/uniclogger:prod
     container_name: unicchat-logger
@@ -321,15 +316,15 @@ services:
       unicchat-mongodb:
         condition: service_healthy
     environment:
-      MongoCS: "mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@unicchat-mongodb:27017/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}"
+      MongoCS: "mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}"
       api.logger.url: ${API_LOGGER_URL}
     networks:
       - unicchat-network
-    # Вариант C: tasker на другом хосте — раскомментируйте
+    # На отдельных серверах — раскомментируйте
     # ports:
     #   - "8080:8080"
 
-  # --- База знаний: Tasker (можно вынести вместе с MinIO и DocumentServer) ---
+  # --- Tasker ---
   unicchat-tasker:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatkbasetasker:prod
     container_name: unicchat-tasker
@@ -337,8 +332,8 @@ services:
     depends_on:
       unicchat-mongodb:
         condition: service_healthy
-    # Вариант C на хосте KB: раскомментируйте порт, depends_on не нужен
-    # (запуск: docker compose up -d --no-deps unicchat-tasker ...)
+    # На сервере Tasker — раскомментируйте порт
+    # (запуск: docker compose up -d --no-deps unicchat-tasker)
     # ports:
     #   - "8080:8080"
     environment:
@@ -347,7 +342,7 @@ services:
     networks:
       - unicchat-network
 
-  # --- Reverse proxy: можно не запускать, если nginx+certbot снаружи ---
+  # --- Nginx (с AppServer; можно заменить своим nginx) ---
   unicchat-nginx:
     image: cr.yandex/crpst6ndtaf70or2n2bb/nginx:2.4.1
     container_name: unicchat-nginx
@@ -389,7 +384,7 @@ services:
     networks:
       - unicchat-network
 
-  # --- База знаний / файлы: MinIO (можно вынести вместе с tasker и DocumentServer) ---
+  # --- MinIO ---
   unicchat-minio:
     image: cr.yandex/crpst6ndtaf70or2n2bb/minio:RELEASE.2024-12-18T13-15-44Z
     container_name: unicchat-minio
@@ -444,7 +439,7 @@ services:
     networks:
       - unicchat-network
 
-  # --- База знаний / файлы: DocumentServer (рекомендуется вместе с MinIO) ---
+  # --- Knowledgebase: DocumentServer ---
   unicchat-documentserver:
     image: cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
     container_name: unicchat-documentserver
@@ -474,7 +469,7 @@ services:
       - unicchat-network
     stdin_open: true
     stop_grace_period: 60s
-    # Вариант B: nginx снаружи — раскомментируйте
+    # Внешний nginx / отдельные серверы — раскомментируйте
     # ports:
     #   - "8081:80"
 
