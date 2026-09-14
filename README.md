@@ -49,6 +49,7 @@
       + [Входящие соединения на сервере UnicChat](#-unicchat-2)
       + [Исходящие соединения](#--15)
 - [Шаг 2a. Установка на отдельных серверах](#-2a-multi)
+   * [Что такое роль](#-2a-role)
    * [Состав серверов](#-2a-map)
    * [Файлы ролей и теги образов](#-2a-roles)
    * [Общий `.env` и адреса](#-2a-env)
@@ -286,7 +287,7 @@ git clone https://github.com/unicommorg/unicchat.enterprise.git
 
 Состав: MongoDB, Vault, Logger, AppServer, Tasker, nginx, MinIO, DocumentServer (+ PostgreSQL и RabbitMQ), init-контейнеры `vault-mongo-init`, `vault-init`, `minio-init`.
 
-Разнесение по серверам — [шаг 2a](#-2a-multi): основной compose + `compose.<роль>.yml` (без дублирования тегов образов).
+Разнесение по серверам — [шаг 2a](#-2a-multi): на каждом сервере свой `compose.<роль>.yml`.
 
 Перед установкой нужна действующая лицензия UnicChat Solid Core (раздел 1.2). Без неё система не заработает корректно.
 
@@ -580,6 +581,13 @@ sudo ufw status
 
 На каждом сервере: Docker, `docker login` в `cr.yandex`, каталог `multi-server-install/`, общий `.env` (пароли одинаковые, адреса — IP соседей).
 
+<!-- TOC --><a name="-2a-role"></a>
+### Что такое роль
+
+**Роль** — это один физический (или виртуальный) сервер и набор контейнеров, которые на нём запускаются. Имя роли совпадает с именем файла: роль MongoDB — файл `compose.mongodb.yml`, роль Vault — `compose.vault.yml` и так далее. Это не отдельный продукт и не пользователь в системе, а способ разнести стек из эталона по машинам.
+
+Связи между серверами задаются IP в `.env`. Кто к кому обращается — на схеме выше (раздел «Установка на отдельных серверах»).
+
 <!-- TOC --><a name="-2a-map"></a>
 ### Состав серверов
 
@@ -596,7 +604,7 @@ sudo ufw status
 
 Пример IP:
 
-| Роль | IP |
+| Сервер (роль) | IP |
 |------|-----|
 | MongoDB | `10.0.10.11` |
 | Vault | `10.0.10.12` |
@@ -604,8 +612,6 @@ sudo ufw status
 | Tasker | `10.0.10.14` |
 | Knowledgebase | `10.0.10.15` |
 | AppServer | `10.0.10.16` |
-
-Между серверами (не в интернет): MongoDB ← Vault, Tasker, AppServer; Vault/Logger ← Tasker; MinIO ← Tasker, Knowledgebase, nginx; Tasker ← AppServer; DocumentServer ← nginx.
 
 <!-- TOC --><a name="-2a-roles"></a>
 ### Файлы ролей и теги образов
