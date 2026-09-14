@@ -1,0 +1,21 @@
+# Роль Vault (+ Logger). Образы — только в docker-compose.yml.
+#
+#   docker compose -f docker-compose.yml -f compose.vault.yml up -d \
+#     unicchat-logger unicchat-vault vault-init
+#
+# depends_on на MongoDB сбрасываем: MongoDB на другом сервере.
+# В .env: MONGODB_HOST=<ip-mongodb>, KBT_MONGO_HOST, KBT_MINIO_HOST.
+
+services:
+  unicchat-vault:
+    depends_on: !reset
+    ports:
+      - "8200:80"
+
+  unicchat-logger:
+    depends_on: !reset
+    ports:
+      - "8080:8080"
+
+  vault-init:
+    depends_on: !reset

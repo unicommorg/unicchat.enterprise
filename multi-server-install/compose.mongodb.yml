@@ -1,0 +1,11 @@
+# Роль MongoDB. Образы не дублируем — берутся из docker-compose.yml.
+#
+#   docker compose -f docker-compose.yml -f compose.mongodb.yml up -d \
+#     unicchat-mongodb vault-mongo-init
+#
+# Без списка сервисов compose поднимет весь стек из docker-compose.yml.
+
+services:
+  unicchat-mongodb:
+    ports:
+      - "27017:27017"

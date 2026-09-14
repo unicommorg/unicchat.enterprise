@@ -50,7 +50,7 @@
       + [Исходящие соединения](#--15)
 - [Шаг 2a. Установка на отдельных серверах](#-2a-multi)
    * [Состав серверов](#-2a-map)
-   * [Как вырезать compose](#-2a-cut)
+   * [Файлы ролей и теги образов](#-2a-roles)
    * [Общий `.env` и адреса](#-2a-env)
    * [Порядок запуска](#-2a-order)
    * [Секрет Vault KBTConfigs](#-2a-vault)
@@ -111,21 +111,19 @@ cd multi-server-install
 docker compose up -d --wait
 ```
 
-Отдельные YAML на каждый сервис не готовим. Если нужно разнести по машинам — берёте этот же `docker-compose.yml`, **вырезаете** из него лишние сервисы и оставляете на каждом сервере только свою часть (шаг 2a).
+Отдельные полные YAML с копиями `image:` не ведём. На разных серверах подключаете тонкий файл роли через `-f` — теги образов Compose берёт из основного `docker-compose.yml` (шаг 2a).
 
 <!-- TOC --><a name="-multi-host"></a>
 ### Установка на отдельных серверах
 
-Идея: один эталонный `docker-compose.yml`. На каждый сервер копируете каталог `multi-server-install/` (или только compose + `.env` + нужные каталоги вроде `nginx/`, `certs/`) и **удаляете из compose сервисы, которые на этой машине не нужны**. Остаётся короткий compose — его и поднимаете.
-
-| Сервер | Что оставить в compose |
-|--------|-------------------------|
-| MongoDB | `unicchat-mongodb`, `vault-mongo-init` |
-| Vault | `unicchat-vault`, `vault-init`, `unicchat-logger` |
-| MinIO | `unicchat-minio`, `minio-init` |
-| Tasker | `unicchat-tasker` |
-| Knowledgebase | `unicchat-documentserver`, `unicchat-postgresql`, `unicchat-rabbitmq` |
-| AppServer | `unicchat-appserver`, `unicchat-nginx` |
+| Сервер | Команда (образы из `docker-compose.yml`) |
+|--------|------------------------------------------|
+| MongoDB | `-f docker-compose.yml -f compose.mongodb.yml` + сервисы mongodb |
+| Vault | `-f … -f compose.vault.yml` |
+| MinIO | `-f … -f compose.minio.yml` |
+| Tasker | `-f … -f compose.tasker.yml` |
+| Knowledgebase | `-f … -f compose.knowledgebase.yml` |
+| AppServer | `-f … -f compose.appserver.yml` |
 
 ```mermaid
 flowchart LR
@@ -288,7 +286,7 @@ git clone https://github.com/unicommorg/unicchat.enterprise.git
 
 Состав: MongoDB, Vault, Logger, AppServer, Tasker, nginx, MinIO, DocumentServer (+ PostgreSQL и RabbitMQ), init-контейнеры `vault-mongo-init`, `vault-init`, `minio-init`.
 
-Разнесение по отдельным серверам — [шаг 2a](#-2a-multi): вырезаете части compose и переносите их на разные машины.
+Разнесение по серверам — [шаг 2a](#-2a-multi): основной compose + `compose.<роль>.yml` (без дублирования тегов образов).
 
 Перед установкой нужна действующая лицензия UnicChat Solid Core (раздел 1.2). Без неё система не заработает корректно.
 
@@ -576,35 +574,27 @@ sudo ufw status
 <!-- TOC --><a name="-2a-multi"></a>
 ## Шаг 2a. Установка на отдельных серверах
 
-В репозитории лежит **один** полный `multi-server-install/docker-compose.yml` — эталон для установки на одном сервере (шаг 2).
+В репозитории один полный [`docker-compose.yml`](multi-server-install/docker-compose.yml) — в нём все сервисы и **все теги образов** (`image:`).
 
-Если сервисы нужны на разных машинах, вы сами:
+На разных серверах не копируем образы в другие файлы и не вырезаем сервисы руками. Берёте тот же `docker-compose.yml` и подключаете тонкий файл роли через `-f`. В файле роли — только порты и сброс `depends_on` (MongoDB/Vault на другой машине). Поле `image:` в ролевых файлах **не пишем**: Compose при слиянии берёт тег из основного файла. Обновили версию образа в одном месте — на всех ролях она та же.
 
-1. Копируете `multi-server-install/` на каждый сервер (или копируете `docker-compose.yml`, `.env` и то, что нужно сервису: для AppServer — `nginx/`, `certs/`).
-2. В `docker-compose.yml` на этой машине **удаляете** (вырезаете) все сервисы и volumes, которые сюда не относятся. Оставляете только свою роль.
-3. Убираете `depends_on` на сервисы, которых в этом файле уже нет.
-4. Прописываете в `.env` IP соседних серверов вместо имён контейнеров.
-5. Открываете порты между серверами и запускаете `docker compose up -d`.
-
-Отдельные готовые YAML на каждую роль мы не поставляем — правите compose локально под свою схему.
-
-На всех серверах: Docker, `docker login` в `cr.yandex`, одинаковые пароли в `.env`.
+На каждом сервере: Docker, `docker login` в `cr.yandex`, каталог `multi-server-install/`, общий `.env` (пароли одинаковые, адреса — IP соседей).
 
 <!-- TOC --><a name="-2a-map"></a>
 ### Состав серверов
 
-| Сервер | Что оставить в `docker-compose.yml` | Что обычно опубликовать |
-|--------|--------------------------------------|-------------------------|
-| **MongoDB** | `unicchat-mongodb`, `vault-mongo-init` + volume `mongodb_data` | `27017` |
-| **Vault** | `unicchat-vault`, `vault-init`, `unicchat-logger` + volume `vault-data` | Vault `8200:80`, Logger `8080` |
-| **MinIO** | `unicchat-minio`, `minio-init` + volume `minio_data` | `9000`, при необходимости `9002` |
-| **Tasker** | `unicchat-tasker` | `8080` |
-| **Knowledgebase** | `unicchat-documentserver`, `unicchat-postgresql`, `unicchat-rabbitmq` + их volumes | DocumentServer `8081:80` |
-| **AppServer** | `unicchat-appserver`, `unicchat-nginx` + volume `chat_data`, каталоги `nginx/`, `certs/` | `80`, `443` |
+| Сервер | Файл роли | Какие сервисы указать в `up -d` |
+|--------|-----------|--------------------------------|
+| **MongoDB** | `compose.mongodb.yml` | `unicchat-mongodb` `vault-mongo-init` |
+| **Vault** | `compose.vault.yml` | `unicchat-logger` `unicchat-vault` `vault-init` |
+| **MinIO** | `compose.minio.yml` | `unicchat-minio` `minio-init` |
+| **Tasker** | `compose.tasker.yml` | `unicchat-tasker` |
+| **Knowledgebase** | `compose.knowledgebase.yml` | `unicchat-postgresql` `unicchat-rabbitmq` `unicchat-documentserver` |
+| **AppServer** | `compose.appserver.yml` | `unicchat-appserver` `unicchat-nginx` |
 
-Секции `networks:` и `unicchat-network` оставьте на каждом сервере. Из `volumes:` удалите тома сервисов, которых в файле больше нет.
+Список сервисов в команде **обязателен**. Без него `docker compose up -d` поднимет весь стек из основного файла.
 
-Пример IP (подставьте свои):
+Пример IP:
 
 | Роль | IP |
 |------|-----|
@@ -617,45 +607,33 @@ sudo ufw status
 
 Между серверами (не в интернет): MongoDB ← Vault, Tasker, AppServer; Vault/Logger ← Tasker; MinIO ← Tasker, Knowledgebase, nginx; Tasker ← AppServer; DocumentServer ← nginx.
 
-<!-- TOC --><a name="-2a-cut"></a>
-### Как вырезать compose
+<!-- TOC --><a name="-2a-roles"></a>
+### Файлы ролей и теги образов
 
-Пример для сервера **MongoDB**: в `docker-compose.yml` остаются только `unicchat-mongodb` и `vault-mongo-init`, сеть и volume `mongodb_data`. Остальное удаляете. У `unicchat-mongodb` публикуете порт:
-
-```yaml
-    ports:
-      - "27017:27017"
-```
-
-Пример для сервера **Tasker**: в файле только `unicchat-tasker` (без `depends_on` на MongoDB — его на этой машине нет). Порт:
-
-```yaml
-    ports:
-      - "8080:8080"
-```
-
-Пример для сервера **Knowledgebase**: оставляете `unicchat-postgresql`, `unicchat-rabbitmq`, `unicchat-documentserver`. У DocumentServer публикуете, например:
-
-```yaml
-    ports:
-      - "8081:80"
-```
-
-Аналогично для Vault (порты Vault и Logger), MinIO (`9000`), AppServer (nginx `80`/`443`). Подсказки по портам уже есть в комментариях эталонного compose.
-
-Перед запуском проверьте файл:
+Пример запуска MongoDB:
 
 ```shell
 cd multi-server-install
-docker compose config
+docker compose -f docker-compose.yml -f compose.mongodb.yml pull \
+  unicchat-mongodb vault-mongo-init
+docker compose -f docker-compose.yml -f compose.mongodb.yml up -d \
+  unicchat-mongodb vault-mongo-init
 ```
 
-Ошибки вида «service … not found» / «depends_on» — значит, ссылка на удалённый сервис осталась; уберите её.
+Проверка, что образ взялся из основного файла, а порт — из роли:
+
+```shell
+docker compose -f docker-compose.yml -f compose.mongodb.yml config | grep -A3 'unicchat-mongodb:'
+```
+
+В `compose.*.yml` не должно быть строк `image:`. Меняете тег только в `docker-compose.yml`.
+
+Если нужен полностью свой урезанный compose без `-f` — можно вырезать сервисы вручную, но тогда теги придётся поддерживать самим; предпочтителен способ с `-f`.
 
 <!-- TOC --><a name="-2a-env"></a>
 ### Общий `.env` и адреса
 
-Пароли в `.env` на всех серверах **одинаковые**. Имена контейнеров (`unicchat-mongodb`, `unicchat-tasker`, …) между машинами не резолвятся — подставьте IP:
+Пароли на всех серверах одинаковые. Вместо имён контейнеров — IP:
 
 ```
 MONGODB_HOST=10.0.10.11
@@ -671,43 +649,42 @@ UNICCHAT_HOST=unicchat-appserver
 ROOT_URL=https://<APP_SERVER_NAME>
 ```
 
-На AppServer для встроенного nginx `DOCUMENT_SERVER_PROXY` и `MINIO_HOST` — IP Knowledgebase и MinIO. Если nginx у вас снаружи — примеры в `multi-server-install/nginx/examples/host/`.
+На AppServer для nginx `DOCUMENT_SERVER_PROXY` и `MINIO_HOST` — IP Knowledgebase и MinIO.
 
 <!-- TOC --><a name="-2a-order"></a>
 ### Порядок запуска
 
-На каждом сервере после вырезания compose:
+На каждом сервере из `multi-server-install/` (подставьте свой `compose.<роль>.yml` и список сервисов из таблицы выше):
 
 ```shell
-cd multi-server-install
-docker compose pull
-docker compose up -d
+docker compose -f docker-compose.yml -f compose.<роль>.yml pull <сервисы…>
+docker compose -f docker-compose.yml -f compose.<роль>.yml up -d <сервисы…>
 ```
 
-Рекомендуемый порядок серверов:
+Порядок серверов:
 
-1. **MongoDB** — дождаться healthy, убедиться что `vault-mongo-init` отработал (`docker compose logs vault-mongo-init`).
-2. **Vault** — поднять logger и vault, затем `vault-init` (`KBTConfigs secret created.`). В `.env` к этому моменту уже должны быть IP в `KBT_MONGO_HOST` и `KBT_MINIO_HOST`.
-3. **MinIO** — затем `minio-init` (бакеты).
+1. **MongoDB** — дождаться healthy, логи `vault-mongo-init`.
+2. **Vault** — logger, vault, затем `vault-init` (`KBTConfigs secret created.`). В `.env` уже IP в `KBT_*`.
+3. **MinIO** — затем `minio-init`.
 4. **Tasker**.
-5. **Knowledgebase** — сначала PostgreSQL и RabbitMQ, потом DocumentServer.
-6. **AppServer** — appserver и nginx (сертификаты как в п. 2.5–2.6, либо свой nginx).
+5. **Knowledgebase** — PostgreSQL и RabbitMQ, потом DocumentServer.
+6. **AppServer** — appserver и nginx (сертификаты как в п. 2.5–2.6).
 
-Проверка — как в п. 2.8.
+Проверка — п. 2.8.
 
 <!-- TOC --><a name="-2a-vault"></a>
 ### Секрет Vault KBTConfigs
 
-Tasker читает из Vault секрет `KBTConfigs` (`MongoCS`, `MinioHost`, `MinioUser`, `MinioPass`). Его создаёт `vault-init` **один раз** и больше не меняет.
+Tasker читает секрет `KBTConfigs` из Vault. Его создаёт `vault-init` один раз.
 
-До первого `vault-init` в `.env` на сервере Vault:
+До первого `vault-init`:
 
 ```
 KBT_MONGO_HOST=10.0.10.11
 KBT_MINIO_HOST=10.0.10.13:9000
 ```
 
-Посмотреть секрет (на сервере Vault, в сети `unicchat-network`):
+Посмотреть (на сервере Vault):
 
 ```shell
 TOKEN=$(docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
@@ -718,7 +695,7 @@ docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
   "http://unicchat-vault/api/Secrets/KBTConfigs/data"
 ```
 
-Пересоздать, если адреса были неверные или сервисы перенесли:
+Пересоздать:
 
 ```shell
 set -a && . ./.env && set +a
@@ -729,20 +706,18 @@ docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
   -sS -X DELETE -H "Authorization: Bearer ${TOKEN}" \
   "http://unicchat-vault/api/Secrets/KBTConfigs"
 
-docker compose up --force-recreate vault-init
-docker compose logs vault-init
+docker compose -f docker-compose.yml -f compose.vault.yml up --force-recreate vault-init
+docker compose -f docker-compose.yml -f compose.vault.yml logs vault-init
 ```
 
-На сервере Tasker: `docker compose restart unicchat-tasker`.
-
-Если DELETE вернул 404 — секрета нет, достаточно `vault-init`. Правка только `.env` без пересоздания секрета не меняет то, что уже записано в Vault.
+На Tasker: `docker compose -f docker-compose.yml -f compose.tasker.yml restart unicchat-tasker`.
 
 <!-- TOC --><a name="-2a-nginx"></a>
 ### Nginx и сертификаты
 
-По умолчанию TLS — контейнер `unicchat-nginx` в вырезанном compose на сервере AppServer; сертификаты как в п. 2.5–2.6. В `.env` upstream’ы MinIO и DocumentServer — IP соответствующих серверов.
+TLS по умолчанию — `unicchat-nginx` на AppServer (п. 2.5–2.6). Upstream MinIO и DocumentServer — IP из `.env`.
 
-Если nginx и certbot уже стоят отдельно: не включайте `unicchat-nginx` в compose AppServer, опубликуйте порт appserver `3000` и documentserver `8081`, используйте конфиги из `multi-server-install/nginx/examples/host/`.
+Свой nginx: не запускайте `unicchat-nginx`, опубликуйте appserver `:3000` и documentserver `:8081`, конфиги — `multi-server-install/nginx/examples/host/`.
 
 <!-- TOC --><a name="-3-"></a>
 ## Шаг 3. Установка локального медиа сервера для ВКС

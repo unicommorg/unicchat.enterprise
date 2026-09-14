@@ -1,0 +1,10 @@
+# Роль MinIO. Образы — только в docker-compose.yml.
+# Порты 9000/9002 уже в docker-compose.yml; файл нужен для явного запуска роли.
+#
+#   docker compose -f docker-compose.yml -f compose.minio.yml up -d \
+#     unicchat-minio minio-init
+
+services:
+  unicchat-minio: {}
+  minio-init:
+    depends_on: !reset

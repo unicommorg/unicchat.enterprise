@@ -1,0 +1,14 @@
+# Роль AppServer (+ nginx). Образы — только в docker-compose.yml.
+#
+#   docker compose -f docker-compose.yml -f compose.appserver.yml up -d \
+#     unicchat-appserver unicchat-nginx
+#
+# В .env: MONGODB_HOST, UNIC_SOLID_HOST, DOCUMENT_SERVER_PROXY, MINIO_HOST — IP соседей.
+# Нужны каталоги nginx/ и certs/ (как в шаге 2).
+
+services:
+  unicchat-appserver:
+    depends_on: !reset
+
+  unicchat-nginx:
+    depends_on: !reset

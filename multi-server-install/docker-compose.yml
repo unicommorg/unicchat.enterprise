@@ -1,19 +1,16 @@
-# Один docker-compose.yml — эталон для установки на одном сервере:
+# Один docker-compose.yml — эталон для одного сервера:
 #   docker compose up -d --wait
 #
-# На отдельных серверах: скопируйте этот файл на машину и УДАЛИТЕ
-# (вырежьте) сервисы, которые сюда не относятся. Оставьте только свою роль.
-# Уберите depends_on на отсутствующие сервисы, откройте ports, в .env
-# укажите IP соседних серверов. Затем: docker compose up -d
+# На отдельных серверах — тот же файл + тонкий compose.<роль>.yml (порты,
+# сброс depends_on). Теги образов (image:) только здесь, в ролевых файлах
+# их нет — Compose подмешивает при:
+#   docker compose -f docker-compose.yml -f compose.mongodb.yml up -d \
+#     unicchat-mongodb vault-mongo-init
 #
-#   MongoDB:        unicchat-mongodb, vault-mongo-init
-#   Vault:          unicchat-vault, vault-init, unicchat-logger
-#   MinIO:          unicchat-minio, minio-init
-#   Tasker:         unicchat-tasker
-#   Knowledgebase:  unicchat-documentserver, unicchat-postgresql, unicchat-rabbitmq
-#   AppServer:      unicchat-appserver, unicchat-nginx
+# Роли: compose.mongodb.yml | compose.vault.yml | compose.minio.yml
+#        compose.tasker.yml | compose.knowledgebase.yml | compose.appserver.yml
 #
-# Адреса между серверами — в .env. Секрет Vault KBTConfigs — README шаг 2a.
+# Адреса между серверами — в .env. Подробности: README шаг 2a.
 
 services:
   # --- MongoDB ---

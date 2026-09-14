@@ -1,0 +1,10 @@
+# Роль Knowledgebase (DocumentServer + PostgreSQL + RabbitMQ).
+# Образы — только в docker-compose.yml.
+#
+#   docker compose -f docker-compose.yml -f compose.knowledgebase.yml up -d \
+#     unicchat-postgresql unicchat-rabbitmq unicchat-documentserver
+
+services:
+  unicchat-documentserver:
+    ports:
+      - "8081:80"

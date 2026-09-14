@@ -1,0 +1,12 @@
+# Роль Tasker. Образы — только в docker-compose.yml.
+#
+#   docker compose -f docker-compose.yml -f compose.tasker.yml up -d \
+#     unicchat-tasker
+#
+# В .env: API_VAULT_URL, API_LOGGER_URL на IP сервера Vault.
+
+services:
+  unicchat-tasker:
+    depends_on: !reset
+    ports:
+      - "8080:8080"
