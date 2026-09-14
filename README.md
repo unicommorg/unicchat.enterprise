@@ -3,7 +3,7 @@
 <!-- TOC --><a name="-unicchat"></a>
 # Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat
 
-версия документа 1.10
+версия документа 1.11
 
 <!-- TOC --><a name=""></a>
 ## Оглавление
@@ -111,19 +111,19 @@ cd multi-server-install
 docker compose up -d --wait
 ```
 
-Отдельные полные YAML с копиями `image:` не ведём. На разных серверах подключаете тонкий файл роли через `-f` — теги образов Compose берёт из основного `docker-compose.yml` (шаг 2a).
+На нескольких серверах те же сервисы разнесены по `compose.<роль>.yml`. Перед запуском сверьте `image:` в файле роли с `docker-compose.yml` (шаг 2a).
 
 <!-- TOC --><a name="-multi-host"></a>
 ### Установка на отдельных серверах
 
-| Сервер | Команда (образы из `docker-compose.yml`) |
-|--------|------------------------------------------|
-| MongoDB | `-f docker-compose.yml -f compose.mongodb.yml` + сервисы mongodb |
-| Vault | `-f … -f compose.vault.yml` |
-| MinIO | `-f … -f compose.minio.yml` |
-| Tasker | `-f … -f compose.tasker.yml` |
-| Knowledgebase | `-f … -f compose.knowledgebase.yml` |
-| AppServer | `-f … -f compose.appserver.yml` |
+| Сервер | Команда |
+|--------|---------|
+| MongoDB | `docker compose -f compose.mongodb.yml up -d` |
+| Vault | `docker compose -f compose.vault.yml up -d` |
+| MinIO | `docker compose -f compose.minio.yml up -d` |
+| Tasker | `docker compose -f compose.tasker.yml up -d` |
+| Knowledgebase | `docker compose -f compose.knowledgebase.yml up -d` |
+| AppServer | `docker compose -f compose.appserver.yml up -d` |
 
 ```mermaid
 flowchart LR
@@ -574,25 +574,25 @@ sudo ufw status
 <!-- TOC --><a name="-2a-multi"></a>
 ## Шаг 2a. Установка на отдельных серверах
 
-В репозитории один полный [`docker-compose.yml`](multi-server-install/docker-compose.yml) — в нём все сервисы и **все теги образов** (`image:`).
+Один сервер — полный [`docker-compose.yml`](multi-server-install/docker-compose.yml). Несколько серверов — те же сервисы уже разбиты по ролям: `compose.mongodb.yml`, `compose.vault.yml` и остальные. На сервере запускаете только свой файл.
 
-На разных серверах не копируем образы в другие файлы и не вырезаем сервисы руками. Берёте тот же `docker-compose.yml` и подключаете тонкий файл роли через `-f`. В файле роли — только порты и сброс `depends_on` (MongoDB/Vault на другой машине). Поле `image:` в ролевых файлах **не пишем**: Compose при слиянии берёт тег из основного файла. Обновили версию образа в одном месте — на всех ролях она та же.
+Перед `up` **сверьте `image:`** в файле роли с эталоном `docker-compose.yml` (тег и имя образа должны совпадать).
 
 На каждом сервере: Docker, `docker login` в `cr.yandex`, каталог `multi-server-install/`, общий `.env` (пароли одинаковые, адреса — IP соседей).
 
 <!-- TOC --><a name="-2a-map"></a>
 ### Состав серверов
 
-| Сервер | Файл роли | Какие сервисы указать в `up -d` |
-|--------|-----------|--------------------------------|
-| **MongoDB** | `compose.mongodb.yml` | `unicchat-mongodb` `vault-mongo-init` |
-| **Vault** | `compose.vault.yml` | `unicchat-logger` `unicchat-vault` `vault-init` |
-| **MinIO** | `compose.minio.yml` | `unicchat-minio` `minio-init` |
+| Сервер | Итоговый файл | Сервисы в файле |
+|--------|----------------|-----------------|
+| **MongoDB** | `compose.mongodb.yml` | `unicchat-mongodb`, `vault-mongo-init` |
+| **Vault** | `compose.vault.yml` | `unicchat-logger`, `unicchat-vault`, `vault-init` |
+| **MinIO** | `compose.minio.yml` | `unicchat-minio`, `minio-init` |
 | **Tasker** | `compose.tasker.yml` | `unicchat-tasker` |
-| **Knowledgebase** | `compose.knowledgebase.yml` | `unicchat-postgresql` `unicchat-rabbitmq` `unicchat-documentserver` |
-| **AppServer** | `compose.appserver.yml` | `unicchat-appserver` `unicchat-nginx` |
+| **Knowledgebase** | `compose.knowledgebase.yml` | `unicchat-postgresql`, `unicchat-rabbitmq`, `unicchat-documentserver` |
+| **AppServer** | `compose.appserver.yml` | `unicchat-appserver`, `unicchat-nginx` |
 
-Список сервисов в команде **обязателен**. Без него `docker compose up -d` поднимет весь стек из основного файла.
+Список сервисов в `up -d` не нужен: в файле уже только эта роль.
 
 Пример IP:
 
@@ -614,21 +614,16 @@ sudo ufw status
 
 ```shell
 cd multi-server-install
-docker compose -f docker-compose.yml -f compose.mongodb.yml pull \
-  unicchat-mongodb vault-mongo-init
-docker compose -f docker-compose.yml -f compose.mongodb.yml up -d \
-  unicchat-mongodb vault-mongo-init
+# сверьте image: unicchat-mongodb и vault-mongo-init с docker-compose.yml
+docker compose -f compose.mongodb.yml pull
+docker compose -f compose.mongodb.yml up -d
 ```
 
-Проверка, что образ взялся из основного файла, а порт — из роли:
+Сверка тегов:
 
 ```shell
-docker compose -f docker-compose.yml -f compose.mongodb.yml config | grep -A3 'unicchat-mongodb:'
+grep 'image:' docker-compose.yml compose.mongodb.yml
 ```
-
-В `compose.*.yml` не должно быть строк `image:`. Меняете тег только в `docker-compose.yml`.
-
-Если нужен полностью свой урезанный compose без `-f` — можно вырезать сервисы вручную, но тогда теги придётся поддерживать самим; предпочтителен способ с `-f`.
 
 <!-- TOC --><a name="-2a-env"></a>
 ### Общий `.env` и адреса
@@ -654,11 +649,11 @@ ROOT_URL=https://<APP_SERVER_NAME>
 <!-- TOC --><a name="-2a-order"></a>
 ### Порядок запуска
 
-На каждом сервере из `multi-server-install/` (подставьте свой `compose.<роль>.yml` и список сервисов из таблицы выше):
+На каждом сервере (свой `compose.<роль>.yml`, предварительно сверьте `image:` с эталоном):
 
 ```shell
-docker compose -f docker-compose.yml -f compose.<роль>.yml pull <сервисы…>
-docker compose -f docker-compose.yml -f compose.<роль>.yml up -d <сервисы…>
+docker compose -f compose.<роль>.yml pull
+docker compose -f compose.<роль>.yml up -d
 ```
 
 Порядок серверов:
@@ -706,11 +701,11 @@ docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
   -sS -X DELETE -H "Authorization: Bearer ${TOKEN}" \
   "http://unicchat-vault/api/Secrets/KBTConfigs"
 
-docker compose -f docker-compose.yml -f compose.vault.yml up --force-recreate vault-init
-docker compose -f docker-compose.yml -f compose.vault.yml logs vault-init
+docker compose -f compose.vault.yml up --force-recreate vault-init
+docker compose -f compose.vault.yml logs vault-init
 ```
 
-На Tasker: `docker compose -f docker-compose.yml -f compose.tasker.yml restart unicchat-tasker`.
+На Tasker: `docker compose -f compose.tasker.yml restart unicchat-tasker`.
 
 <!-- TOC --><a name="-2a-nginx"></a>
 ### Nginx и сертификаты

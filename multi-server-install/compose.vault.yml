@@ -1,21 +1,125 @@
-# Роль Vault (+ Logger). Образы — только в docker-compose.yml.
-#
-#   docker compose -f docker-compose.yml -f compose.vault.yml up -d \
-#     unicchat-logger unicchat-vault vault-init
-#
-# depends_on на MongoDB сбрасываем: MongoDB на другом сервере.
-# В .env: MONGODB_HOST=<ip-mongodb>, KBT_MONGO_HOST, KBT_MINIO_HOST.
-
+# Роль Vault. Запуск: docker compose -f compose.vault.yml up -d
+# Сверьте image: с docker-compose.yml.
 services:
   unicchat-vault:
-    depends_on: !reset
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
+    container_name: unicchat-vault
+    restart: always
+    command: server
+    environment:
+      MongoCS: mongodb://${VAULT_DB_USER}:${VAULT_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${VAULT_DB_NAME}?directConnection=true&authSource=${VAULT_DB_NAME}&replicaSet=${MONGODB_REPLICA_SET_NAME}&authMechanism=SCRAM-SHA-256
+      api.logger.url: http://unicchat-logger:8080/
+    volumes:
+    - vault-data:/vault/file/
+    networks:
+    - unicchat-network
+    cap_add:
+    - IPC_LOCK
     ports:
-      - "8200:80"
-
+    - 8200:80
   unicchat-logger:
-    depends_on: !reset
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/uniclogger:prod
+    container_name: unicchat-logger
+    restart: always
+    environment:
+      MongoCS: mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}
+      api.logger.url: ${API_LOGGER_URL}
+    networks:
+    - unicchat-network
     ports:
-      - "8080:8080"
-
+    - 8080:8080
   vault-init:
-    depends_on: !reset
+    image: curlimages/curl:8.8.0
+    container_name: vault-init
+    restart: 'no'
+    depends_on:
+      unicchat-vault:
+        condition: service_started
+    entrypoint:
+    - /bin/sh
+    - -ec
+    command:
+    - |
+      echo "Waiting for Vault..."
+      until VAULT_TOKEN="$$(curl -fsS "$${VAULT_URL}$${VAULT_TOKEN_PATH}?username=$${VAULT_TOKEN_USERNAME}")" && [ -n "$${VAULT_TOKEN}" ]; do
+        sleep 5
+      done
+
+      echo "Vault token received."
+      ATTEMPT=1
+
+      while [ "$${ATTEMPT}" -le "$${VAULT_INIT_RETRIES}" ]; do
+        echo "Checking KBTConfigs secret... attempt $${ATTEMPT}/$${VAULT_INIT_RETRIES}"
+
+        RESPONSE_BODY="$$(mktemp)"
+        HTTP_CODE="$$(curl -sS -o "$${RESPONSE_BODY}" -w "%{http_code}" \
+          -H "Authorization: Bearer $${VAULT_TOKEN}" \
+          "$${VAULT_URL}api/Secrets/KBTConfigs/data" || true)"
+
+        if [ "$${HTTP_CODE}" = "200" ]; then
+          rm -f "$${RESPONSE_BODY}"
+          echo "KBTConfigs secret already exists, skipping."
+          exit 0
+        fi
+
+        rm -f "$${RESPONSE_BODY}"
+        echo "Creating KBTConfigs secret..."
+
+        RESPONSE_BODY="$$(mktemp)"
+        HTTP_CODE="$$(curl -sS -o "$${RESPONSE_BODY}" -w "%{http_code}" -X POST "$${VAULT_URL}api/Secrets" \
+          -H "Authorization: Bearer $${VAULT_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -H "accept: text/plain" \
+          -d "{
+            \"id\": \"KBTConfigs\",
+            \"name\": \"KBTConfigs\",
+            \"type\": \"Password\",
+            \"data\": \"All info in META\",
+            \"metadata\": {
+              \"MongoCS\": \"mongodb://$${TASKER_DB_USER}:$${TASKER_DB_PASSWORD}@$${KBT_MONGO_HOST}:27017/$${TASKER_DB_NAME}?directConnection=true&authSource=$${TASKER_DB_NAME}&authMechanism=SCRAM-SHA-256&replicaSet=$${MONGODB_REPLICA_SET_NAME}\",
+              \"MinioHost\": \"$${MINIO_HOST}\",
+              \"MinioUser\": \"$${MINIO_USER}\",
+              \"MinioPass\": \"$${MINIO_PASSWORD}\"
+            },
+            \"tags\": [\"KB\", \"Tasker\", \"Mongo\", \"Minio\"],
+            \"expiresAt\": \"2030-12-31T23:59:59.999Z\"
+          }" || true)"
+
+        if [ "$${HTTP_CODE}" -ge 200 ] && [ "$${HTTP_CODE}" -lt 300 ]; then
+          rm -f "$${RESPONSE_BODY}"
+          echo "KBTConfigs secret created."
+          exit 0
+        fi
+
+        echo "Vault is not ready to create KBTConfigs yet. HTTP $${HTTP_CODE}:"
+        cat "$${RESPONSE_BODY}"
+        rm -f "$${RESPONSE_BODY}"
+
+        ATTEMPT="$$(($${ATTEMPT} + 1))"
+        sleep "$${VAULT_INIT_RETRY_DELAY}"
+      done
+
+      echo "Failed to create KBTConfigs secret after $${VAULT_INIT_RETRIES} attempts."
+      exit 1
+    environment:
+      VAULT_URL: ${API_VAULT_URL}
+      VAULT_TOKEN_PATH: api/token/0f8e160416b94225a73f86ac23b9118b
+      VAULT_TOKEN_USERNAME: KBTservice
+      TASKER_DB_USER: ${TASKER_DB_USER}
+      TASKER_DB_PASSWORD: ${TASKER_DB_PASSWORD}
+      TASKER_DB_NAME: ${TASKER_DB_NAME}
+      MINIO_HOST: ${KBT_MINIO_HOST:-unicchat-minio:9000}
+      MINIO_USER: ${MINIO_ROOT_USER}
+      MINIO_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      KBT_MONGO_HOST: ${KBT_MONGO_HOST:-unicchat-mongodb}
+      MONGODB_REPLICA_SET_NAME: ${MONGODB_REPLICA_SET_NAME}
+      VAULT_INIT_RETRIES: 10
+      VAULT_INIT_RETRY_DELAY: 5
+    networks:
+    - unicchat-network
+networks:
+  unicchat-network:
+    name: unicchat-network
+volumes:
+  vault-data:
+    driver: local

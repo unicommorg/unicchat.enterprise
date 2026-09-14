@@ -1,16 +1,9 @@
-# Один docker-compose.yml — эталон для одного сервера:
+# Эталон для одного сервера:
 #   docker compose up -d --wait
 #
-# На отдельных серверах — тот же файл + тонкий compose.<роль>.yml (порты,
-# сброс depends_on). Теги образов (image:) только здесь, в ролевых файлах
-# их нет — Compose подмешивает при:
-#   docker compose -f docker-compose.yml -f compose.mongodb.yml up -d \
-#     unicchat-mongodb vault-mongo-init
-#
-# Роли: compose.mongodb.yml | compose.vault.yml | compose.minio.yml
-#        compose.tasker.yml | compose.knowledgebase.yml | compose.appserver.yml
-#
-# Адреса между серверами — в .env. Подробности: README шаг 2a.
+# Несколько серверов — те же сервисы в compose.<роль>.yml.
+# Перед запуском сверьте image: в файле роли с этим файлом.
+# Подробности: README шаг 2a.
 
 services:
   # --- MongoDB ---

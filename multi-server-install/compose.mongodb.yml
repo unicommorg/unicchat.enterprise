@@ -1,11 +1,145 @@
-# Роль MongoDB. Образы не дублируем — берутся из docker-compose.yml.
-#
-#   docker compose -f docker-compose.yml -f compose.mongodb.yml up -d \
-#     unicchat-mongodb vault-mongo-init
-#
-# Без списка сервисов compose поднимет весь стек из docker-compose.yml.
-
+# Роль MongoDB. Запуск: docker compose -f compose.mongodb.yml up -d
+# Сверьте image: с docker-compose.yml.
 services:
   unicchat-mongodb:
+    image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
+    container_name: unicchat-mongodb
+    restart: always
+    environment:
+      MONGODB_REPLICA_SET_MODE: ${MONGODB_REPLICA_SET_MODE}
+      MONGODB_REPLICA_SET_NAME: ${MONGODB_REPLICA_SET_NAME}
+      MONGODB_REPLICA_SET_KEY: ${MONGODB_REPLICA_SET_KEY}
+      MONGODB_PORT_NUMBER: ${MONGODB_PORT_NUMBER}
+      MONGODB_ADVERTISED_HOSTNAME: ${MONGODB_ADVERTISED_HOSTNAME}
+      MONGODB_ENABLE_JOURNAL: ${MONGODB_ENABLE_JOURNAL}
+      MONGODB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+      MONGODB_USERNAME: ${MONGODB_USERNAME}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD}
+      MONGODB_DATABASE: ${MONGODB_DATABASE}
+    volumes:
+    - mongodb_data:/bitnami/mongodb
+    networks:
+    - unicchat-network
+    healthcheck:
+      test: echo 'db.hello().isWritablePrimary || db.hello().ismaster' | mongosh localhost:27017/test --quiet | grep true || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     ports:
-      - "27017:27017"
+    - 27017:27017
+  vault-mongo-init:
+    image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
+    container_name: vault-mongo-init
+    restart: 'no'
+    depends_on:
+      unicchat-mongodb:
+        condition: service_healthy
+    command:
+    - /bin/bash
+    - -ec
+    - |
+      until mongosh "mongodb://root:$${MONGODB_ROOT_PASSWORD}@unicchat-mongodb:27017/admin?replicaSet=$${MONGODB_REPLICA_SET_NAME}&authSource=admin" \
+        --eval "db.hello().isWritablePrimary || db.hello().ismaster" --quiet | grep true >/dev/null 2>&1
+      do
+        echo "Waiting for MongoDB primary..."
+        sleep 5
+      done
+
+      echo "Checking if Vault user exists..."
+
+      mongosh "mongodb://root:$${MONGODB_ROOT_PASSWORD}@unicchat-mongodb:27017/admin?replicaSet=$${MONGODB_REPLICA_SET_NAME}&authSource=admin" --eval "
+        const dbName = '$${VAULT_DB_NAME}';
+        const userName = '$${VAULT_DB_USER}';
+        const password = '$${VAULT_DB_PASSWORD}';
+
+        const dbx = db.getSiblingDB(dbName);
+
+        if (!dbx.getUser(userName)) {
+          print('User does not exist, creating...');
+
+          dbx.createUser({
+            user: userName,
+            pwd: password,
+            roles: [
+              { role: 'readWrite', db: dbName }
+            ]
+          });
+
+          print('Vault user created');
+        } else {
+          print('Vault user already exists, skipping');
+        }
+      "
+
+      echo "Checking if Tasker user exists..."
+
+      mongosh "mongodb://root:$${MONGODB_ROOT_PASSWORD}@unicchat-mongodb:27017/admin?replicaSet=$${MONGODB_REPLICA_SET_NAME}&authSource=admin" --eval "
+        const dbName = '$${TASKER_DB_NAME}';
+        const userName = '$${TASKER_DB_USER}';
+        const password = '$${TASKER_DB_PASSWORD}';
+
+        const dbx = db.getSiblingDB(dbName);
+
+        if (!dbx.getUser(userName)) {
+          print('User does not exist, creating...');
+
+          dbx.createUser({
+            user: userName,
+            pwd: password,
+            roles: [
+              { role: 'readWrite', db: dbName }
+            ]
+          });
+
+          print('Tasker user created');
+        } else {
+          print('Tasker user already exists, skipping');
+        }
+      "
+      echo "Checking if Logger user exists..."
+
+      mongosh "mongodb://root:$${MONGODB_ROOT_PASSWORD}@unicchat-mongodb:27017/admin?replicaSet=$${MONGODB_REPLICA_SET_NAME}&authSource=admin" --eval "
+        const dbName = '$${LOGGER_DB}';
+        const userName = '$${LOGGER_DB_USER}';
+        const password = '$${LOGGER_DB_PASSWORD}';
+
+        const dbx = db.getSiblingDB(dbName);
+
+        if (!dbx.getUser(userName)) {
+          print('User does not exist, creating...');
+
+          dbx.createUser({
+            user: userName,
+            pwd: password,
+            roles: [
+              { role: 'readWrite', db: dbName }
+            ]
+          });
+
+          print('Logger user created');
+        } else {
+          print('Logger user already exists, skipping');
+        }
+      "
+      echo "Done."
+    environment:
+      VAULT_DB_USER: ${VAULT_DB_USER}
+      VAULT_DB_PASSWORD: ${VAULT_DB_PASSWORD}
+      VAULT_DB_NAME: ${VAULT_DB_NAME}
+      TASKER_DB_USER: ${TASKER_DB_USER}
+      TASKER_DB_PASSWORD: ${TASKER_DB_PASSWORD}
+      TASKER_DB_NAME: ${TASKER_DB_NAME}
+      LOGGER_DB_USER: ${LOGGER_DB_USER}
+      LOGGER_DB_PASSWORD: ${LOGGER_DB_PASSWORD}
+      LOGGER_DB: ${LOGGER_DB}
+      MONGODB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+      MONGODB_REPLICA_SET_NAME: ${MONGODB_REPLICA_SET_NAME}
+    networks:
+    - unicchat-network
+networks:
+  unicchat-network:
+    name: unicchat-network
+volumes:
+  mongodb_data:
+    driver: local

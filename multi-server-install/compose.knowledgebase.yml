@@ -1,10 +1,72 @@
-# Роль Knowledgebase (DocumentServer + PostgreSQL + RabbitMQ).
-# Образы — только в docker-compose.yml.
-#
-#   docker compose -f docker-compose.yml -f compose.knowledgebase.yml up -d \
-#     unicchat-postgresql unicchat-rabbitmq unicchat-documentserver
-
+# Роль Knowledgebase. Запуск: docker compose -f compose.knowledgebase.yml up -d
+# Сверьте image: с docker-compose.yml.
 services:
   unicchat-documentserver:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
+    container_name: unicchat-documentserver
+    restart: always
+    depends_on:
+    - unicchat-postgresql
+    - unicchat-rabbitmq
+    environment:
+      ALLOW_META_IP_ADDRESS: true
+      JWT_ENABLED: ${JWT_ENABLED}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_HEADER: ${JWT_HEADER}
+      DB_TYPE: ${DB_TYPE}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      AMQP_URI: ${AMQP_URI}
+      ALLOW_PRIVATE_IP_ADDRESS: ${ALLOW_PRIVATE_IP_ADDRESS}
+    volumes:
+    - documentserver_data:/var/www/uniceditor/Data
+    - documentserver_log:/var/log/uniceditor
+    - documentserver_cache:/var/lib/uniceditor/documentserver/App_Data/cache/files
+    - documentserver_files:/var/www/uniceditor/documentserver-example/public/files
+    - documentserver_fonts:/usr/share/fonts
+    networks:
+    - unicchat-network
+    stdin_open: true
+    stop_grace_period: 60s
     ports:
-      - "8081:80"
+    - 8081:80
+  unicchat-postgresql:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/postgres:12
+    container_name: unicchat-postgresql
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+    - postgresql_data:/var/lib/postgresql
+    expose:
+    - '5432'
+    networks:
+    - unicchat-network
+  unicchat-rabbitmq:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/rabbitmq:latest
+    container_name: unicchat-rabbitmq
+    restart: always
+    expose:
+    - '5672'
+    networks:
+    - unicchat-network
+networks:
+  unicchat-network:
+    name: unicchat-network
+volumes:
+  documentserver_cache:
+    driver: local
+  documentserver_files:
+    driver: local
+  postgresql_data:
+    driver: local
+  documentserver_log:
+    driver: local
+  documentserver_fonts:
+    driver: local
+  documentserver_data:
+    driver: local

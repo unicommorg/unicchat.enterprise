@@ -1,14 +1,74 @@
-# Роль AppServer (+ nginx). Образы — только в docker-compose.yml.
-#
-#   docker compose -f docker-compose.yml -f compose.appserver.yml up -d \
-#     unicchat-appserver unicchat-nginx
-#
-# В .env: MONGODB_HOST, UNIC_SOLID_HOST, DOCUMENT_SERVER_PROXY, MINIO_HOST — IP соседей.
-# Нужны каталоги nginx/ и certs/ (как в шаге 2).
-
+# Роль AppServer. Запуск: docker compose -f compose.appserver.yml up -d
+# Сверьте image: с docker-compose.yml.
 services:
   unicchat-appserver:
-    depends_on: !reset
-
+    image: cr.yandex/crpst6ndtaf70or2n2bb/unic_chat_appserver:2.4.3
+    container_name: unicchat-appserver
+    restart: always
+    environment:
+      CREATE_TOKENS_FOR_USERS: true
+      MONGODB_HOST: ${MONGODB_HOST}
+      MONGODB_PORT: ${MONGODB_PORT_NUMBER}
+      DB_COLLECTIONS_PREFIX: ${DB_COLLECTIONS_PREFIX}
+      UNIC_SOLID_HOST: ${UNIC_SOLID_HOST}
+      PORT: ${PORT}
+      DEPLOY_METHOD: ${DEPLOY_METHOD}
+      MONGO_URL: mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${MONGODB_DATABASE}?replicaSet=${MONGODB_REPLICA_SET_NAME}
+      MONGO_OPLOG_URL: mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/local
+      ROOT_URL: ${ROOT_URL}
+      DOCUMENT_SERVER_HOST: https://${DOCUMENTSERVER_SERVER_NAME}
+      LICENSE_HOST: ${LICENSE_HOST}
+    volumes:
+    - chat_data:/app/uploads
+    networks:
+    - unicchat-network
+    healthcheck:
+      test:
+      - CMD
+      - node
+      - -e
+      - 'require(''http'').get(''http://127.0.0.1:3000/health'', (r) => { let d=''''; r.on(''data'', c => d+=c); r.on(''end'', () => process.exit(r.statusCode === 200 && d.includes(''ok'') ? 0 : 1)); }).on(''error'', () => process.exit(1))'
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
   unicchat-nginx:
-    depends_on: !reset
+    image: cr.yandex/crpst6ndtaf70or2n2bb/nginx:2.4.1
+    container_name: unicchat-nginx
+    restart: always
+    depends_on:
+      unicchat-appserver:
+        condition: service_healthy
+    environment:
+      ROOT_URL: ${ROOT_URL}
+      APP_SERVER_NAME: ${APP_SERVER_NAME}
+      UNICCHAT_HOST: ${UNICCHAT_HOST}
+      PORT: ${PORT}
+      SSL_CERT: ${SSL_CERT}
+      SSL_KEY: ${SSL_KEY}
+      DOCUMENTSERVER_PROXY_ENABLE: ${DOCUMENTSERVER_PROXY_ENABLE}
+      DOCUMENTSERVER_SERVER_NAME: ${DOCUMENTSERVER_SERVER_NAME}
+      DOCUMENT_SERVER_PROXY: ${DOCUMENT_SERVER_PROXY}
+      DOCUMENTSERVER_SSL_CERT: ${DOCUMENTSERVER_SSL_CERT}
+      DOCUMENTSERVER_SSL_KEY: ${DOCUMENTSERVER_SSL_KEY}
+      MINIO_PROXY_ENABLE: ${MINIO_PROXY_ENABLE}
+      MINIO_SERVER_NAME: ${MINIO_SERVER_NAME}
+      MINIO_HOST: ${MINIO_HOST}
+      MINIO_PORT: ${MINIO_PORT}
+      MINIO_SSL_CERT: ${MINIO_SSL_CERT}
+      MINIO_SSL_KEY: ${MINIO_SSL_KEY}
+    volumes:
+    - ./certs:/certs
+    - ./nginx/templates:/etc/nginx/templates:ro
+    - ./nginx/conf.d:/etc/nginx/conf.d
+    ports:
+    - 80:80
+    - 443:443
+    networks:
+    - unicchat-network
+networks:
+  unicchat-network:
+    name: unicchat-network
+volumes:
+  chat_data:
+    driver: local
