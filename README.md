@@ -56,6 +56,7 @@
    * [2.11 Вариант C — база знаний и MinIO отдельно](#211-external-kb)
    * [2.12 Комбинация B+C](#212-combined)
       + [Диагностика split-установок](#-split-troubleshoot)
+   * [2.13 Секрет Vault KBTConfigs на разных серверах](#213-vault-kbt)
 - [Шаг 3. Установка локального медиа сервера для ВКС](#-3-)
 - [Шаг 6. Создание пользователя администратора](#-6-)
 - [Шаг 7. Настройка push-уведомлений](#-7-push-)
@@ -105,7 +106,7 @@ ___
 <!-- TOC --><a name="--variants"></a>
 ### Варианты состава стека (A–D)
 
-Шаг 2 по умолчанию — **вариант A** (всё в одном `docker-compose.yml`). Варианты B–D не требуют править основной compose: к нему подключаются override-файлы из `multi-server-install/`.
+Шаг 2 по умолчанию — **вариант A**: один файл `multi-server-install/docker-compose.yml`, все сервисы на одном хосте. Варианты B–D — те же сервисы; какие блоки можно вынести, написано комментариями в compose и в п. 2.10–2.12. Отдельные YAML на каждый вариант не нужны.
 
 <!-- TOC --><a name="-a-unified"></a>
 #### A. Единый compose
@@ -300,9 +301,13 @@ git clone https://github.com/unicommorg/unicchat.enterprise.git
 
 Установка идёт из каталога `multi-server-install/` одним файлом `docker-compose.yml` и одним `.env`. Это **вариант A**. Сеть `unicchat-network`, пользователи MongoDB (vault/tasker/logger), секрет Vault `KBTConfigs` и бакеты MinIO создаются init-контейнерами — руками это делать не нужно.
 
-Состав стека варианта A: `unicchat-mongodb`, `unicchat-vault`, `unicchat-appserver`, `unicchat-logger`, `unicchat-tasker`, `unicchat-nginx`, `unicchat-minio`, `unicchat-documentserver` (плюс PostgreSQL и RabbitMQ для DocumentServer) и init-контейнеры `vault-mongo-init`, `vault-init`, `minio-init`.
+Состав стека (блоки в `docker-compose.yml`):
 
-Варианты B–D подключают файлы `compose.external-nginx.yml`, `compose.external-kb.yml` и `compose.kb-host.yml` — основной `docker-compose.yml` не редактируют. Каталог `multi-server-install/services/*.yml` — устаревший путь, для новых установок не используйте.
+| Блок | Сервисы | Можно вынести |
+|------|---------|----------------|
+| Ядро | MongoDB, Vault, AppServer, Logger (+ init) | нет, это хост приложения |
+| Reverse proxy | `unicchat-nginx` | да — ваш nginx и certbot (вариант B) |
+| База знаний и файлы | Tasker, MinIO, DocumentServer, PostgreSQL, RabbitMQ | да — отдельный хост (вариант C) |
 
 Перед установкой нужна действующая лицензия UnicChat Solid Core (раздел 1.2). Без неё система не заработает корректно.
 
@@ -432,7 +437,7 @@ echo "MINIO_ROOT_PASSWORD=$(gen)"
 - `KBT_MONGO_HOST` — хост MongoDB в том же секрете. Вариант A: `unicchat-mongodb`. Вариант C: IP app-хоста, куда tasker ходит на 27017.
 - `MINIO_HOST` / `MINIO_PORT` — upstream встроенного nginx, не путать с `KBT_MINIO_HOST`.
 
-Секрет `KBTConfigs` создаёт `vault-init` **один раз**. Если секрет уже есть, смена `KBT_MINIO_HOST` / `KBT_MONGO_HOST` в `.env` его не перезапишет — обновите секрет в Vault вручную или удалите и перезапустите `vault-init`.
+Секрет `KBTConfigs` создаёт `vault-init` **один раз**. Если сервисы уже разнесены по хостам или вы меняли `KBT_MINIO_HOST` / `KBT_MONGO_HOST` после первого запуска — пересоздайте секрет по [п. 2.13](#213-vault-kbt).
 
 <!-- TOC --><a name="25-certbot"></a>
 ### 2.5 SSL-сертификаты (Certbot)
@@ -526,7 +531,7 @@ docker compose up -d --wait
 
 `--wait` дождётся healthcheck appserver и mongodb; nginx стартует после healthy appserver.
 
-Для вариантов B/C/D не используйте эту команду «как есть» — файлы compose указаны в п. 2.10–2.12.
+Варианты B–D: тот же файл, не все сервисы. Какие блоки не запускать и какие `ports` раскомментировать — п. 2.10–2.12 и комментарии в `docker-compose.yml`.
 
 Логи:
 
@@ -613,7 +618,7 @@ sudo ufw status
 | App-хост | **не** 80/443 | заняты edge или свободны |
 | App-хост → только с edge | 3000/tcp AppServer, 8081/tcp DocumentServer, 9000/tcp MinIO (если MinIO на этом же хосте) | `proxy_pass` |
 
-Публикация портов задаётся в `compose.external-nginx.yml`. Если nginx на том же хосте, что Docker, сузьте bind до `127.0.0.1` в override.
+Публикация портов — раскомментируйте `ports` в `docker-compose.yml` у appserver (3000) и documentserver (8081). Если nginx на том же хосте, что Docker, укажите bind `127.0.0.1:3000:3000`. MinIO уже слушает 9000.
 
 **Вариант C (KB+MinIO на другом хосте)**
 
@@ -634,12 +639,16 @@ sudo ufw status
 
 1. Docker, registry login и `.env` — как в п. 2.1–2.4. Разделы 2.5–2.6 пропустите.
 2. A-записи трёх имён — на IP **edge** (п. 1.4).
-3. На app-хосте:
+3. В `docker-compose.yml` раскомментируйте `ports` у `unicchat-appserver` (`3000:3000`) и `unicchat-documentserver` (`8081:80`). Сервис `unicchat-nginx` не запускайте:
 
 ```shell
 cd ~/unicchat.enterprise/multi-server-install
-docker compose -f docker-compose.yml -f compose.external-nginx.yml pull
-docker compose -f docker-compose.yml -f compose.external-nginx.yml up -d --wait
+docker compose pull
+docker compose up -d --wait \
+  unicchat-mongodb vault-mongo-init unicchat-vault vault-init \
+  unicchat-appserver unicchat-logger unicchat-tasker \
+  unicchat-minio minio-init \
+  unicchat-documentserver unicchat-postgresql unicchat-rabbitmq
 ```
 
 4. На машине с nginx установите пакеты и скопируйте vhost’ы из [`multi-server-install/nginx/examples/host/`](multi-server-install/nginx/examples/host/README.md). Замените `app.example.com` и `127.0.0.1` на свои DNS и IP app-хоста (если nginx не на той же машине).
@@ -677,17 +686,21 @@ WebSocket: в примере `00-app.conf` уже есть `Upgrade` / `Connecti
 
 Порядок: сеть между хостами → MinIO и бакеты → Vault (секрет с адресами) → tasker → AppServer.
 
-**На KB-хосте** скопируйте репозиторий, тот же `.env`, поправьте адреса Vault и Logger на app-хост (порты из `compose.external-kb.yml`):
+**На KB-хосте** скопируйте репозиторий и тот же `.env`, поправьте адреса Vault и Logger на app-хост:
 
 ```
 API_VAULT_URL=http://<app-host>:8200/
 API_LOGGER_URL=http://<app-host>:8080/
 ```
 
+В `docker-compose.yml` раскомментируйте `ports` у `unicchat-tasker` (`8080:8080`) и у `unicchat-documentserver` (`8081:80`). Запускайте только блок базы знаний (`--no-deps`, чтобы compose не тянул MongoDB с ядра):
+
 ```shell
 cd ~/unicchat.enterprise/multi-server-install
-docker compose -f compose.kb-host.yml --env-file .env pull
-docker compose -f compose.kb-host.yml --env-file .env up -d
+docker compose pull
+docker compose up -d --no-deps \
+  unicchat-minio minio-init unicchat-tasker \
+  unicchat-documentserver unicchat-postgresql unicchat-rabbitmq
 ```
 
 Проверка бакетов и API:
@@ -707,38 +720,38 @@ KBT_MONGO_HOST=<app-host-ip>
 
 `KBT_MINIO_HOST=unicchat-minio:9000` корректен: tasker и MinIO в одной docker-сети на KB-хосте, tasker читает это значение из Vault. `KBT_MONGO_HOST` — адрес, с которого tasker достучится до MongoDB app-хоста (27017).
 
+На app-хосте раскомментируйте `ports` у MongoDB (`27017`), Vault (`8200:80`) и Logger (`8080:8080`). Блок базы знаний не запускайте:
+
 ```shell
 cd ~/unicchat.enterprise/multi-server-install
-docker compose -f docker-compose.yml -f compose.external-kb.yml pull
-docker compose -f docker-compose.yml -f compose.external-kb.yml up -d --wait
+docker compose pull
+docker compose up -d --wait \
+  unicchat-mongodb vault-mongo-init unicchat-vault vault-init \
+  unicchat-appserver unicchat-logger unicchat-nginx
 ```
 
 Встроенный nginx на app-хосте продолжает слушать 80/443. Имена MinIO и DocumentServer в этом случае **не** должны смотреть на app-хост: встроенный nginx будет отдавать 502 (контейнеров нет). Либо поставьте nginx на KB-хосте и направьте A-записи `MINIO_SERVER_NAME` / `DOCUMENTSERVER_SERVER_NAME` туда, либо сразу используйте вариант D. Если оставляете встроенный nginx только для приложения — удалите на app-хосте шаблоны `nginx/templates/10-documentserver.conf.template` и `20-minio.conf.template` и пересоздайте `unicchat-nginx`.
 
 Ограничьте 27017, 8200, 8080 на app-хосте firewall’ом до IP KB-хоста.
 
-Если `vault-init` уже создал `KBTConfigs` с внутренними именами, секрет не обновится сам — удалите его в Vault и перезапустите контейнер `vault-init` либо поправьте metadata вручную.
+Если `vault-init` уже отработал с именами контейнеров (`unicchat-mongodb`, `unicchat-minio:9000`), tasker на другом сервере до MongoDB не достучится. Пересоздайте секрет по [п. 2.13](#213-vault-kbt), затем перезапустите tasker.
 
 <!-- TOC --><a name="212-combined"></a>
 ### 2.12 Комбинация B+C
 
-Типичный контур заказчика: TLS на периметре, мессенджер на app-хосте, база знаний и объектное хранилище отдельно.
+Типичный вариант: TLS на периметре, мессенджер на хосте приложения, база знаний и объектное хранилище отдельно.
 
-**App-хост:**
+**App-хост** — ядро, без nginx и без блока KB. Раскомментируйте `ports` у appserver (3000), MongoDB (27017), Vault (8200), Logger (8080):
 
 ```shell
 cd ~/unicchat.enterprise/multi-server-install
-docker compose -f docker-compose.yml \
-  -f compose.external-nginx.yml \
-  -f compose.external-kb.yml \
-  pull
-docker compose -f docker-compose.yml \
-  -f compose.external-nginx.yml \
-  -f compose.external-kb.yml \
-  up -d --wait
+docker compose pull
+docker compose up -d --wait \
+  unicchat-mongodb vault-mongo-init unicchat-vault vault-init \
+  unicchat-appserver unicchat-logger
 ```
 
-**KB-хост:** как в п. 2.11 (`compose.kb-host.yml`), с `API_VAULT_URL` / `API_LOGGER_URL` на app-хост.
+**KB-хост:** как в п. 2.11, с `API_VAULT_URL` / `API_LOGGER_URL` на app-хост.
 
 **Edge:** как в п. 2.10, но `proxy_pass`:
 
@@ -758,11 +771,96 @@ A-записи всех трёх имён — на IP edge. Certbot работа
 | Симптом | Что проверить |
 |---------|----------------|
 | Edge отдаёт **502** | Контейнер слушает опубликованный порт (`ss -lntp` / `docker compose ps`). `proxy_pass` на верный IP и порт (3000 / 8081 / 9000). Firewall между edge и backend. |
-| Certbot: порт 80 занят | В варианте B не должен работать `unicchat-nginx`. `docker compose stop unicchat-nginx` либо убедитесь, что подключён `compose.external-nginx.yml`. |
+| Certbot: порт 80 занят | В варианте B не запускайте `unicchat-nginx` (`docker compose stop unicchat-nginx`). |
 | База знаний пустая / tasker не стартует | С KB-хоста: `curl -sS http://<app-host>:8200/` (Vault) и доступ к Mongo `KBT_MONGO_HOST:27017`. Логи: `docker logs unicchat-tasker`. |
 | Файлы / редактор документов не открываются | Vault `KBTConfigs.metadata.MinioHost` совпадает с тем, что видит tasker. MinIO healthy: `curl http://<kb-host>:9000/minio/health/live`. Бакеты `unicchat-files` и `uc.onlyoffice.docs` есть (`minio-init`). |
-| Смена MinIO после первого up ничего не даёт | `vault-init` не перезаписывает существующий секрет. Обновите `KBTConfigs` или удалите секрет и запустите `vault-init` снова. |
+| Смена MinIO / разнос по серверам после первого up | `vault-init` не перезаписывает существующий секрет. [П. 2.13](#213-vault-kbt). |
 | Веб-сокет рвётся через внешний nginx | Заголовки `Upgrade` и `Connection`, таймауты 86400 — как в `nginx/examples/host/00-app.conf`. |
+
+<!-- TOC --><a name="213-vault-kbt"></a>
+### 2.13 Секрет Vault KBTConfigs на разных серверах
+
+База знаний (tasker) читает из Vault секрет `KBTConfigs`. Его пишет контейнер `vault-init` при **первом** успешном запуске и больше не меняет. На одном хосте (вариант A) достаточно значений по умолчанию. Если Tasker и MinIO стоят на другом сервере (варианты C и D), в секрете должны быть адреса, которые tasker реально резолвит.
+
+Что лежит в metadata секрета:
+
+| Поле | Откуда в `.env` | Вариант A (один хост) | Варианты C/D (разные серверы) |
+|------|-----------------|------------------------|-------------------------------|
+| `MongoCS` | `TASKER_DB_*`, `KBT_MONGO_HOST` | хост `unicchat-mongodb` | IP или DNS **хоста приложения**, порт 27017 |
+| `MinioHost` | `KBT_MINIO_HOST` | `unicchat-minio:9000` | `unicchat-minio:9000`, если tasker и MinIO в одной docker-сети на KB-хосте; иначе `IP-KB-хоста:9000` |
+| `MinioUser` / `MinioPass` | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | те же, что в `.env` | те же пароли на обоих хостах |
+
+Сначала поправьте `.env` на хосте приложения (пример: app-хост `10.0.10.11`, KB-хост `10.0.10.22`):
+
+```
+KBT_MONGO_HOST=10.0.10.11
+KBT_MINIO_HOST=unicchat-minio:9000
+UNIC_SOLID_HOST=http://10.0.10.22:8080
+```
+
+На KB-хосте в том же `.env`:
+
+```
+API_VAULT_URL=http://10.0.10.11:8200/
+API_LOGGER_URL=http://10.0.10.11:8080/
+```
+
+Порт Vault `8200` на хосте приложения должен быть открыт (раскомментируйте `ports` у `unicchat-vault` в `docker-compose.yml`).
+
+#### Посмотреть текущий секрет
+
+На хосте приложения, из каталога `multi-server-install/`:
+
+```shell
+cd ~/unicchat.enterprise/multi-server-install
+
+TOKEN=$(docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
+  -fsS "http://unicchat-vault/api/token/0f8e160416b94225a73f86ac23b9118b?username=KBTservice")
+
+docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
+  -sS -H "Authorization: Bearer ${TOKEN}" \
+  "http://unicchat-vault/api/Secrets/KBTConfigs/data"
+```
+
+В ответе проверьте `metadata.MongoCS` и `metadata.MinioHost`. Если там `unicchat-mongodb`, а tasker уже на другом сервере — секрет нужно пересоздать.
+
+#### Удалить старый секрет и записать новый
+
+`vault-init` создаёт `KBTConfigs` только если его ещё нет. Поэтому старый секрет удаляют, затем снова запускают init. Значения он возьмёт из текущего `.env`.
+
+```shell
+cd ~/unicchat.enterprise/multi-server-install
+set -a && . ./.env && set +a
+
+TOKEN=$(docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
+  -fsS "http://unicchat-vault/api/token/0f8e160416b94225a73f86ac23b9118b?username=KBTservice")
+
+docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
+  -sS -X DELETE -H "Authorization: Bearer ${TOKEN}" \
+  "http://unicchat-vault/api/Secrets/KBTConfigs"
+
+docker compose up --force-recreate --no-deps vault-init
+docker compose logs vault-init
+```
+
+В логе должно быть `KBTConfigs secret created.` Снова выполните GET из шага выше: в `MongoCS` — IP хоста приложения, в `MinioHost` — то, что задано в `KBT_MINIO_HOST`.
+
+На KB-хосте перечитайте секрет:
+
+```shell
+docker compose restart unicchat-tasker
+docker compose logs --tail=80 unicchat-tasker
+```
+
+Если DELETE отвечает 404 — секрета нет, сразу запускайте `vault-init`. Если 405 — удалите через API с суффиксом `/data` (`.../api/Secrets/KBTConfigs/data`) и повторите init.
+
+Пересоздавать секрет нужно, когда:
+
+- перенесли tasker или MinIO на другой сервер;
+- сменили IP хоста приложения или пароль MinIO / пользователя tasker в MongoDB;
+- изначально подняли всё на одном хосте, затем разнесли блоки.
+
+После пересоздания пароли в `.env` и в Vault должны совпадать. Менять только `.env` недостаточно.
 
 <!-- TOC --><a name="-3-"></a>
 ## Шаг 3. Установка локального медиа сервера для ВКС

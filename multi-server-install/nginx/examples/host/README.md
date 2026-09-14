@@ -4,13 +4,13 @@
 
 Шаблоны ниже рассчитаны на **тот же хост**, что и Docker: `proxy_pass` на `127.0.0.1`. Если nginx на другой машине, замените `127.0.0.1` на IP app-хоста (и для MinIO/DocumentServer — на IP KB-хоста в варианте C/D).
 
-Порты, которые публикует `compose.external-nginx.yml` / `compose.kb-host.yml`:
+Порты, которые нужно открыть в `docker-compose.yml` (раскомментировать `ports` у сервиса):
 
 | Сервис | Host port | Upstream в примерах |
 |--------|-----------|---------------------|
 | AppServer | 3000 | `http://127.0.0.1:3000` |
 | DocumentServer | 8081 | `http://127.0.0.1:8081` |
-| MinIO S3 | 9000 | `http://127.0.0.1:9000` |
+| MinIO S3 | 9000 | `http://127.0.0.1:9000` (уже опубликован в compose) |
 
 ## Установка nginx и certbot (Ubuntu)
 

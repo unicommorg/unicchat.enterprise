@@ -1,5 +1,29 @@
+# Один docker-compose.yml на все варианты установки.
+# По умолчанию поднимайте всё: docker compose up -d --wait
+#
+# Блоки (какие сервисы можно вынести — README §2.10–2.12):
+#
+#   Ядро (хост приложения):
+#     unicchat-mongodb, vault-mongo-init, unicchat-vault, vault-init,
+#     unicchat-appserver, unicchat-logger
+#
+#   Reverse proxy (можно заменить nginx+certbot на хосте или другой VM):
+#     unicchat-nginx
+#     Не запускайте этот сервис, если 80/443 занимает ваш nginx.
+#     Тогда раскомментируйте ports у appserver (3000) и documentserver (8081).
+#
+#   База знаний и файлы (можно целиком на отдельный хост):
+#     unicchat-tasker, unicchat-minio, minio-init,
+#     unicchat-documentserver, unicchat-postgresql, unicchat-rabbitmq
+#     На хосте приложения эти сервисы не запускайте.
+#     На втором хосте — тот же файл, запускайте только этот блок
+#     (у tasker: docker compose up -d --no-deps ..., иначе compose
+#     потянет mongodb с ядра). Раскомментируйте ports у mongodb/vault/logger
+#     на хосте приложения и у tasker/documentserver на хосте KB.
+#     В .env: UNIC_SOLID_HOST, API_VAULT_URL, API_LOGGER_URL, KBT_*.
+
 services:
-  # 1. MongoDB - база данных, должна быть готова до других сервисов
+  # --- Ядро: MongoDB (остаётся на хосте приложения) ---
   unicchat-mongodb:
     image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
     container_name: unicchat-mongodb
@@ -27,8 +51,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    # Вариант C: tasker на другом хосте — раскомментируйте
+    # ports:
+    #   - "27017:27017"
 
-  # 2. Vault - зависит от mongodb
+  # --- Ядро: Vault ---
   unicchat-vault:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
     container_name: unicchat-vault
@@ -46,6 +73,9 @@ services:
       - unicchat-network
     cap_add:
       - IPC_LOCK
+    # Вариант C: tasker на другом хосте — раскомментируйте
+    # ports:
+    #   - "8200:80"
 
   vault-mongo-init:
     image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
@@ -247,7 +277,7 @@ services:
     networks:
       - unicchat-network
 
-  # 3. Appserver - зависит от mongodb
+  # --- Ядро: AppServer ---
   unicchat-appserver:
     image: cr.yandex/crpst6ndtaf70or2n2bb/unic_chat_appserver:2.4.3
     container_name: unicchat-appserver
@@ -278,8 +308,11 @@ services:
       timeout: 5s
       retries: 10
       start_period: 90s
+    # Вариант B: nginx снаружи — раскомментируйте
+    # ports:
+    #   - "3000:3000"
 
-  # 4. Logger - зависит от mongodb
+  # --- Ядро: Logger ---
   unicchat-logger:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/uniclogger:prod
     container_name: unicchat-logger
@@ -292,8 +325,11 @@ services:
       api.logger.url: ${API_LOGGER_URL}
     networks:
       - unicchat-network
+    # Вариант C: tasker на другом хосте — раскомментируйте
+    # ports:
+    #   - "8080:8080"
 
-  # 5. Tasker - зависит от mongodb
+  # --- База знаний: Tasker (можно вынести вместе с MinIO и DocumentServer) ---
   unicchat-tasker:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatkbasetasker:prod
     container_name: unicchat-tasker
@@ -301,14 +337,17 @@ services:
     depends_on:
       unicchat-mongodb:
         condition: service_healthy
+    # Вариант C на хосте KB: раскомментируйте порт, depends_on не нужен
+    # (запуск: docker compose up -d --no-deps unicchat-tasker ...)
     # ports:
-    #   - 8881:8080
+    #   - "8080:8080"
     environment:
       api.vault.url: ${API_VAULT_URL}
       api.logger.url: ${API_LOGGER_URL}
     networks:
       - unicchat-network
 
+  # --- Reverse proxy: можно не запускать, если nginx+certbot снаружи ---
   unicchat-nginx:
     image: cr.yandex/crpst6ndtaf70or2n2bb/nginx:2.4.1
     container_name: unicchat-nginx
@@ -350,7 +389,7 @@ services:
     networks:
       - unicchat-network
 
-  # 6. MinIO - S3-совместимое объектное хранилище
+  # --- База знаний / файлы: MinIO (можно вынести вместе с tasker и DocumentServer) ---
   unicchat-minio:
     image: cr.yandex/crpst6ndtaf70or2n2bb/minio:RELEASE.2024-12-18T13-15-44Z
     container_name: unicchat-minio
@@ -405,9 +444,7 @@ services:
     networks:
       - unicchat-network
 
-  # ================================================================================
-  # 7. DocumentServer - Document Server
-  # ================================================================================
+  # --- База знаний / файлы: DocumentServer (рекомендуется вместе с MinIO) ---
   unicchat-documentserver:
     image: cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
     container_name: unicchat-documentserver
@@ -437,10 +474,10 @@ services:
       - unicchat-network
     stdin_open: true
     stop_grace_period: 60s
+    # Вариант B: nginx снаружи — раскомментируйте
+    # ports:
+    #   - "8081:80"
 
-  # ================================================================================
-  # 7.1. RabbitMQ - для DocumentServer
-  # ================================================================================
   unicchat-rabbitmq:
     image: cr.yandex/crpst6ndtaf70or2n2bb/rabbitmq:latest
     container_name: unicchat-rabbitmq
@@ -450,9 +487,6 @@ services:
     networks:
       - unicchat-network
 
-  # ================================================================================
-  # 7.2. PostgreSQL - для DocumentServer
-  # ================================================================================
   unicchat-postgresql:
     image: cr.yandex/crpst6ndtaf70or2n2bb/postgres:12
     container_name: unicchat-postgresql
