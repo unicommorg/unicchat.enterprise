@@ -1,8 +1,8 @@
 # UnicChat Services
 
-Канонический путь — один файл [`docker-compose.yml`](../docker-compose.yml).
+Эталон — один [`docker-compose.yml`](../docker-compose.yml).
 
 - Один сервер: `docker compose up -d --wait`
-- Отдельные серверы: тот же файл, на каждой машине свои сервисы — см. README, шаг 2a
+- Несколько серверов: вырезаете из compose нужные сервисы и переносите на машины — README, шаг 2a
 
 YAML в этом каталоге — старые контуры. Для новых установок не используйте.

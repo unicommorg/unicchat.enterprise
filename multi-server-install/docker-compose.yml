@@ -1,9 +1,10 @@
-# Один docker-compose.yml.
-# На одном сервере: docker compose up -d --wait
+# Один docker-compose.yml — эталон для установки на одном сервере:
+#   docker compose up -d --wait
 #
-# На отдельных серверах — тот же файл, запускайте только свои сервисы
-# (docker compose up -d --no-deps <сервисы>). Порты раскомментируйте
-# там, где сервис должен быть доступен с других машин.
+# На отдельных серверах: скопируйте этот файл на машину и УДАЛИТЕ
+# (вырежьте) сервисы, которые сюда не относятся. Оставьте только свою роль.
+# Уберите depends_on на отсутствующие сервисы, откройте ports, в .env
+# укажите IP соседних серверов. Затем: docker compose up -d
 #
 #   MongoDB:        unicchat-mongodb, vault-mongo-init
 #   Vault:          unicchat-vault, vault-init, unicchat-logger
@@ -12,10 +13,7 @@
 #   Knowledgebase:  unicchat-documentserver, unicchat-postgresql, unicchat-rabbitmq
 #   AppServer:      unicchat-appserver, unicchat-nginx
 #
-# Адреса между серверами — в .env (MONGODB_HOST, UNIC_SOLID_HOST,
-# API_VAULT_URL, API_LOGGER_URL, KBT_MONGO_HOST, KBT_MINIO_HOST,
-# DOCUMENT_SERVER_PROXY, MINIO_HOST). Секрет Vault KBTConfigs —
-# см. README шаг 2a.
+# Адреса между серверами — в .env. Секрет Vault KBTConfigs — README шаг 2a.
 
 services:
   # --- MongoDB ---
