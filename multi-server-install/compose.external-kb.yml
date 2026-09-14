@@ -1,0 +1,49 @@
+# Override: база знаний и MinIO на другом хосте (вариант C, app-хост).
+#
+# На этом хосте не поднимаются tasker, MinIO, DocumentServer и их зависимости.
+# Наружу (лучше только к KB-хосту) публикуются MongoDB, Vault и Logger —
+# tasker на KB-хосте ходит в них по IP.
+#
+#   docker compose -f docker-compose.yml -f compose.external-kb.yml up -d --wait
+#
+# Вместе с внешним nginx (вариант D):
+#   docker compose -f docker-compose.yml -f compose.external-nginx.yml -f compose.external-kb.yml up -d --wait
+#
+# KB-хост поднимается отдельным файлом compose.kb-host.yml.
+
+services:
+  unicchat-tasker:
+    profiles:
+      - bundled-kb
+
+  unicchat-minio:
+    profiles:
+      - bundled-kb
+
+  minio-init:
+    profiles:
+      - bundled-kb
+
+  unicchat-documentserver:
+    profiles:
+      - bundled-kb
+
+  unicchat-postgresql:
+    profiles:
+      - bundled-kb
+
+  unicchat-rabbitmq:
+    profiles:
+      - bundled-kb
+
+  unicchat-mongodb:
+    ports:
+      - "27017:27017"
+
+  unicchat-vault:
+    ports:
+      - "8200:80"
+
+  unicchat-logger:
+    ports:
+      - "8080:8080"

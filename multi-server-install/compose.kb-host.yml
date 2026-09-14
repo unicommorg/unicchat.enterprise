@@ -1,0 +1,150 @@
+# База знаний + MinIO + DocumentServer на отдельном хосте (вариант C/D).
+#
+# Запускать из каталога multi-server-install/ с тем же .env, что на app-хосте,
+# но с адресами Vault/Logger, доступными с этой машины:
+#   API_VAULT_URL=http://<app-host>:8200/
+#   API_LOGGER_URL=http://<app-host>:8080/
+#
+#   docker compose -f compose.kb-host.yml --env-file .env up -d --wait
+#
+# На app-хосте в .env до первого vault-init:
+#   UNIC_SOLID_HOST=http://<kb-host>:8080
+#   KBT_MINIO_HOST=unicchat-minio:9000
+#   KBT_MONGO_HOST=<app-host-ip>
+# (KBT_MINIO_HOST=unicchat-minio:9000 работает, потому что tasker и MinIO
+#  в одной docker-сети на этом хосте.)
+
+services:
+  unicchat-minio:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: unicchat-minio
+    restart: always
+    command: server --console-address ":9002" /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER: ${MINIO_BROWSER}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9002:9002"
+    networks:
+      - unicchat-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/minio-mc:latest
+    container_name: minio-init
+    restart: "no"
+    depends_on:
+      unicchat-minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+          mc alias set local "http://unicchat-minio:9000" "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+          mc mb --ignore-existing "local/$${MINIO_BUCKET}"
+          mc mb --ignore-existing "local/$${MINIO_DOCS_BUCKET}"
+          mc anonymous set public "local/$${MINIO_DOCS_BUCKET}"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-unicchat-files}
+      MINIO_DOCS_BUCKET: ${MINIO_DOCS_BUCKET:-uc.onlyoffice.docs}
+    networks:
+      - unicchat-network
+
+  unicchat-tasker:
+    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatkbasetasker:prod
+    container_name: unicchat-tasker
+    restart: always
+    environment:
+      api.vault.url: ${API_VAULT_URL}
+      api.logger.url: ${API_LOGGER_URL}
+    ports:
+      - "8080:8080"
+    networks:
+      - unicchat-network
+
+  unicchat-documentserver:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
+    container_name: unicchat-documentserver
+    restart: always
+    depends_on:
+      - unicchat-postgresql
+      - unicchat-rabbitmq
+    environment:
+      ALLOW_META_IP_ADDRESS: true
+      JWT_ENABLED: ${JWT_ENABLED}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_HEADER: ${JWT_HEADER}
+      DB_TYPE: ${DB_TYPE}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      AMQP_URI: ${AMQP_URI}
+      ALLOW_PRIVATE_IP_ADDRESS: ${ALLOW_PRIVATE_IP_ADDRESS}
+    volumes:
+      - documentserver_data:/var/www/uniceditor/Data
+      - documentserver_log:/var/log/uniceditor
+      - documentserver_cache:/var/lib/uniceditor/documentserver/App_Data/cache/files
+      - documentserver_files:/var/www/uniceditor/documentserver-example/public/files
+      - documentserver_fonts:/usr/share/fonts
+    ports:
+      - "8081:80"
+    networks:
+      - unicchat-network
+    stdin_open: true
+    stop_grace_period: 60s
+
+  unicchat-rabbitmq:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/rabbitmq:latest
+    container_name: unicchat-rabbitmq
+    restart: always
+    expose:
+      - "5672"
+    networks:
+      - unicchat-network
+
+  unicchat-postgresql:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/postgres:12
+    container_name: unicchat-postgresql
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgresql_data:/var/lib/postgresql
+    expose:
+      - "5432"
+    networks:
+      - unicchat-network
+
+networks:
+  unicchat-network:
+    name: unicchat-network
+
+volumes:
+  minio_data:
+    driver: local
+  documentserver_data:
+    driver: local
+  documentserver_log:
+    driver: local
+  documentserver_cache:
+    driver: local
+  documentserver_files:
+    driver: local
+  documentserver_fonts:
+    driver: local
+  postgresql_data:
+    driver: local

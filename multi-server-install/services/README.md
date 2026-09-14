@@ -1,63 +1,23 @@
-# UnicChat Services - Separate Deployment
+# UnicChat Services — separate compose files
 
-Эта директория содержит отдельные docker-compose файлы для каждого сервиса UnicChat.
+Канонический путь для новых установок — единый [`docker-compose.yml`](../docker-compose.yml) плюс override при необходимости:
 
-## Использование
+| Задача | Файлы |
+|--------|--------|
+| Всё на одном хосте (вариант A) | `docker-compose.yml` |
+| Nginx и certbot снаружи (вариант B) | `docker-compose.yml` + [`compose.external-nginx.yml`](../compose.external-nginx.yml) |
+| База знаний и MinIO на другом хосте, app-сторона (вариант C/D) | `docker-compose.yml` + [`compose.external-kb.yml`](../compose.external-kb.yml) |
+| База знаний и MinIO, KB-хост | [`compose.kb-host.yml`](../compose.kb-host.yml) |
+| Edge + отдельная KB (вариант D) | на app-хосте оба override; на KB-хосте `compose.kb-host.yml`; nginx — [`nginx/examples/host/`](../nginx/examples/host/) |
 
-Вы можете запустить сервисы по отдельности на разных серверах:
+Инструкция: корневой [README.md](../../README.md), разделы 2.10–2.12.
 
-### MongoDB
-```bash
-cd multi-server-install/services
-docker-compose -f mongodb.yml up -d
-```
+## Legacy YAML в этом каталоге
 
-### AppServer
-```bash
-cd multi-server-install/services
-docker-compose -f appserver.yml up -d
-```
+Файлы `mongodb.yml`, `appserver.yml`, `vault.yml`, `logger.yml`, `tasker.yml`, `minio.yml`, `documentserver.yml` оставлены для старых контуров. Образы и пути `env_file` в них **не совпадают** с текущим единым compose. Для клиентских установок их не используйте.
 
-### Vault
-```bash
-cd multi-server-install/services
-docker-compose -f vault.yml up -d
-```
+Если всё же запускаете их:
 
-### Logger
-```bash
-cd multi-server-install/services
-docker-compose -f logger.yml up -d
-```
-
-### Tasker
-```bash
-cd multi-server-install/services
-docker-compose -f tasker.yml up -d
-```
-
-### MinIO
-```bash
-cd multi-server-install/services
-docker-compose -f minio.yml up -d
-```
-
-### DocumentServer
-```bash
-cd multi-server-install/services
-docker-compose -f documentserver.yml up -d
-```
-
-## Важно!
-
-1. **Сеть**: Все сервисы должны быть в одной сети `unicchat-network`
-2. **Env файлы**: Необходимо создать файлы окружения в директории `multi-server-install/`
-3. **Зависимости**: Некоторые сервисы зависят от других (например, AppServer от MongoDB)
-
-## Для распределенной установки
-
-Если сервисы на разных серверах, настройте:
-
-1. Внешнюю сеть (overlay network в Docker Swarm или аналог)
-2. Измените `unicchat-mongodb` на реальный IP/hostname MongoDB сервера
-3. Аналогично для других зависимостей
+1. Сеть `unicchat-network` должна существовать (`docker network create unicchat-network`).
+2. Env-файлы, на которые ссылаются YAML, нужно создать самостоятельно.
+3. На разных серверах замените docker-DNS (`unicchat-mongodb` и т.д.) на реальные IP/hostname.

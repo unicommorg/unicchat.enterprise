@@ -205,7 +205,7 @@ services:
                 \"type\": \"Password\",
                 \"data\": \"All info in META\",
                 \"metadata\": {
-                  \"MongoCS\": \"mongodb://$${TASKER_DB_USER}:$${TASKER_DB_PASSWORD}@unicchat-mongodb:27017/$${TASKER_DB_NAME}?directConnection=true&authSource=$${TASKER_DB_NAME}&authMechanism=SCRAM-SHA-256&replicaSet=$${MONGODB_REPLICA_SET_NAME}\",
+                  \"MongoCS\": \"mongodb://$${TASKER_DB_USER}:$${TASKER_DB_PASSWORD}@$${KBT_MONGO_HOST}:27017/$${TASKER_DB_NAME}?directConnection=true&authSource=$${TASKER_DB_NAME}&authMechanism=SCRAM-SHA-256&replicaSet=$${MONGODB_REPLICA_SET_NAME}\",
                   \"MinioHost\": \"$${MINIO_HOST}\",
                   \"MinioUser\": \"$${MINIO_USER}\",
                   \"MinioPass\": \"$${MINIO_PASSWORD}\"
@@ -237,9 +237,10 @@ services:
       TASKER_DB_USER: ${TASKER_DB_USER}
       TASKER_DB_PASSWORD: ${TASKER_DB_PASSWORD}
       TASKER_DB_NAME: ${TASKER_DB_NAME}
-      MINIO_HOST: unicchat-minio:9000
+      MINIO_HOST: ${KBT_MINIO_HOST:-unicchat-minio:9000}
       MINIO_USER: ${MINIO_ROOT_USER}
       MINIO_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      KBT_MONGO_HOST: ${KBT_MONGO_HOST:-unicchat-mongodb}
       MONGODB_REPLICA_SET_NAME: ${MONGODB_REPLICA_SET_NAME}
       VAULT_INIT_RETRIES: 10
       VAULT_INIT_RETRY_DELAY: 5
