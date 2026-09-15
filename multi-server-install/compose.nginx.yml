@@ -1,0 +1,38 @@
+# Роль Nginx. Запуск: docker compose -f compose.nginx.yml up -d
+# Сверьте image: с docker-compose.yml.
+# Upstream AppServer — UNICCHAT_HOST в .env (IP сервера AppServer).
+services:
+  unicchat-nginx:
+    image: cr.yandex/crpst6ndtaf70or2n2bb/nginx:2.4.1
+    container_name: unicchat-nginx
+    restart: always
+    environment:
+      ROOT_URL: ${ROOT_URL}
+      APP_SERVER_NAME: ${APP_SERVER_NAME}
+      UNICCHAT_HOST: ${UNICCHAT_HOST}
+      PORT: ${PORT}
+      SSL_CERT: ${SSL_CERT}
+      SSL_KEY: ${SSL_KEY}
+      DOCUMENTSERVER_PROXY_ENABLE: ${DOCUMENTSERVER_PROXY_ENABLE}
+      DOCUMENTSERVER_SERVER_NAME: ${DOCUMENTSERVER_SERVER_NAME}
+      DOCUMENT_SERVER_PROXY: ${DOCUMENT_SERVER_PROXY}
+      DOCUMENTSERVER_SSL_CERT: ${DOCUMENTSERVER_SSL_CERT}
+      DOCUMENTSERVER_SSL_KEY: ${DOCUMENTSERVER_SSL_KEY}
+      MINIO_PROXY_ENABLE: ${MINIO_PROXY_ENABLE}
+      MINIO_SERVER_NAME: ${MINIO_SERVER_NAME}
+      MINIO_HOST: ${MINIO_HOST}
+      MINIO_PORT: ${MINIO_PORT}
+      MINIO_SSL_CERT: ${MINIO_SSL_CERT}
+      MINIO_SSL_KEY: ${MINIO_SSL_KEY}
+    volumes:
+    - ./certs:/certs
+    - ./nginx/templates:/etc/nginx/templates:ro
+    - ./nginx/conf.d:/etc/nginx/conf.d
+    ports:
+    - 80:80
+    - 443:443
+    networks:
+    - unicchat-network
+networks:
+  unicchat-network:
+    name: unicchat-network

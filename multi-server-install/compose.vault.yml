@@ -1,5 +1,6 @@
 # Роль Vault. Запуск: docker compose -f compose.vault.yml up -d
 # Сверьте image: с docker-compose.yml.
+# Logger — отдельный сервер: api.logger.url из API_LOGGER_URL в .env.
 services:
   unicchat-vault:
     image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
@@ -8,7 +9,7 @@ services:
     command: server
     environment:
       MongoCS: mongodb://${VAULT_DB_USER}:${VAULT_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${VAULT_DB_NAME}?directConnection=true&authSource=${VAULT_DB_NAME}&replicaSet=${MONGODB_REPLICA_SET_NAME}&authMechanism=SCRAM-SHA-256
-      api.logger.url: http://unicchat-logger:8080/
+      api.logger.url: ${API_LOGGER_URL}
     volumes:
     - vault-data:/vault/file/
     networks:
@@ -17,17 +18,6 @@ services:
     - IPC_LOCK
     ports:
     - 8200:80
-  unicchat-logger:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/uniclogger:prod
-    container_name: unicchat-logger
-    restart: always
-    environment:
-      MongoCS: mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}
-      api.logger.url: ${API_LOGGER_URL}
-    networks:
-    - unicchat-network
-    ports:
-    - 8080:8080
   vault-init:
     image: curlimages/curl:8.8.0
     container_name: vault-init
