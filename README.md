@@ -415,7 +415,6 @@ echo "MINIO_ROOT_PASSWORD=$(gen)"
 - `LICENSE_HOST=https://push1.unic.chat/`
 - Пути к сертификатам: `/certs/config/live/<домен>/fullchain.pem` и `privkey.pem`. После смены домена поправьте `SSL_CERT`/`SSL_KEY`, `DOCUMENTSERVER_SSL_*`, `MINIO_SSL_*`.
 - На одном сервере оставьте имена контейнеров: `UNIC_SOLID_HOST=http://unicchat-tasker:8080`, `API_VAULT_URL=http://unicchat-vault/`, `API_LOGGER_URL=http://unicchat-logger:8080/`, `KBT_MINIO_HOST=unicchat-minio:9000`, `KBT_MONGO_HOST=unicchat-mongodb`, `UNICCHAT_HOST=unicchat-appserver`, `DOCUMENT_SERVER_PROXY=unicchat-documentserver`, `MINIO_HOST=unicchat-minio`, а `NGINX_APP_PORT` не задавайте. На отдельных серверах эти же переменные меняются на IP и хостовые порты — таблица в [шаге 2a](#-2a-multi).
-- Версии образов не правьте в compose-файлах: все теги вынесены в `IMAGE_*` в `.env` и одинаковы для одного и нескольких серверов.
 
 Секрет `KBTConfigs` создаёт `vault-init` один раз. При смене адресов MongoDB/MinIO для tasker — [п. «Секрет Vault KBTConfigs»](#-2a-vault).
 
@@ -628,7 +627,7 @@ sudo ufw status
 | AppServer | `10.0.10.17` |
 | Nginx | `10.0.10.18` |
 
-Порты, которые файл роли публикует на хосте. Их и открывайте между серверами (не в интернет):
+Порты, которые файл роли публикует на хосте. Их и открывайте между серверами:
 
 | Роль | Порт на хосте | Внутри контейнера | Кто ходит |
 |------|---------------|-------------------|-----------|
@@ -641,7 +640,7 @@ sudo ufw status
 | AppServer | 8080 | 3000 | Nginx |
 | Nginx | 80, 443 | 80, 443 | пользователи |
 
-Порт на хосте и внутренний порт различаются. В `.env` соседей указывают **порт на хосте**: Logger — `8082`, Tasker — `8881`, AppServer — `8080`, DocumentServer — `8880`. Logger и Tasker внутри слушают один и тот же `8080`, поэтому на хосте они разведены.
+Порт на хосте и внутренний порт различаются. В `.env` соседей указывают **порт на хосте**: Logger — `8082`, Tasker — `8881`, AppServer — `8080`, DocumentServer — `8880`.
 
 <!-- TOC --><a name="-2a-roles"></a>
 ### Файлы ролей
