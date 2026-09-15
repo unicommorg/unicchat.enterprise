@@ -51,7 +51,7 @@
 - [Шаг 2a. Установка на отдельных серверах](#-2a-multi)
    * [Что такое роль](#-2a-role)
    * [Состав серверов](#-2a-map)
-   * [Файлы ролей и теги образов](#-2a-roles)
+   * [Файлы ролей](#-2a-roles)
    * [Общий `.env` и адреса](#-2a-env)
    * [Порядок запуска](#-2a-order)
    * [Секрет Vault KBTConfigs](#-2a-vault)
@@ -112,7 +112,7 @@ cd multi-server-install
 docker compose up -d --wait
 ```
 
-На нескольких серверах те же сервисы разнесены по `compose.<роль>.yml`. Перед запуском сверьте `image:` в файле роли с `docker-compose.yml` (шаг 2a).
+На нескольких серверах те же сервисы разнесены по `compose.<роль>.yml`. Образы берутся из `IMAGE_*` в `.env` (шаг 2a).
 
 <!-- TOC --><a name="-multi-host"></a>
 ### Установка на отдельных серверах
@@ -369,7 +369,7 @@ cd unicchat.enterprise/multi-server-install
 cp .env.example .env
 ```
 
-Значения `change_me_*` из `.env.example` замените своими паролями (п. ниже) и подставьте их в `.env`.
+Значения `change_me_*` из `.env.example` замените своими паролями (п. ниже) и подставьте их в `.env`. Теги контейнеров — переменные `IMAGE_*` в том же файле; их копируют на все серверы как есть.
 
 <!-- TOC --><a name="24-secrets"></a>
 #### Свои секреты и учётные данные
@@ -386,7 +386,6 @@ cp .env.example .env
 | `LOGGER_DB_PASSWORD` | БД Logger |
 | `TASKER_DB_PASSWORD` | БД Tasker / базы знаний |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | S3; попадут в секрет Vault `KBTConfigs` |
-| Пароль администратора в шаге 6 | вход в продукт, не из `.env` |
 
 Имена служебных пользователей (`MONGODB_USERNAME`, `VAULT_DB_USER`, `LOGGER_DB_USER`, `TASKER_DB_USER`, `MINIO_ROOT_USER`) тоже лучше задать свои, а не оставлять из примера.
 
@@ -585,7 +584,7 @@ sudo ufw status
 
 На сервере запускаете только свой файл. Logger не входит в файл Vault; nginx не входит в файл AppServer.
 
-Перед `up` **сверьте `image:`** в файле роли с эталоном `docker-compose.yml` (тег и имя образа должны совпадать).
+Перед `up` тот же `.env`, что на остальных серверах: пароли одинаковые, адреса — IP соседей, теги образов — `IMAGE_*` (меняются только в `.env`).
 
 На каждом сервере: Docker, `docker login` в `cr.yandex`, каталог `multi-server-install/`, общий `.env` (пароли одинаковые, адреса — IP соседей).
 
@@ -638,27 +637,22 @@ sudo ufw status
 | AppServer | 3000 | Nginx |
 
 <!-- TOC --><a name="-2a-roles"></a>
-### Файлы ролей и теги образов
+### Файлы ролей
 
 Пример запуска MongoDB:
 
 ```shell
 cd multi-server-install
-# сверьте image: unicchat-mongodb и vault-mongo-init с docker-compose.yml
 docker compose -f compose.mongodb.yml pull
 docker compose -f compose.mongodb.yml up -d
 ```
 
-Сверка тегов:
-
-```shell
-grep 'image:' docker-compose.yml compose.mongodb.yml
-```
+Образ MongoDB берётся из `IMAGE_MONGODB` в `.env`.
 
 <!-- TOC --><a name="-2a-env"></a>
 ### Общий `.env` и адреса
 
-Пароли на всех серверах одинаковые. Вместо имён контейнеров — IP:
+Пароли и `IMAGE_*` на всех серверах одинаковые. Вместо имён контейнеров — IP:
 
 ```
 MONGODB_HOST=10.0.10.11
@@ -679,7 +673,7 @@ ROOT_URL=https://<APP_SERVER_NAME>
 <!-- TOC --><a name="-2a-order"></a>
 ### Порядок запуска
 
-На каждом сервере (свой `compose.<роль>.yml`, предварительно сверьте `image:` с эталоном):
+На каждом сервере (свой `compose.<роль>.yml`, тот же `.env`):
 
 ```shell
 docker compose -f compose.<роль>.yml pull

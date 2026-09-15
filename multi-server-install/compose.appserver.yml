@@ -1,8 +1,8 @@
 # Роль AppServer. Запуск: docker compose -f compose.appserver.yml up -d
-# Сверьте image: с docker-compose.yml.
+# Образы — IMAGE_* в .env.
 services:
   unicchat-appserver:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/unic_chat_appserver:2.4.3
+    image: ${IMAGE_APPSERVER}
     container_name: unicchat-appserver
     restart: always
     environment:

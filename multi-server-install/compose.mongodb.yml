@@ -1,8 +1,8 @@
 # Роль MongoDB. Запуск: docker compose -f compose.mongodb.yml up -d
-# Сверьте image: с docker-compose.yml.
+# Образы — IMAGE_* в .env.
 services:
   unicchat-mongodb:
-    image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
+    image: ${IMAGE_MONGODB}
     container_name: unicchat-mongodb
     restart: always
     environment:
@@ -29,7 +29,7 @@ services:
     ports:
     - 27017:27017
   vault-mongo-init:
-    image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
+    image: ${IMAGE_MONGODB}
     container_name: vault-mongo-init
     restart: 'no'
     depends_on:

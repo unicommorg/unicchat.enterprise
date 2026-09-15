@@ -1,8 +1,8 @@
 # Роль Tasker. Запуск: docker compose -f compose.tasker.yml up -d
-# Сверьте image: с docker-compose.yml.
+# Образы — IMAGE_* в .env.
 services:
   unicchat-tasker:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatkbasetasker:prod
+    image: ${IMAGE_TASKER}
     container_name: unicchat-tasker
     restart: always
     environment:

@@ -1,8 +1,8 @@
 # Роль MinIO. Запуск: docker compose -f compose.minio.yml up -d
-# Сверьте image: с docker-compose.yml.
+# Образы — IMAGE_* в .env.
 services:
   unicchat-minio:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/minio:RELEASE.2024-12-18T13-15-44Z
+    image: ${IMAGE_MINIO}
     container_name: unicchat-minio
     restart: always
     command: server --console-address ":9002" /data
@@ -27,7 +27,7 @@ services:
       timeout: 5s
       retries: 5
   minio-init:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/minio-mc:latest
+    image: ${IMAGE_MINIO_MC}
     container_name: minio-init
     restart: 'no'
     depends_on:

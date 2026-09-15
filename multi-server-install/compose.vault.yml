@@ -1,9 +1,9 @@
 # Роль Vault. Запуск: docker compose -f compose.vault.yml up -d
-# Сверьте image: с docker-compose.yml.
+# Образы — IMAGE_* в .env.
 # Logger — отдельный сервер: api.logger.url из API_LOGGER_URL в .env.
 services:
   unicchat-vault:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
+    image: ${IMAGE_VAULT}
     container_name: unicchat-vault
     restart: always
     command: server
@@ -19,7 +19,7 @@ services:
     ports:
     - 8200:80
   vault-init:
-    image: curlimages/curl:8.8.0
+    image: ${IMAGE_VAULT_INIT}
     container_name: vault-init
     restart: 'no'
     depends_on:

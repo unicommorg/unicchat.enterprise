@@ -1,9 +1,9 @@
 # Роль Nginx. Запуск: docker compose -f compose.nginx.yml up -d
-# Сверьте image: с docker-compose.yml.
+# Образы — IMAGE_* в .env.
 # Upstream AppServer — UNICCHAT_HOST в .env (IP сервера AppServer).
 services:
   unicchat-nginx:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/nginx:2.4.1
+    image: ${IMAGE_NGINX}
     container_name: unicchat-nginx
     restart: always
     environment:

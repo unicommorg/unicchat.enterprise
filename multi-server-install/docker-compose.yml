@@ -4,13 +4,13 @@
 # Несколько серверов — compose.mongodb.yml, compose.vault.yml,
 # compose.logger.yml, compose.minio.yml, compose.tasker.yml,
 # compose.knowledgebase.yml, compose.appserver.yml, compose.nginx.yml.
-# Перед запуском сверьте image: в файле роли с этим файлом.
+# Теги образов — IMAGE_* в .env.
 # Подробности: README шаг 2a.
 
 services:
   # --- MongoDB ---
   unicchat-mongodb:
-    image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
+    image: ${IMAGE_MONGODB}
     container_name: unicchat-mongodb
     restart: always
     environment:
@@ -42,7 +42,7 @@ services:
 
   # --- Vault ---
   unicchat-vault:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicvault:prod
+    image: ${IMAGE_VAULT}
     container_name: unicchat-vault
     restart: always
     depends_on:
@@ -63,7 +63,7 @@ services:
     #   - "8200:80"
 
   vault-mongo-init:
-    image: cr.yandex/crps5m51hmah43pmfb23/mongodb:4.4
+    image: ${IMAGE_MONGODB}
     container_name: vault-mongo-init
     restart: "no"
     depends_on:
@@ -173,7 +173,7 @@ services:
       - unicchat-network
 
   vault-init:
-    image: curlimages/curl:8.8.0
+    image: ${IMAGE_VAULT_INIT}
     container_name: vault-init
     restart: "no"
     depends_on:
@@ -264,7 +264,7 @@ services:
 
   # --- AppServer ---
   unicchat-appserver:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/unic_chat_appserver:2.4.3
+    image: ${IMAGE_APPSERVER}
     container_name: unicchat-appserver
     restart: always
     depends_on:
@@ -299,7 +299,7 @@ services:
 
   # --- Logger (обычно с Vault) ---
   unicchat-logger:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/uniclogger:prod
+    image: ${IMAGE_LOGGER}
     container_name: unicchat-logger
     restart: always
     depends_on:
@@ -316,7 +316,7 @@ services:
 
   # --- Tasker ---
   unicchat-tasker:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/unicchatkbasetasker:prod
+    image: ${IMAGE_TASKER}
     container_name: unicchat-tasker
     restart: always
     depends_on:
@@ -334,7 +334,7 @@ services:
 
   # --- Nginx (с AppServer; можно заменить своим nginx) ---
   unicchat-nginx:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/nginx:2.4.1
+    image: ${IMAGE_NGINX}
     container_name: unicchat-nginx
     restart: always
     depends_on:
@@ -376,7 +376,7 @@ services:
 
   # --- MinIO ---
   unicchat-minio:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/minio:RELEASE.2024-12-18T13-15-44Z
+    image: ${IMAGE_MINIO}
     container_name: unicchat-minio
     restart: always
     command: server --console-address ":9002" /data
@@ -399,7 +399,7 @@ services:
       retries: 5
 
   minio-init:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/minio-mc:latest
+    image: ${IMAGE_MINIO_MC}
     container_name: minio-init
     restart: "no"
     depends_on:
@@ -431,7 +431,7 @@ services:
 
   # --- Knowledgebase: DocumentServer ---
   unicchat-documentserver:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
+    image: ${IMAGE_DOCUMENTSERVER}
     container_name: unicchat-documentserver
     restart: always
     depends_on:
@@ -464,7 +464,7 @@ services:
     #   - "8081:80"
 
   unicchat-rabbitmq:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/rabbitmq:latest
+    image: ${IMAGE_RABBITMQ}
     container_name: unicchat-rabbitmq
     restart: always
     expose:
@@ -473,7 +473,7 @@ services:
       - unicchat-network
 
   unicchat-postgresql:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/postgres:12
+    image: ${IMAGE_POSTGRES}
     container_name: unicchat-postgresql
     restart: always
     environment:

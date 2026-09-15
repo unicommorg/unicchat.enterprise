@@ -1,8 +1,8 @@
 # Роль Logger. Запуск: docker compose -f compose.logger.yml up -d
-# Сверьте image: с docker-compose.yml.
+# Образы — IMAGE_* в .env.
 services:
   unicchat-logger:
-    image: cr.yandex/crpi5ll6mqcn793fvu9i/unic/uniclogger:prod
+    image: ${IMAGE_LOGGER}
     container_name: unicchat-logger
     restart: always
     environment:

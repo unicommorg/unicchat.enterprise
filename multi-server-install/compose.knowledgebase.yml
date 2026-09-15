@@ -1,8 +1,8 @@
 # Роль Knowledgebase. Запуск: docker compose -f compose.knowledgebase.yml up -d
-# Сверьте image: с docker-compose.yml.
+# Образы — IMAGE_* в .env.
 services:
   unicchat-documentserver:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/uniceditor:latest
+    image: ${IMAGE_DOCUMENTSERVER}
     container_name: unicchat-documentserver
     restart: always
     depends_on:
@@ -33,7 +33,7 @@ services:
     ports:
     - 8081:80
   unicchat-postgresql:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/postgres:12
+    image: ${IMAGE_POSTGRES}
     container_name: unicchat-postgresql
     restart: always
     environment:
@@ -47,7 +47,7 @@ services:
     networks:
     - unicchat-network
   unicchat-rabbitmq:
-    image: cr.yandex/crpst6ndtaf70or2n2bb/rabbitmq:latest
+    image: ${IMAGE_RABBITMQ}
     container_name: unicchat-rabbitmq
     restart: always
     expose:
