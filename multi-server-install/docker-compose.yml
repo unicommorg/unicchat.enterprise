@@ -36,9 +36,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    # На отдельных серверах — раскомментируйте
-    # ports:
-    #   - "27017:27017"
+    ports:
+      - "27017:27017"
 
   # --- Vault ---
   unicchat-vault:
@@ -58,9 +57,8 @@ services:
       - unicchat-network
     cap_add:
       - IPC_LOCK
-    # На отдельных серверах — раскомментируйте
-    # ports:
-    #   - "8200:80"
+    ports:
+      - "8200:80"
 
   vault-mongo-init:
     image: ${IMAGE_MONGODB}
@@ -293,9 +291,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 90s
-    # Внешний nginx / отдельные серверы — раскомментируйте
-    # ports:
-    #   - "3000:3000"
+    ports:
+      - "8080:3000"
 
   # --- Logger (обычно с Vault) ---
   unicchat-logger:
@@ -307,12 +304,12 @@ services:
         condition: service_healthy
     environment:
       MongoCS: "mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}"
+      Storage__ConnectionString: "mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}"
       api.logger.url: ${API_LOGGER_URL}
     networks:
       - unicchat-network
-    # На отдельных серверах — раскомментируйте
-    # ports:
-    #   - "8080:8080"
+    ports:
+      - "8082:8080"
 
   # --- Tasker ---
   unicchat-tasker:
@@ -322,10 +319,8 @@ services:
     depends_on:
       unicchat-mongodb:
         condition: service_healthy
-    # На сервере Tasker — раскомментируйте порт
-    # (запуск: docker compose up -d --no-deps unicchat-tasker)
-    # ports:
-    #   - "8080:8080"
+    ports:
+      - "8881:8080"
     environment:
       api.vault.url: ${API_VAULT_URL}
       api.logger.url: ${API_LOGGER_URL}
@@ -344,7 +339,7 @@ services:
       ROOT_URL: ${ROOT_URL}
       APP_SERVER_NAME: ${APP_SERVER_NAME}
       UNICCHAT_HOST: ${UNICCHAT_HOST}
-      PORT: ${PORT}
+      PORT: ${NGINX_APP_PORT:-${PORT}}
       SSL_CERT: ${SSL_CERT}
       SSL_KEY: ${SSL_KEY}
       # SSL_CERTIFICATE_FILE_IN_BASE64: ${SSL_CERTIFICATE_FILE_IN_BASE64}
@@ -459,9 +454,9 @@ services:
       - unicchat-network
     stdin_open: true
     stop_grace_period: 60s
-    # Внешний nginx / отдельные серверы — раскомментируйте
-    # ports:
-    #   - "8081:80"
+    ports:
+      - "8880:80"
+      - "8443:443"
 
   unicchat-rabbitmq:
     image: ${IMAGE_RABBITMQ}

@@ -31,7 +31,8 @@ services:
     stdin_open: true
     stop_grace_period: 60s
     ports:
-    - 8081:80
+    - 8880:80
+    - 8443:443
   unicchat-postgresql:
     image: ${IMAGE_POSTGRES}
     container_name: unicchat-postgresql

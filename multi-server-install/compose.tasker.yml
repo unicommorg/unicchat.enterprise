@@ -11,7 +11,7 @@ services:
     networks:
     - unicchat-network
     ports:
-    - 8080:8080
+    - 8881:8080
 networks:
   unicchat-network:
     name: unicchat-network

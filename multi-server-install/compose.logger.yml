@@ -7,11 +7,12 @@ services:
     restart: always
     environment:
       MongoCS: mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}
+      Storage__ConnectionString: mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}
       api.logger.url: ${API_LOGGER_URL}
     networks:
     - unicchat-network
     ports:
-    - 8080:8080
+    - 8082:8080
 networks:
   unicchat-network:
     name: unicchat-network

@@ -33,7 +33,7 @@ services:
       retries: 10
       start_period: 90s
     ports:
-    - 3000:3000
+    - 8080:3000
 networks:
   unicchat-network:
     name: unicchat-network
