@@ -56,6 +56,7 @@
    * [Порядок запуска](#-2a-order)
    * [Секрет Vault KBTConfigs](#-2a-vault)
    * [Nginx и сертификаты](#-2a-nginx)
+   * [Частые ошибки](#-2a-troubles)
 - [Шаг 3. Установка локального медиа сервера для ВКС](#-3-)
 - [Шаг 6. Создание пользователя администратора](#-6-)
 - [Шаг 7. Настройка push-уведомлений](#-7-push-)
@@ -235,7 +236,9 @@ RAM 8 Gb;
 <!-- TOC --><a name="12-unicchat-solid-core"></a>
 ### 1.2. Запрос лицензии для Unicchat Solid Core
 
-Просим обратиться в компанию unicomm для выдачи лицензии Unicchat Solid Core
+> **Обязательный шаг. Запросите лицензию Unicchat Solid Core в компании Unicomm до начала установки.**
+>
+> **Без действующей лицензии контейнеры поднимутся, но продукт работать не будет.**
 
 
 
@@ -411,7 +414,8 @@ echo "MINIO_ROOT_PASSWORD=$(gen)"
 - `ROOT_URL=https://<APP_SERVER_NAME>`
 - `LICENSE_HOST=https://push1.unic.chat/`
 - Пути к сертификатам: `/certs/config/live/<домен>/fullchain.pem` и `privkey.pem`. После смены домена поправьте `SSL_CERT`/`SSL_KEY`, `DOCUMENTSERVER_SSL_*`, `MINIO_SSL_*`.
-- На одном сервере оставьте `UNIC_SOLID_HOST=http://unicchat-tasker:8080`, `KBT_MINIO_HOST=unicchat-minio:9000`, `KBT_MONGO_HOST=unicchat-mongodb`. На отдельных серверах — [шаг 2a](#-2a-multi).
+- На одном сервере оставьте имена контейнеров: `UNIC_SOLID_HOST=http://unicchat-tasker:8080`, `API_VAULT_URL=http://unicchat-vault/`, `API_LOGGER_URL=http://unicchat-logger:8080/`, `KBT_MINIO_HOST=unicchat-minio:9000`, `KBT_MONGO_HOST=unicchat-mongodb`, `UNICCHAT_HOST=unicchat-appserver`, `DOCUMENT_SERVER_PROXY=unicchat-documentserver`, `MINIO_HOST=unicchat-minio`, а `NGINX_APP_PORT` не задавайте. На отдельных серверах эти же переменные меняются на IP и хостовые порты — таблица в [шаге 2a](#-2a-multi).
+- Версии образов не правьте в compose-файлах: все теги вынесены в `IMAGE_*` в `.env` и одинаковы для одного и нескольких серверов.
 
 Секрет `KBTConfigs` создаёт `vault-init` один раз. При смене адресов MongoDB/MinIO для tasker — [п. «Секрет Vault KBTConfigs»](#-2a-vault).
 
@@ -624,17 +628,20 @@ sudo ufw status
 | AppServer | `10.0.10.17` |
 | Nginx | `10.0.10.18` |
 
-Между этими серверами откройте только нужные порты (не в интернет):
+Порты, которые файл роли публикует на хосте. Их и открывайте между серверами (не в интернет):
 
-| Куда | Порт | Кто ходит |
-|------|------|-----------|
-| MongoDB | 27017 | Vault, Logger, Tasker, AppServer |
-| Vault | 8200 | Tasker, `vault-init` |
-| Logger | 8080 | Vault, Tasker |
-| MinIO | 9000 | Tasker, Knowledgebase, Nginx |
-| Tasker | 8080 | AppServer |
-| Knowledgebase | 8081 | Nginx (DocumentServer) |
-| AppServer | 3000 | Nginx |
+| Роль | Порт на хосте | Внутри контейнера | Кто ходит |
+|------|---------------|-------------------|-----------|
+| MongoDB | 27017 | 27017 | Vault, Logger, Tasker, AppServer |
+| Vault | 8200 | 80 | Tasker, `vault-init` |
+| Logger | 8082 | 8080 | Vault, Tasker |
+| MinIO | 9000, 9002 | 9000, 9002 | Tasker, Knowledgebase, Nginx |
+| Tasker | 8881 | 8080 | AppServer |
+| Knowledgebase | 8880, 8443 | 80, 443 | Nginx (DocumentServer) |
+| AppServer | 8080 | 3000 | Nginx |
+| Nginx | 80, 443 | 80, 443 | пользователи |
+
+Порт на хосте и внутренний порт различаются. В `.env` соседей указывают **порт на хосте**: Logger — `8082`, Tasker — `8881`, AppServer — `8080`, DocumentServer — `8880`. Logger и Tasker внутри слушают один и тот же `8080`, поэтому на хосте они разведены.
 
 <!-- TOC --><a name="-2a-roles"></a>
 ### Файлы ролей
@@ -652,23 +659,47 @@ docker compose -f compose.mongodb.yml up -d
 <!-- TOC --><a name="-2a-env"></a>
 ### Общий `.env` и адреса
 
-Пароли и `IMAGE_*` на всех серверах одинаковые. Вместо имён контейнеров — IP:
+`.env` один и тот же на всех серверах: пароли, `IMAGE_*` и адреса совпадают. Меняются только те переменные, где вместо имени контейнера нужен **IP соседа и порт на хосте**.
 
-```
-MONGODB_HOST=10.0.10.11
-UNIC_SOLID_HOST=http://10.0.10.15:8080
-API_VAULT_URL=http://10.0.10.12:8200/
-API_LOGGER_URL=http://10.0.10.13:8080/
-KBT_MONGO_HOST=10.0.10.11
-KBT_MINIO_HOST=10.0.10.14:9000
-DOCUMENT_SERVER_PROXY=10.0.10.16
-MINIO_HOST=10.0.10.14
-MINIO_PORT=9000
-UNICCHAT_HOST=10.0.10.17
-ROOT_URL=https://<APP_SERVER_NAME>
-```
+Полный список правок относительно `.env.example` (IP — из примера выше):
 
-На серверах Vault и Tasker `API_LOGGER_URL` — URL Logger. На сервере Nginx: `UNICCHAT_HOST` — IP AppServer, `DOCUMENT_SERVER_PROXY` — IP Knowledgebase, `MINIO_HOST` — IP MinIO. Сертификаты (п. 2.5–2.6) выпускают на сервере Nginx.
+| Переменная | Один сервер | Отдельные серверы | Чей адрес |
+|------------|-------------|-------------------|-----------|
+| `MONGODB_HOST` | `unicchat-mongodb` | `10.0.10.11` | MongoDB |
+| `MONGODB_ADVERTISED_HOSTNAME` | `unicchat-mongodb` | `10.0.10.11` | MongoDB |
+| `API_VAULT_URL` | `http://unicchat-vault/` | `http://10.0.10.12:8200/` | Vault |
+| `API_LOGGER_URL` | `http://unicchat-logger:8080/` | `http://10.0.10.13:8082/` | Logger |
+| `UNIC_SOLID_HOST` | `http://unicchat-tasker:8080` | `http://10.0.10.15:8881` | Tasker |
+| `KBT_MONGO_HOST` | `unicchat-mongodb` | `10.0.10.11` | MongoDB |
+| `KBT_MINIO_HOST` | `unicchat-minio:9000` | `10.0.10.14:9000` | MinIO |
+| `MINIO_HOST` | `unicchat-minio` | `10.0.10.14` | MinIO |
+| `DOCUMENT_SERVER_PROXY` | `unicchat-documentserver` | `10.0.10.16:8880` | Knowledgebase |
+| `UNICCHAT_HOST` | `unicchat-appserver` | `10.0.10.17` | AppServer |
+| `NGINX_APP_PORT` | не задавать | `8080` | AppServer |
+| `ROOT_URL` | `https://${APP_SERVER_NAME}` | `https://${APP_SERVER_NAME}` | не меняется |
+
+`NGINX_APP_PORT` нужен потому, что `PORT=3000` — порт внутри контейнера AppServer, а на отдельном сервере nginx идёт на хостовый `8080`. На одном сервере переменную оставляют пустой, и nginx берёт `PORT`.
+
+`DOCUMENT_SERVER_PROXY` на отдельных серверах **с портом** `:8880`. Без порта nginx пойдёт на `:80` того же хоста, то есть на себя.
+
+`KBT_MONGO_HOST` и `KBT_MINIO_HOST` попадают в секрет Vault `KBTConfigs`. Их правят **до** первого запуска `vault-init`, иначе секрет придётся пересоздавать (см. ниже).
+
+Что от роли зависит:
+
+| Роль | Переменные, которые обязаны быть заполнены |
+|------|--------------------------------------------|
+| MongoDB | `MONGODB_*` (пароли, `MONGODB_HOST`, `MONGODB_ADVERTISED_HOSTNAME`) |
+| Vault | `VAULT_DB_*`, `MONGODB_HOST`, `API_LOGGER_URL` |
+| Logger | `LOGGER_DB_*`, `MONGODB_HOST`, `API_LOGGER_URL` |
+| MinIO | `MINIO_ROOT_*`, `MINIO_BUCKET`, `MINIO_DOCS_BUCKET` |
+| Tasker | `API_VAULT_URL`, `API_LOGGER_URL`, `TASKER_DB_*` |
+| Knowledgebase | `DB_*`, `AMQP_URI`, `JWT_*` |
+| AppServer | `MONGODB_*`, `UNIC_SOLID_HOST`, `ROOT_URL`, `LICENSE_HOST`, `DOCUMENTSERVER_SERVER_NAME` |
+| Nginx | `APP_SERVER_NAME`, `MINIO_SERVER_NAME`, `DOCUMENTSERVER_SERVER_NAME`, `UNICCHAT_HOST`, `NGINX_APP_PORT`, `DOCUMENT_SERVER_PROXY`, `MINIO_HOST`, `MINIO_PORT`, пути к сертификатам |
+
+`DB_HOST` и `AMQP_URI` остаются именами контейнеров (`unicchat-postgresql`, `unicchat-rabbitmq`): PostgreSQL и RabbitMQ живут в роли Knowledgebase вместе с DocumentServer.
+
+Сертификаты (п. 2.5–2.6) выпускают на сервере Nginx.
 
 <!-- TOC --><a name="-2a-order"></a>
 ### Порядок запуска
@@ -738,7 +769,19 @@ docker compose -f compose.vault.yml logs vault-init
 
 TLS по умолчанию — контейнер `unicchat-nginx` на отдельном сервере (п. 2.5–2.6). Upstream: AppServer, MinIO, DocumentServer — IP из `.env`.
 
-Свой nginx на хосте: не запускайте `compose.nginx.yml`, опубликуйте appserver `:3000` и documentserver `:8081`, конфиги — `multi-server-install/nginx/examples/host/`.
+Свой nginx на хосте: не запускайте `compose.nginx.yml`, проксируйте на хостовые порты AppServer `:8080` и DocumentServer `:8880`, конфиги — `multi-server-install/nginx/examples/host/`.
+
+<!-- TOC --><a name="-2a-troubles"></a>
+### Частые ошибки
+
+| Симптом | Причина | Что сделать |
+|---------|---------|-------------|
+| `Bind for 0.0.0.0:8080 failed: port is already allocated` при старте Tasker | на этом хосте уже занят `8080` (Logger или AppServer) — так бывает, когда несколько ролей запущены на одной машине | развести хостовые порты как в таблице портов: Logger `8082`, Tasker `8881`, AppServer `8080` |
+| В логах AppServer `connect ECONNREFUSED ...:8080` на Tasker | `UNIC_SOLID_HOST` указывает на внутренний `8080`, а Tasker на другом сервере опубликован на `8881` | `UNIC_SOLID_HOST=http://<tasker-host>:8881` |
+| Logger падает с `Storage connection is not configured` | у Logger нет строки подключения к MongoDB | проверьте `MONGODB_*` и `LOGGER_DB*` в `.env`; строка собирается из них в `compose.logger.yml` |
+| Tasker не видит MongoDB или MinIO, хотя `.env` поправлен | секрет `KBTConfigs` создан со старыми значениями `KBT_*` | пересоздать секрет (см. раздел выше) и перезапустить Tasker |
+| Nginx отдаёт 502 на DocumentServer | `DOCUMENT_SERVER_PROXY` без порта → nginx идёт на `:80` сам в себя | `DOCUMENT_SERVER_PROXY=<kb-host>:8880` |
+| `WARN Found orphan containers ...` | несколько ролей в одном каталоге, у них общий project name | предупреждение безопасно; `--remove-orphans` не использовать, иначе снесёт контейнеры других ролей |
 
 <!-- TOC --><a name="-3-"></a>
 ## Шаг 3. Установка локального медиа сервера для ВКС
