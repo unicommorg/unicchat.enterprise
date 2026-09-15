@@ -579,18 +579,20 @@ sudo ufw status
 <!-- TOC --><a name="-2a-multi"></a>
 ## Шаг 2a. Установка на отдельных серверах
 
-Один сервер — полный [`docker-compose.yml`](multi-server-install/docker-compose.yml). Несколько серверов — те же сервисы в отдельных файлах:
+Один сервер — полный [`docker-compose.yml`](multi-server-install/docker-compose.yml). Несколько серверов — те же сервисы уже разбиты по файлам ролей:
 
 `compose.mongodb.yml`, `compose.vault.yml`, `compose.logger.yml`, `compose.minio.yml`, `compose.tasker.yml`, `compose.knowledgebase.yml`, `compose.appserver.yml`, `compose.nginx.yml`.
 
-На сервере запускаете только свой файл. Перед `up` **сверьте `image:`** в файле роли с эталоном `docker-compose.yml` (тег и имя образа должны совпадать).
+На сервере запускаете только свой файл. Logger не входит в файл Vault; nginx не входит в файл AppServer.
+
+Перед `up` **сверьте `image:`** в файле роли с эталоном `docker-compose.yml` (тег и имя образа должны совпадать).
 
 На каждом сервере: Docker, `docker login` в `cr.yandex`, каталог `multi-server-install/`, общий `.env` (пароли одинаковые, адреса — IP соседей).
 
 <!-- TOC --><a name="-2a-role"></a>
 ### Что такое роль
 
-**Роль** — это один физический (или виртуальный) сервер и набор контейнеров, которые на нём запускаются. Имя роли совпадает с именем файла: роль MongoDB — файл `compose.mongodb.yml`, роль Vault — `compose.vault.yml` и так далее. Это не отдельный продукт и не пользователь в системе, а способ разнести стек из эталона по машинам.
+**Роль** — это один физический (или виртуальный) сервер и набор контейнеров, которые на нём запускаются. Имя роли совпадает с именем файла: роль MongoDB — `compose.mongodb.yml`, роль Logger — `compose.logger.yml`, роль Nginx — `compose.nginx.yml`. Это не отдельный продукт и не пользователь в системе, а способ разнести стек из эталона по машинам.
 
 Связи между серверами задаются IP в `.env`. Кто к кому обращается — на схеме выше (раздел «Установка на отдельных серверах»).
 
@@ -622,6 +624,18 @@ sudo ufw status
 | Knowledgebase | `10.0.10.16` |
 | AppServer | `10.0.10.17` |
 | Nginx | `10.0.10.18` |
+
+Между этими серверами откройте только нужные порты (не в интернет):
+
+| Куда | Порт | Кто ходит |
+|------|------|-----------|
+| MongoDB | 27017 | Vault, Logger, Tasker, AppServer |
+| Vault | 8200 | Tasker, `vault-init` |
+| Logger | 8080 | Vault, Tasker |
+| MinIO | 9000 | Tasker, Knowledgebase, Nginx |
+| Tasker | 8080 | AppServer |
+| Knowledgebase | 8081 | Nginx (DocumentServer) |
+| AppServer | 3000 | Nginx |
 
 <!-- TOC --><a name="-2a-roles"></a>
 ### Файлы ролей и теги образов
@@ -660,20 +674,7 @@ UNICCHAT_HOST=10.0.10.17
 ROOT_URL=https://<APP_SERVER_NAME>
 ```
 
-На сервере Vault в `.env`: `API_LOGGER_URL` — URL Logger. На сервере Nginx в `.env`: `UNICCHAT_HOST` — IP AppServer, `DOCUMENT_SERVER_PROXY` — IP Knowledgebase, `MINIO_HOST` — IP MinIO. Сертификаты (п. 2.5–2.6) выпускают на сервере Nginx.
-
-Между серверами (не в интернет) открывают:
-
-| Роль | Порт |
-|------|------|
-| MongoDB | 27017 |
-| Vault | 8200 |
-| Logger | 8080 |
-| MinIO | 9000 |
-| Tasker | 8080 |
-| Knowledgebase (DocumentServer) | 8081 |
-| AppServer | 3000 |
-| Nginx | 80, 443 (с интернета) |
+На серверах Vault и Tasker `API_LOGGER_URL` — URL Logger. На сервере Nginx: `UNICCHAT_HOST` — IP AppServer, `DOCUMENT_SERVER_PROXY` — IP Knowledgebase, `MINIO_HOST` — IP MinIO. Сертификаты (п. 2.5–2.6) выпускают на сервере Nginx.
 
 <!-- TOC --><a name="-2a-order"></a>
 ### Порядок запуска

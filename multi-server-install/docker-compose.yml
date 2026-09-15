@@ -1,9 +1,9 @@
 # Эталон для одного сервера:
 #   docker compose up -d --wait
 #
-# Несколько серверов — compose.mongodb.yml, compose.vault.yml, compose.logger.yml,
-# compose.minio.yml, compose.tasker.yml, compose.knowledgebase.yml,
-# compose.appserver.yml, compose.nginx.yml.
+# Несколько серверов — compose.mongodb.yml, compose.vault.yml,
+# compose.logger.yml, compose.minio.yml, compose.tasker.yml,
+# compose.knowledgebase.yml, compose.appserver.yml, compose.nginx.yml.
 # Перед запуском сверьте image: в файле роли с этим файлом.
 # Подробности: README шаг 2a.
 
