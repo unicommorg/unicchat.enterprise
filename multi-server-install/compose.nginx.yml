@@ -1,8 +1,6 @@
-# Роль Nginx. Запуск: docker compose -f compose.nginx.yml up -d
+# Роль Nginx. docker compose -f compose.nginx.yml up -d
 # Образы — IMAGE_* в .env.
-# Upstream AppServer — UNICCHAT_HOST в .env (IP сервера AppServer).
-# Vhost'ы пишет nginx-config-init через envsubst в контейнере
-# (entrypoint образа SSL_* затирает и /docker-entrypoint.d/ не запускает).
+# Upstream AppServer — UNICCHAT_HOST в .env.
 services:
   nginx-config-init:
     image: ${IMAGE_NGINX}

@@ -1,13 +1,6 @@
-# Эталон для одного сервера:
-#   1) .env  2) сертификаты в ./certs (README п. 2.5)
-#   3) docker compose up -d --wait
-#
-# Несколько серверов — compose.mongodb.yml, compose.vault.yml,
-# compose.logger.yml (postgres + logger-postgres-init + logger),
-# compose.minio.yml, compose.tasker.yml, compose.knowledgebase.yml,
-# compose.appserver.yml, compose.nginx.yml (nginx-config-init + nginx).
-# Теги образов — IMAGE_* в .env. Logger :prod — PostgreSQL, не MongoDB.
-# Подробности: README шаг 2a.
+# Один сервер: docker compose up -d --wait
+# Несколько серверов: compose.<роль>.yml — README шаг 2a.
+# Образы — IMAGE_* в .env.
 
 services:
   # --- MongoDB ---
@@ -268,7 +261,7 @@ services:
     ports:
       - "8080:3000"
 
-  # --- Logger: Postgres + init пользователя, затем приложение ---
+  # --- Logger ---
   unicchat-logger-postgres:
     image: ${IMAGE_POSTGRES}
     container_name: unicchat-logger-postgres
@@ -358,9 +351,7 @@ services:
     networks:
       - unicchat-network
 
-  # --- Nginx: vhost'ы рендерит init-контейнер (envsubst внутри Docker) ---
-  # IMAGE_NGINX 2.4.1 не обходит /docker-entrypoint.d/ и затирает SSL_*.
-  # Сертификаты кладутся в ./certs вручную (или certbot, п. 2.5 README).
+  # --- Nginx ---
   nginx-config-init:
     image: ${IMAGE_NGINX}
     container_name: nginx-config-init
@@ -428,8 +419,6 @@ services:
       MINIO_SSL_KEY: ${MINIO_SSL_KEY}
     volumes:
       - ./certs:/certs
-      # default.conf.tpl — заглушка: jinja2-entrypoint образа падает без неё.
-      # vhost'ы пишет nginx-config-init (envsubst в контейнере) в ./nginx/conf.d/.
       - ./nginx/templates:/etc/nginx/templates:ro
       - ./nginx/conf.d:/etc/nginx/conf.d
     ports:

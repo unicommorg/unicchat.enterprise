@@ -1,6 +1,5 @@
-# Роль Logger. Запуск: docker compose -f compose.logger.yml up -d
+# Роль Logger. docker compose -f compose.logger.yml up -d
 # Образы — IMAGE_* в .env.
-# Хранилище — PostgreSQL (Storage__ConnectionString). Пользователя БД создаёт logger-postgres-init.
 services:
   unicchat-logger-postgres:
     image: ${IMAGE_POSTGRES}
@@ -67,7 +66,7 @@ services:
       logger-postgres-init:
         condition: service_completed_successfully
     environment:
-      Storage__ConnectionString: Host=${LOGGER_PG_HOST};Port=${LOGGER_PG_PORT};Database=${LOGGER_DB};Username=${LOGGER_DB_USER};Password=${LOGGER_DB_PASSWORD}
+      Storage__ConnectionString: "Host=${LOGGER_PG_HOST};Port=${LOGGER_PG_PORT};Database=${LOGGER_DB};Username=${LOGGER_DB_USER};Password=${LOGGER_DB_PASSWORD}"
       api.logger.url: ${API_LOGGER_URL}
     networks:
       - unicchat-network
