@@ -106,14 +106,13 @@ ___
 <!-- TOC --><a name="-one-compose"></a>
 ### Один docker-compose.yml
 
-Базовая установка (шаг 2) — все сервисы на одном сервере. Порядок: `.env` → сертификаты (п. 2.5) → `compose up`. Без файлов в `./certs` nginx не станет healthy.
-
+Базовая установка (шаг 2) — все сервисы на одном сервере. Порядок: `.env` → сертификаты (п. 2.5) → `compose up`. 
 ```shell
 cd multi-server-install
 docker compose up -d --wait
 ```
 
-На нескольких серверах те же сервисы разнесены по `compose.<роль>.yml`. Образы берутся из `IMAGE_*` в `.env` (шаг 2a). Logger пишет в PostgreSQL (`unicchat-logger-postgres`), не в MongoDB. Vhost nginx пишет init-контейнер `nginx-config-init`.
+
 
 <!-- TOC --><a name="-multi-host"></a>
 ### Установка на отдельных серверах
