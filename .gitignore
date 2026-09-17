@@ -33,7 +33,7 @@ certs/
 # Nginx конфигурация (генерируется автоматически)
 nginx/config/nginx.conf
 nginx/config/*.conf
-# Рендер envsubst из multi-server-install/nginx/templates/
+# Рендер nginx-config-init (envsubst в контейнере) из nginx/templates/
 multi-server-install/nginx/conf.d/*.conf
 
 # Сгенерированные при деплое (env, creds — см. выше)

@@ -1,11 +1,52 @@
 # Роль Nginx. Запуск: docker compose -f compose.nginx.yml up -d
 # Образы — IMAGE_* в .env.
 # Upstream AppServer — UNICCHAT_HOST в .env (IP сервера AppServer).
+# Vhost'ы пишет nginx-config-init через envsubst в контейнере
+# (entrypoint образа SSL_* затирает и /docker-entrypoint.d/ не запускает).
 services:
+  nginx-config-init:
+    image: ${IMAGE_NGINX}
+    container_name: nginx-config-init
+    restart: "no"
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+        VARS='$${APP_SERVER_NAME} $${DOCUMENTSERVER_SERVER_NAME} $${MINIO_SERVER_NAME} $${SSL_CERT} $${SSL_KEY} $${DOCUMENTSERVER_SSL_CERT} $${DOCUMENTSERVER_SSL_KEY} $${MINIO_SSL_CERT} $${MINIO_SSL_KEY} $${UNICCHAT_HOST} $${PORT} $${DOCUMENT_SERVER_PROXY} $${MINIO_HOST} $${MINIO_PORT} $${ROOT_URL}'
+        mkdir -p /conf.d
+        for t in 00-app 10-documentserver 20-minio; do
+          envsubst "$$VARS" < "/templates/$${t}.conf.template" > "/conf.d/$${t}.conf"
+        done
+    environment:
+      ROOT_URL: ${ROOT_URL}
+      APP_SERVER_NAME: ${APP_SERVER_NAME}
+      UNICCHAT_HOST: ${UNICCHAT_HOST}
+      PORT: ${NGINX_APP_PORT:-${PORT}}
+      SSL_CERT: ${SSL_CERT}
+      SSL_KEY: ${SSL_KEY}
+      DOCUMENTSERVER_SERVER_NAME: ${DOCUMENTSERVER_SERVER_NAME}
+      DOCUMENT_SERVER_PROXY: ${DOCUMENT_SERVER_PROXY}
+      DOCUMENTSERVER_SSL_CERT: ${DOCUMENTSERVER_SSL_CERT}
+      DOCUMENTSERVER_SSL_KEY: ${DOCUMENTSERVER_SSL_KEY}
+      MINIO_SERVER_NAME: ${MINIO_SERVER_NAME}
+      MINIO_HOST: ${MINIO_HOST}
+      MINIO_PORT: ${MINIO_PORT}
+      MINIO_SSL_CERT: ${MINIO_SSL_CERT}
+      MINIO_SSL_KEY: ${MINIO_SSL_KEY}
+    volumes:
+      - ./nginx/templates:/templates:ro
+      - ./nginx/conf.d:/conf.d
+    networks:
+      - unicchat-network
+
   unicchat-nginx:
     image: ${IMAGE_NGINX}
     container_name: unicchat-nginx
     restart: always
+    depends_on:
+      nginx-config-init:
+        condition: service_completed_successfully
     environment:
       ROOT_URL: ${ROOT_URL}
       APP_SERVER_NAME: ${APP_SERVER_NAME}
@@ -25,14 +66,24 @@ services:
       MINIO_SSL_CERT: ${MINIO_SSL_CERT}
       MINIO_SSL_KEY: ${MINIO_SSL_KEY}
     volumes:
-    - ./certs:/certs
-    - ./nginx/templates:/etc/nginx/templates:ro
-    - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./certs:/certs
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d
     ports:
-    - 80:80
-    - 443:443
+      - 80:80
+      - 443:443
     networks:
-    - unicchat-network
+      - unicchat-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "test -s /etc/nginx/conf.d/00-app.conf && test -s /etc/nginx/conf.d/10-documentserver.conf && test -s /etc/nginx/conf.d/20-minio.conf && nginx -t",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 networks:
   unicchat-network:
     name: unicchat-network

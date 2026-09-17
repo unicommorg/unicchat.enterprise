@@ -97,31 +97,6 @@ services:
           print('Tasker user already exists, skipping');
         }
       "
-      echo "Checking if Logger user exists..."
-
-      mongosh "mongodb://root:$${MONGODB_ROOT_PASSWORD}@unicchat-mongodb:27017/admin?replicaSet=$${MONGODB_REPLICA_SET_NAME}&authSource=admin" --eval "
-        const dbName = '$${LOGGER_DB}';
-        const userName = '$${LOGGER_DB_USER}';
-        const password = '$${LOGGER_DB_PASSWORD}';
-
-        const dbx = db.getSiblingDB(dbName);
-
-        if (!dbx.getUser(userName)) {
-          print('User does not exist, creating...');
-
-          dbx.createUser({
-            user: userName,
-            pwd: password,
-            roles: [
-              { role: 'readWrite', db: dbName }
-            ]
-          });
-
-          print('Logger user created');
-        } else {
-          print('Logger user already exists, skipping');
-        }
-      "
       echo "Done."
     environment:
       VAULT_DB_USER: ${VAULT_DB_USER}
@@ -130,9 +105,6 @@ services:
       TASKER_DB_USER: ${TASKER_DB_USER}
       TASKER_DB_PASSWORD: ${TASKER_DB_PASSWORD}
       TASKER_DB_NAME: ${TASKER_DB_NAME}
-      LOGGER_DB_USER: ${LOGGER_DB_USER}
-      LOGGER_DB_PASSWORD: ${LOGGER_DB_PASSWORD}
-      LOGGER_DB: ${LOGGER_DB}
       MONGODB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
       MONGODB_REPLICA_SET_NAME: ${MONGODB_REPLICA_SET_NAME}
     networks:

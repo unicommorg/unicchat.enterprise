@@ -1,10 +1,12 @@
 # Эталон для одного сервера:
-#   docker compose up -d --wait
+#   1) .env  2) сертификаты в ./certs (README п. 2.5)
+#   3) docker compose up -d --wait
 #
 # Несколько серверов — compose.mongodb.yml, compose.vault.yml,
-# compose.logger.yml, compose.minio.yml, compose.tasker.yml,
-# compose.knowledgebase.yml, compose.appserver.yml, compose.nginx.yml.
-# Теги образов — IMAGE_* в .env.
+# compose.logger.yml (postgres + logger-postgres-init + logger),
+# compose.minio.yml, compose.tasker.yml, compose.knowledgebase.yml,
+# compose.appserver.yml, compose.nginx.yml (nginx-config-init + nginx).
+# Теги образов — IMAGE_* в .env. Logger :prod — PostgreSQL, не MongoDB.
 # Подробности: README шаг 2a.
 
 services:
@@ -129,31 +131,6 @@ services:
               print('Tasker user already exists, skipping');
             }
           "
-          echo "Checking if Logger user exists..."
-
-          mongosh "mongodb://root:$${MONGODB_ROOT_PASSWORD}@unicchat-mongodb:27017/admin?replicaSet=$${MONGODB_REPLICA_SET_NAME}&authSource=admin" --eval "
-            const dbName = '$${LOGGER_DB}';
-            const userName = '$${LOGGER_DB_USER}';
-            const password = '$${LOGGER_DB_PASSWORD}';
-
-            const dbx = db.getSiblingDB(dbName);
-
-            if (!dbx.getUser(userName)) {
-              print('User does not exist, creating...');
-
-              dbx.createUser({
-                user: userName,
-                pwd: password,
-                roles: [
-                  { role: 'readWrite', db: dbName }
-                ]
-              });
-
-              print('Logger user created');
-            } else {
-              print('Logger user already exists, skipping');
-            }
-          "
           echo "Done."
     environment:
       VAULT_DB_USER: ${VAULT_DB_USER}
@@ -162,9 +139,6 @@ services:
       TASKER_DB_USER: ${TASKER_DB_USER}
       TASKER_DB_PASSWORD: ${TASKER_DB_PASSWORD}
       TASKER_DB_NAME: ${TASKER_DB_NAME}
-      LOGGER_DB_USER: ${LOGGER_DB_USER}
-      LOGGER_DB_PASSWORD: ${LOGGER_DB_PASSWORD}
-      LOGGER_DB: ${LOGGER_DB}
       MONGODB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
       MONGODB_REPLICA_SET_NAME: ${MONGODB_REPLICA_SET_NAME}
     networks:
@@ -294,17 +268,74 @@ services:
     ports:
       - "8080:3000"
 
-  # --- Logger (обычно с Vault) ---
+  # --- Logger: Postgres + init пользователя, затем приложение ---
+  unicchat-logger-postgres:
+    image: ${IMAGE_POSTGRES}
+    container_name: unicchat-logger-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LOGGER_DB_PASSWORD}
+      POSTGRES_DB: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - logger_postgres_data:/var/lib/postgresql
+    networks:
+      - unicchat-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    expose:
+      - "5432"
+
+  logger-postgres-init:
+    image: ${IMAGE_POSTGRES}
+    container_name: logger-postgres-init
+    restart: "no"
+    depends_on:
+      unicchat-logger-postgres:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+          echo "Waiting for logger postgres..."
+          until pg_isready -h unicchat-logger-postgres -U postgres >/dev/null 2>&1; do
+            sleep 2
+          done
+
+          echo "Ensuring logger role and database..."
+          psql -h unicchat-logger-postgres -U postgres -d postgres \
+            -c "CREATE ROLE $${LOGGER_DB_USER} LOGIN PASSWORD '$${LOGGER_DB_PASSWORD}';" \
+            || echo "logger role already exists"
+          psql -h unicchat-logger-postgres -U postgres -d postgres \
+            -c "CREATE DATABASE $${LOGGER_DB} OWNER $${LOGGER_DB_USER};" \
+            || echo "logger database already exists"
+          psql -h unicchat-logger-postgres -U postgres -d postgres \
+            -c "GRANT ALL PRIVILEGES ON DATABASE $${LOGGER_DB} TO $${LOGGER_DB_USER};"
+          echo "Logger postgres user ready."
+    environment:
+      LOGGER_DB_USER: ${LOGGER_DB_USER}
+      LOGGER_DB_PASSWORD: ${LOGGER_DB_PASSWORD}
+      LOGGER_DB: ${LOGGER_DB}
+    networks:
+      - unicchat-network
+
   unicchat-logger:
     image: ${IMAGE_LOGGER}
     container_name: unicchat-logger
     restart: always
     depends_on:
-      unicchat-mongodb:
+      unicchat-logger-postgres:
         condition: service_healthy
+      logger-postgres-init:
+        condition: service_completed_successfully
     environment:
-      MongoCS: "mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}"
-      Storage__ConnectionString: "mongodb://${LOGGER_DB_USER}:${LOGGER_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${LOGGER_DB}?directConnection=true&authSource=${LOGGER_DB}&authMechanism=SCRAM-SHA-256&replicaSet=${MONGODB_REPLICA_SET_NAME}"
+      Storage__ConnectionString: "Host=${LOGGER_PG_HOST};Port=${LOGGER_PG_PORT};Database=${LOGGER_DB};Username=${LOGGER_DB_USER};Password=${LOGGER_DB_PASSWORD}"
       api.logger.url: ${API_LOGGER_URL}
     networks:
       - unicchat-network
@@ -327,7 +358,45 @@ services:
     networks:
       - unicchat-network
 
-  # --- Nginx (с AppServer; можно заменить своим nginx) ---
+  # --- Nginx: vhost'ы рендерит init-контейнер (envsubst внутри Docker) ---
+  # IMAGE_NGINX 2.4.1 не обходит /docker-entrypoint.d/ и затирает SSL_*.
+  # Сертификаты кладутся в ./certs вручную (или certbot, п. 2.5 README).
+  nginx-config-init:
+    image: ${IMAGE_NGINX}
+    container_name: nginx-config-init
+    restart: "no"
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+          VARS='$${APP_SERVER_NAME} $${DOCUMENTSERVER_SERVER_NAME} $${MINIO_SERVER_NAME} $${SSL_CERT} $${SSL_KEY} $${DOCUMENTSERVER_SSL_CERT} $${DOCUMENTSERVER_SSL_KEY} $${MINIO_SSL_CERT} $${MINIO_SSL_KEY} $${UNICCHAT_HOST} $${PORT} $${DOCUMENT_SERVER_PROXY} $${MINIO_HOST} $${MINIO_PORT} $${ROOT_URL}'
+          mkdir -p /conf.d
+          for t in 00-app 10-documentserver 20-minio; do
+            envsubst "$$VARS" < "/templates/$${t}.conf.template" > "/conf.d/$${t}.conf"
+          done
+    environment:
+      ROOT_URL: ${ROOT_URL}
+      APP_SERVER_NAME: ${APP_SERVER_NAME}
+      UNICCHAT_HOST: ${UNICCHAT_HOST}
+      PORT: ${NGINX_APP_PORT:-${PORT}}
+      SSL_CERT: ${SSL_CERT}
+      SSL_KEY: ${SSL_KEY}
+      DOCUMENTSERVER_SERVER_NAME: ${DOCUMENTSERVER_SERVER_NAME}
+      DOCUMENT_SERVER_PROXY: ${DOCUMENT_SERVER_PROXY}
+      DOCUMENTSERVER_SSL_CERT: ${DOCUMENTSERVER_SSL_CERT}
+      DOCUMENTSERVER_SSL_KEY: ${DOCUMENTSERVER_SSL_KEY}
+      MINIO_SERVER_NAME: ${MINIO_SERVER_NAME}
+      MINIO_HOST: ${MINIO_HOST}
+      MINIO_PORT: ${MINIO_PORT}
+      MINIO_SSL_CERT: ${MINIO_SSL_CERT}
+      MINIO_SSL_KEY: ${MINIO_SSL_KEY}
+    volumes:
+      - ./nginx/templates:/templates:ro
+      - ./nginx/conf.d:/conf.d
+    networks:
+      - unicchat-network
+
   unicchat-nginx:
     image: ${IMAGE_NGINX}
     container_name: unicchat-nginx
@@ -335,6 +404,8 @@ services:
     depends_on:
       unicchat-appserver:
         condition: service_healthy
+      nginx-config-init:
+        condition: service_completed_successfully
     environment:
       ROOT_URL: ${ROOT_URL}
       APP_SERVER_NAME: ${APP_SERVER_NAME}
@@ -357,17 +428,25 @@ services:
       MINIO_SSL_KEY: ${MINIO_SSL_KEY}
     volumes:
       - ./certs:/certs
-      # Свой каталог шаблонов поверх вендорского:
-      # - default.conf.tpl — заглушка, без неё кастомный jinja2-entrypoint падает
-      # - *.conf.template — три vhost, их рендерит штатный envsubst
+      # default.conf.tpl — заглушка: jinja2-entrypoint образа падает без неё.
+      # vhost'ы пишет nginx-config-init (envsubst в контейнере) в ./nginx/conf.d/.
       - ./nginx/templates:/etc/nginx/templates:ro
-      # Отрендеренные конфиги видны и правятся с хоста, применяются через nginx -s reload
       - ./nginx/conf.d:/etc/nginx/conf.d
     ports:
       - "80:80"
       - "443:443"
     networks:
       - unicchat-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "test -s /etc/nginx/conf.d/00-app.conf && test -s /etc/nginx/conf.d/10-documentserver.conf && test -s /etc/nginx/conf.d/20-minio.conf && nginx -t",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # --- MinIO ---
   unicchat-minio:
@@ -506,4 +585,6 @@ volumes:
   documentserver_fonts:
     driver: local
   postgresql_data:
+    driver: local
+  logger_postgres_data:
     driver: local

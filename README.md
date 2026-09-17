@@ -3,7 +3,7 @@
 <!-- TOC --><a name="-unicchat"></a>
 # Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat
 
-версия документа 1.11
+версия документа 1.12
 
 <!-- TOC --><a name=""></a>
 ## Оглавление
@@ -106,14 +106,14 @@ ___
 <!-- TOC --><a name="-one-compose"></a>
 ### Один docker-compose.yml
 
-Базовая установка (шаг 2) — все сервисы на одном сервере:
+Базовая установка (шаг 2) — все сервисы на одном сервере. Порядок: `.env` → сертификаты (п. 2.5) → `compose up`. Без файлов в `./certs` nginx не станет healthy.
 
 ```shell
 cd multi-server-install
 docker compose up -d --wait
 ```
 
-На нескольких серверах те же сервисы разнесены по `compose.<роль>.yml`. Образы берутся из `IMAGE_*` в `.env` (шаг 2a).
+На нескольких серверах те же сервисы разнесены по `compose.<роль>.yml`. Образы берутся из `IMAGE_*` в `.env` (шаг 2a). Logger пишет в PostgreSQL (`unicchat-logger-postgres`), не в MongoDB. Vhost nginx пишет init-контейнер `nginx-config-init`.
 
 <!-- TOC --><a name="-multi-host"></a>
 ### Установка на отдельных серверах
@@ -146,7 +146,7 @@ flowchart LR
   Docs --> Rabbit[rabbitmq]
   Vault --> Mongo
   Vault --> Logger
-  Logger --> Mongo
+  Logger --> LoggerPg[logger-postgres]
 ```
 
 Подробности — [шаг 2a](#-2a-multi).
@@ -290,9 +290,9 @@ git clone https://github.com/unicommorg/unicchat.enterprise.git
 <!-- TOC --><a name="-2-install"></a>
 ## Шаг 2. Установка
 
-Установка на **одном сервере** из каталога `multi-server-install/`: один `docker-compose.yml` и один `.env`. Сеть `unicchat-network`, пользователи MongoDB (vault/tasker/logger), секрет Vault `KBTConfigs` и бакеты MinIO создаются init-контейнерами.
+Установка на **одном сервере** из каталога `multi-server-install/`: один `docker-compose.yml` и один `.env`. Сеть `unicchat-network`, пользователи MongoDB (vault/tasker), пользователь PostgreSQL Logger, секрет Vault `KBTConfigs` и бакеты MinIO создаются init-контейнерами.
 
-Состав: MongoDB, Vault, Logger, AppServer, Tasker, nginx, MinIO, DocumentServer (+ PostgreSQL и RabbitMQ), init-контейнеры `vault-mongo-init`, `vault-init`, `minio-init`.
+Состав: MongoDB, Vault, Logger (+ PostgreSQL Logger), AppServer, Tasker, nginx, MinIO, DocumentServer (+ PostgreSQL и RabbitMQ), init-контейнеры `vault-mongo-init`, `vault-init`, `minio-init`, `nginx-config-init`, `logger-postgres-init`.
 
 Разнесение по серверам — [шаг 2a](#-2a-multi): на каждом сервере свой `compose.<роль>.yml`.
 
@@ -414,7 +414,8 @@ echo "MINIO_ROOT_PASSWORD=$(gen)"
 - `ROOT_URL=https://<APP_SERVER_NAME>`
 - `LICENSE_HOST=https://push1.unic.chat/`
 - Пути к сертификатам: `/certs/config/live/<домен>/fullchain.pem` и `privkey.pem`. После смены домена поправьте `SSL_CERT`/`SSL_KEY`, `DOCUMENTSERVER_SSL_*`, `MINIO_SSL_*`.
-- На одном сервере оставьте имена контейнеров: `UNIC_SOLID_HOST=http://unicchat-tasker:8080`, `API_VAULT_URL=http://unicchat-vault/`, `API_LOGGER_URL=http://unicchat-logger:8080/`, `KBT_MINIO_HOST=unicchat-minio:9000`, `KBT_MONGO_HOST=unicchat-mongodb`, `UNICCHAT_HOST=unicchat-appserver`, `DOCUMENT_SERVER_PROXY=unicchat-documentserver`, `MINIO_HOST=unicchat-minio`, а `NGINX_APP_PORT` не задавайте. На отдельных серверах эти же переменные меняются на IP и хостовые порты — таблица в [шаге 2a](#-2a-multi).
+- На одном сервере оставьте имена контейнеров: `UNIC_SOLID_HOST=http://unicchat-tasker:8080`, `API_VAULT_URL=http://unicchat-vault/`, `API_LOGGER_URL=http://unicchat-logger:8080/`, `LOGGER_PG_HOST=unicchat-logger-postgres`, `KBT_MINIO_HOST=unicchat-minio:9000`, `KBT_MONGO_HOST=unicchat-mongodb`, `UNICCHAT_HOST=unicchat-appserver`, `DOCUMENT_SERVER_PROXY=unicchat-documentserver`, `MINIO_HOST=unicchat-minio`, а `NGINX_APP_PORT` не задавайте. На отдельных серверах адреса соседей меняются на IP и хостовые порты — таблица в [шаге 2a](#-2a-multi). `LOGGER_PG_HOST` / `LOGGER_PG_PORT` не трогайте: Postgres Logger живёт в той же роли, что и `unicchat-logger`.
+- Logger `:prod` хранит логи в PostgreSQL (`LOGGER_PG_HOST` / `unicchat-logger-postgres`), не в MongoDB.
 
 Секрет `KBTConfigs` создаёт `vault-init` один раз. При смене адресов MongoDB/MinIO для tasker — [п. «Секрет Vault KBTConfigs»](#-2a-vault).
 
@@ -423,10 +424,11 @@ echo "MINIO_ROOT_PASSWORD=$(gen)"
 
 Нужны **три отдельных** сертификата Let's Encrypt (по одному на домен) в `./certs/config/live/<домен>/`. Nginx монтирует `./certs` в `/certs`, поэтому пути в `.env` совпадают с тем, что пишет certbot при таком монтировании.
 
-Порты 80/443 в этот момент должны быть свободны (nginx ещё не запущен). DNS A-записи уже должны указывать на этот сервер.
+Порты 80/443 в этот момент должны быть свободны. Если `unicchat-nginx` уже слушает 80, сначала остановите его — иначе certbot не займёт порт и в логах nginx будет `cannot load certificate .../fullchain.pem`. DNS A-записи уже должны указывать на этот сервер (роль Nginx).
 
 ```shell
 cd ~/unicchat.enterprise/multi-server-install
+docker compose stop unicchat-nginx 2>/dev/null || true
 set -a && . ./.env && set +a
 mkdir -p certs/config certs/logs certs/work
 
@@ -450,26 +452,28 @@ run_cert "$MINIO_SERVER_NAME"
 
 Подставьте свой `EMAIL`. Домены берутся из `.env`, в команде их хардкодить не нужно.
 
-Продление:
+Продление (порт 80 должен быть свободен):
 
 ```shell
 cd ~/unicchat.enterprise/multi-server-install
+docker compose stop unicchat-nginx
 docker run --rm \
   -p 80:80 \
   -v "$(pwd)/certs/config:/etc/letsencrypt" \
   -v "$(pwd)/certs/logs:/var/log/letsencrypt" \
   -v "$(pwd)/certs/work:/var/lib/letsencrypt" \
   certbot/certbot renew --non-interactive
-
-docker compose exec unicchat-nginx nginx -s reload
+docker compose start unicchat-nginx
 ```
 
-Для `renew` порт 80 должен быть доступен снаружи. Если nginx уже слушает 80, остановите его на время renew (`docker compose stop unicchat-nginx`) либо используйте webroot — в базовой установке достаточно остановить nginx, обновить сертификаты и снова `docker compose start unicchat-nginx`.
+На роли Nginx те же команды с `-f compose.nginx.yml`. Без сертификатов `docker compose up -d --wait` не завершится: healthcheck `nginx -t` падает.
 
 <!-- TOC --><a name="26-nginx"></a>
 ### 2.6 Nginx
 
-Три шаблона в `nginx/templates/` содержат плейсхолдеры (`${APP_SERVER_NAME}`, `${SSL_CERT}`, `${DOCUMENTSERVER_SERVER_NAME}`, `${MINIO_SERVER_NAME}` и остальные). При старте контейнера `unicchat-nginx` штатный `envsubst` подставляет значения из `.env` и пишет:
+Образ `IMAGE_NGINX` (`nginx:2.4.1`) **не** выполняет `/docker-entrypoint.d/20-envsubst-on-templates.sh` и при старте безусловно ставит `SSL_CERT=/certs/unicchat.crt`. На переменные окружения контейнера nginx полагаться нельзя.
+
+Контейнер `nginx-config-init` (тот же образ, команда `envsubst` внутри Docker, без скриптов на хосте) подставляет значения из `.env` в три шаблона и пишет:
 
 | Файл на хосте | Домен |
 |---------------|--------|
@@ -477,12 +481,16 @@ docker compose exec unicchat-nginx nginx -s reload
 | `nginx/conf.d/10-documentserver.conf` | `DOCUMENTSERVER_SERVER_NAME` |
 | `nginx/conf.d/20-minio.conf` | `MINIO_SERVER_NAME` |
 
+`unicchat-nginx` стартует только после успешного init. Healthcheck проверяет, что три файла не пустые, и `nginx -t` (в том числе что файлы сертификатов из `.env` лежат в `./certs`). Сертификаты выпускают вручную или через certbot в Docker (п. 2.5) и кладут в `./certs` — от ОС клиента это не зависит.
+
+`docker compose up -d --wait` без vhost больше не завершится кодом 0.
+
 Каталог `nginx/conf.d/` смонтирован в контейнер: файлы видны с хоста.
 
-Смена домена или пути к сертификату — правка `.env` (и соответствующих `SSL_*`), затем:
+Смена домена или пути к сертификату — правка `.env` (и соответствующих `SSL_*`), затем пересоздайте init (иначе Compose не запустит уже завершённый контейнер повторно):
 
 ```shell
-docker compose up -d --force-recreate unicchat-nginx
+docker compose up -d --force-recreate nginx-config-init unicchat-nginx
 ```
 
 Разовая отладка без пересоздания контейнера:
@@ -493,7 +501,7 @@ docker compose exec unicchat-nginx nginx -t
 docker compose exec unicchat-nginx nginx -s reload
 ```
 
-Такая правка живёт до следующего пересоздания контейнера. Постоянные изменения держите в `nginx/templates/` и в `.env`.
+Такая правка живёт до следующего запуска `nginx-config-init`. Постоянные изменения держите в `nginx/templates/` и в `.env`.
 
 <!-- TOC --><a name="27-unicchat"></a>
 ### 2.7 Запуск
@@ -504,7 +512,7 @@ docker compose pull
 docker compose up -d --wait
 ```
 
-`--wait` дождётся healthcheck appserver и mongodb; nginx стартует после healthy appserver.
+`--wait` дождётся healthcheck mongodb/appserver, `logger-postgres-init`, `nginx-config-init` и healthcheck nginx (три vhost и `nginx -t`). Сертификаты из п. 2.5 должны уже лежать в `./certs`. Если nginx unhealthy — `docker compose logs nginx-config-init unicchat-nginx` и пути `SSL_*` в `.env`.
 
 Логи:
 
@@ -605,12 +613,12 @@ sudo ufw status
 |--------|----------------|-----------------|
 | **MongoDB** | `compose.mongodb.yml` | `unicchat-mongodb`, `vault-mongo-init` |
 | **Vault** | `compose.vault.yml` | `unicchat-vault`, `vault-init` |
-| **Logger** | `compose.logger.yml` | `unicchat-logger` |
+| **Logger** | `compose.logger.yml` | `unicchat-logger-postgres`, `logger-postgres-init`, `unicchat-logger` |
 | **MinIO** | `compose.minio.yml` | `unicchat-minio`, `minio-init` |
 | **Tasker** | `compose.tasker.yml` | `unicchat-tasker` |
 | **Knowledgebase** | `compose.knowledgebase.yml` | `unicchat-postgresql`, `unicchat-rabbitmq`, `unicchat-documentserver` |
 | **AppServer** | `compose.appserver.yml` | `unicchat-appserver` |
-| **Nginx** | `compose.nginx.yml` | `unicchat-nginx` |
+| **Nginx** | `compose.nginx.yml` | `nginx-config-init`, `unicchat-nginx` |
 
 Список сервисов в `up -d` не нужен: в файле уже только эта роль.
 
@@ -631,9 +639,9 @@ sudo ufw status
 
 | Роль | Порт на хосте | Внутри контейнера | Кто ходит |
 |------|---------------|-------------------|-----------|
-| MongoDB | 27017 | 27017 | Vault, Logger, Tasker, AppServer |
+| MongoDB | 27017 | 27017 | Vault, Tasker, AppServer |
 | Vault | 8200 | 80 | Tasker, `vault-init` |
-| Logger | 8082 | 8080 | Vault, Tasker |
+| Logger | 8082 | 8080 | Vault, Tasker (HTTP). Postgres Logger на хосте не публикуется |
 | MinIO | 9000, 9002 | 9000, 9002 | Tasker, Knowledgebase, Nginx |
 | Tasker | 8881 | 8080 | AppServer |
 | Knowledgebase | 8880, 8443 | 80, 443 | Nginx (DocumentServer) |
@@ -689,14 +697,14 @@ docker compose -f compose.mongodb.yml up -d
 |------|--------------------------------------------|
 | MongoDB | `MONGODB_*` (пароли, `MONGODB_HOST`, `MONGODB_ADVERTISED_HOSTNAME`) |
 | Vault | `VAULT_DB_*`, `MONGODB_HOST`, `API_LOGGER_URL` |
-| Logger | `LOGGER_DB_*`, `MONGODB_HOST`, `API_LOGGER_URL` |
+| Logger | `LOGGER_DB_*`, `LOGGER_PG_HOST`, `LOGGER_PG_PORT`, `API_LOGGER_URL` |
 | MinIO | `MINIO_ROOT_*`, `MINIO_BUCKET`, `MINIO_DOCS_BUCKET` |
 | Tasker | `API_VAULT_URL`, `API_LOGGER_URL`, `TASKER_DB_*` |
 | Knowledgebase | `DB_*`, `AMQP_URI`, `JWT_*` |
 | AppServer | `MONGODB_*`, `UNIC_SOLID_HOST`, `ROOT_URL`, `LICENSE_HOST`, `DOCUMENTSERVER_SERVER_NAME` |
 | Nginx | `APP_SERVER_NAME`, `MINIO_SERVER_NAME`, `DOCUMENTSERVER_SERVER_NAME`, `UNICCHAT_HOST`, `NGINX_APP_PORT`, `DOCUMENT_SERVER_PROXY`, `MINIO_HOST`, `MINIO_PORT`, пути к сертификатам |
 
-`DB_HOST` и `AMQP_URI` остаются именами контейнеров (`unicchat-postgresql`, `unicchat-rabbitmq`): PostgreSQL и RabbitMQ живут в роли Knowledgebase вместе с DocumentServer.
+`DB_HOST`, `AMQP_URI`, `LOGGER_PG_HOST` и `LOGGER_PG_PORT` остаются именами контейнеров: PostgreSQL DocumentServer и RabbitMQ живут в роли Knowledgebase; PostgreSQL Logger — в роли Logger вместе с `unicchat-logger`. Соседям Postgres Logger не нужен, им достаточно `API_LOGGER_URL`.
 
 Сертификаты (п. 2.5–2.6) выпускают на сервере Nginx.
 
@@ -712,14 +720,14 @@ docker compose -f compose.<роль>.yml up -d
 
 Порядок серверов:
 
-1. **MongoDB** — дождаться healthy, логи `vault-mongo-init`.
-2. **Logger**.
-3. **Vault** — затем `vault-init` (`KBTConfigs secret created.`). В `.env` уже IP в `KBT_*` и `API_LOGGER_URL`.
+1. **MongoDB** — дождаться healthy, логи `vault-mongo-init` (пользователи Vault и Tasker; пользователя Logger там нет).
+2. **Logger** — `logger-postgres-init` completed, затем `unicchat-logger`. С других серверов открыт только HTTP `:8082`.
+3. **Vault** — затем `vault-init` (`KBTConfigs secret created.`). В `.env` уже IP в `KBT_*` и `API_LOGGER_URL` на `:8082`.
 4. **MinIO** — затем `minio-init`.
 5. **Tasker**.
 6. **Knowledgebase** — PostgreSQL и RabbitMQ, потом DocumentServer.
 7. **AppServer**.
-8. **Nginx** — сертификаты как в п. 2.5–2.6.
+8. **Nginx** — сначала сертификаты (п. 2.5, порты 80/443 свободны), затем `compose.nginx.yml`. Vhost пишет `nginx-config-init`.
 
 Проверка — п. 2.8.
 
@@ -766,9 +774,22 @@ docker compose -f compose.vault.yml logs vault-init
 <!-- TOC --><a name="-2a-nginx"></a>
 ### Nginx и сертификаты
 
-TLS по умолчанию — контейнер `unicchat-nginx` на отдельном сервере (п. 2.5–2.6). Upstream: AppServer, MinIO, DocumentServer — IP из `.env`.
+Роль Nginx — `nginx-config-init` + `unicchat-nginx`. Init подставляет `.env` в `nginx/templates/*.conf.template` и пишет `nginx/conf.d/`. Сам nginx шаблоны **не** рендерит: образ `IMAGE_NGINX` (`nginx:2.4.1`) затирает `SSL_CERT` и не запускает `/docker-entrypoint.d/`.
 
-Свой nginx на хосте: не запускайте `compose.nginx.yml`, проксируйте на хостовые порты AppServer `:8080` и DocumentServer `:8880`, конфиги — `multi-server-install/nginx/examples/host/`.
+Порядок на сервере Nginx:
+
+1. Тот же `.env`, что на остальных (уже с IP upstream: `UNICCHAT_HOST`, `NGINX_APP_PORT=8080`, `DOCUMENT_SERVER_PROXY=<kb-host>:8880`, `MINIO_HOST`).
+2. Три сертификата certbot (п. 2.5). Порты 80/443 свободны — роль ещё не запущена.
+3. `docker compose -f compose.nginx.yml up -d`
+4. `docker compose -f compose.nginx.yml ps` — `unicchat-nginx` healthy.
+
+После смены домена или пути к сертификату:
+
+```shell
+docker compose -f compose.nginx.yml up -d --force-recreate nginx-config-init unicchat-nginx
+```
+
+Свой nginx на хосте: не запускайте `compose.nginx.yml`, проксируйте на хостовые порты AppServer `:8080`, DocumentServer `:8880` и MinIO `:9000`, конфиги — `multi-server-install/nginx/examples/host/`.
 
 <!-- TOC --><a name="-2a-troubles"></a>
 ### Частые ошибки
@@ -777,9 +798,11 @@ TLS по умолчанию — контейнер `unicchat-nginx` на отд�
 |---------|---------|-------------|
 | `Bind for 0.0.0.0:8080 failed: port is already allocated` при старте Tasker | на этом хосте уже занят `8080` (Logger или AppServer) — так бывает, когда несколько ролей запущены на одной машине | развести хостовые порты как в таблице портов: Logger `8082`, Tasker `8881`, AppServer `8080` |
 | В логах AppServer `connect ECONNREFUSED ...:8080` на Tasker | `UNIC_SOLID_HOST` указывает на внутренний `8080`, а Tasker на другом сервере опубликован на `8881` | `UNIC_SOLID_HOST=http://<tasker-host>:8881` |
-| Logger падает с `Storage connection is not configured` | у Logger нет строки подключения к MongoDB | проверьте `MONGODB_*` и `LOGGER_DB*` в `.env`; строка собирается из них в `compose.logger.yml` |
+| Logger падает с `PostgreSQL connections are not available` / `configured storage connection is MongoDB` | Logger `:prod` ждёт Postgres, а в env остался Mongo URI | `LOGGER_PG_HOST=unicchat-logger-postgres`; `MongoCS` не задавать; пользователь БД создаёт `logger-postgres-init` |
 | Tasker не видит MongoDB или MinIO, хотя `.env` поправлен | секрет `KBTConfigs` создан со старыми значениями `KBT_*` | пересоздать секрет (см. раздел выше) и перезапустить Tasker |
 | Nginx отдаёт 502 на DocumentServer | `DOCUMENT_SERVER_PROXY` без порта → nginx идёт на `:80` сам в себя | `DOCUMENT_SERVER_PROXY=<kb-host>:8880` |
+| nginx Restarting, `cannot load certificate .../fullchain.pem` | нет файлов certbot в `./certs` или пути `SSL_*` не совпадают с доменами | п. 2.5, затем `--force-recreate nginx-config-init unicchat-nginx` |
+| `compose up --wait` не проходит nginx | пустые vhost или `nginx -t` fail | `docker compose logs nginx-config-init`; `ls -l nginx/conf.d`; пути `SSL_*` |
 | `WARN Found orphan containers ...` | несколько ролей в одном каталоге, у них общий project name | предупреждение безопасно; `--remove-orphans` не использовать, иначе снесёт контейнеры других ролей |
 
 <!-- TOC --><a name="-3-"></a>
@@ -943,7 +966,7 @@ docker logs unicchat-appserver | grep -i redmine
 
 - Убедитесь, что все IP-адреса и учетные данные заменены на реальные значения
 - Убедитесь, что порт 8201 не занят другими приложениями
-- Пользователи MongoDB для vault/tasker/logger создаются init-контейнером `vault-mongo-init`
+- Пользователи MongoDB для vault/tasker создаются `vault-mongo-init`. Пользователь PostgreSQL Logger — `logger-postgres-init`.
 
 <!-- TOC --><a name="--18"></a>
 ## Клиентские приложения
