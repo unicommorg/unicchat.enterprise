@@ -1,4 +1,4 @@
-# Один сервер: docker compose up -d --wait
+# Один сервер: docker compose up -d  (CI: --wait, список сервисов — README §2.7)
 # Несколько серверов: compose.<роль>.yml — README шаг 2a.
 # Образы — IMAGE_* в .env.
 
@@ -40,8 +40,8 @@ services:
     container_name: unicchat-vault
     restart: always
     depends_on:
-      unicchat-mongodb:
-        condition: service_healthy
+      vault-mongo-init:
+        condition: service_completed_successfully
     command: server
     environment:
       MongoCS: "mongodb://${VAULT_DB_USER}:${VAULT_DB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT_NUMBER}/${VAULT_DB_NAME}?directConnection=true&authSource=${VAULT_DB_NAME}&replicaSet=${MONGODB_REPLICA_SET_NAME}&authMechanism=SCRAM-SHA-256"
@@ -54,6 +54,16 @@ services:
       - IPC_LOCK
     ports:
       - "8200:80"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1/ >/dev/null 2>&1 || wget -q -O /dev/null http://127.0.0.1/ || bash -c 'echo >/dev/tcp/127.0.0.1/80'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
 
   vault-mongo-init:
     image: ${IMAGE_MONGODB}
@@ -143,7 +153,7 @@ services:
     restart: "no"
     depends_on:
       unicchat-vault:
-        condition: service_started
+        condition: service_healthy
     entrypoint:
       - /bin/sh
       - -ec
@@ -341,8 +351,10 @@ services:
     container_name: unicchat-tasker
     restart: always
     depends_on:
-      unicchat-mongodb:
-        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     ports:
       - "8881:8080"
     environment:
@@ -498,8 +510,12 @@ services:
     container_name: unicchat-documentserver
     restart: always
     depends_on:
-      - unicchat-postgresql
-      - unicchat-rabbitmq
+      unicchat-postgresql:
+        condition: service_started
+      unicchat-rabbitmq:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     environment:
       ALLOW_META_IP_ADDRESS: true
       JWT_ENABLED: ${JWT_ENABLED}

@@ -2,7 +2,7 @@
 <!-- TOC --><a name="-unicchat"></a>
 # Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat
 
-версия документа 1.13
+версия документа 1.14
 
 <!-- TOC --><a name=""></a>
 ## Оглавление
@@ -107,7 +107,7 @@ ___
 
 | Сценарий | Где описан | Что запускать |
 |----------|------------|----------------|
-| Все сервисы на одном сервере | [шаг 2](#-2-install) | `docker compose up -d --wait` из каталога `multi-server-install/` |
+| Все сервисы на одном сервере | [шаг 2](#-2-install) | `docker compose up -d` из каталога `multi-server-install/` |
 | Сервисы на отдельных серверах | [шаг 2a](#-2a-multi) | на каждом сервере свой `compose.<роль>.yml` |
 
 <!-- TOC --><a name="-multi-host"></a>
@@ -416,16 +416,14 @@ cd ~/unicchat.enterprise/multi-server-install
 set -a && . ./.env && set +a
 mkdir -p certs/config certs/logs certs/work
 
-EMAIL=admin@example.com
-
 run_cert() {
-  docker run --rm -it \
+  docker run --rm \
     -p 80:80 \
     -v "$(pwd)/certs/config:/etc/letsencrypt" \
     -v "$(pwd)/certs/logs:/var/log/letsencrypt" \
     -v "$(pwd)/certs/work:/var/lib/letsencrypt" \
     certbot/certbot certonly --standalone \
-    --agree-tos -m "$EMAIL" --non-interactive \
+    --agree-tos --register-unsafely-without-email --non-interactive \
     -d "$1"
 }
 
@@ -434,7 +432,7 @@ run_cert "$DOCUMENTSERVER_SERVER_NAME"
 run_cert "$MINIO_SERVER_NAME"
 ```
 
-Подставьте свой `EMAIL`. Домены берутся из `.env`.
+Домены берутся из `.env`.
 
 Продление:
 
@@ -477,7 +475,13 @@ docker compose up -d --force-recreate nginx-config-init unicchat-nginx
 ```shell
 cd ~/unicchat.enterprise/multi-server-install
 docker compose pull
-docker compose up -d --wait
+docker compose up -d
+```
+
+Для CI и скриптов с `set -e` — дождаться healthy (одна строка, без переносов):
+
+```shell
+docker compose up -d --wait unicchat-appserver unicchat-documentserver unicchat-logger unicchat-logger-postgres unicchat-minio unicchat-mongodb unicchat-nginx unicchat-postgresql unicchat-rabbitmq unicchat-tasker unicchat-vault
 ```
 
 ```shell

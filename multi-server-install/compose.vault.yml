@@ -18,13 +18,23 @@ services:
     - IPC_LOCK
     ports:
     - 8200:80
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1/ >/dev/null 2>&1 || wget -q -O /dev/null http://127.0.0.1/ || bash -c 'echo >/dev/tcp/127.0.0.1/80'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
   vault-init:
     image: ${IMAGE_VAULT_INIT}
     container_name: vault-init
     restart: 'no'
     depends_on:
       unicchat-vault:
-        condition: service_started
+        condition: service_healthy
     entrypoint:
     - /bin/sh
     - -ec
