@@ -478,7 +478,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Для CI и скриптов с `set -e` — дождаться healthy (одна строка, без переносов):
+Для CI и скриптов с `set -e` — дождаться healthy:
 
 ```shell
 docker compose up -d --wait unicchat-appserver unicchat-documentserver unicchat-logger unicchat-logger-postgres unicchat-minio unicchat-mongodb unicchat-nginx unicchat-postgresql unicchat-rabbitmq unicchat-tasker unicchat-vault
