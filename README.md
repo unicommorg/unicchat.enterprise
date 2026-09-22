@@ -2,7 +2,7 @@
 <!-- TOC --><a name="-unicchat"></a>
 # Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat
 
-версия документа 1.15
+версия документа 1.16
 
 <!-- TOC --><a name=""></a>
 ## Оглавление
@@ -308,7 +308,7 @@ git clone https://github.com/unicommorg/unicchat.enterprise.git
 
 **Лицензия**
 
-Лицензия на продукт UnicChat от Unicomm (п. 1.2). Для проверки нужен исходящий 443/tcp на `push1.unic.chat` — строка в таблице выше.
+Лицензия на продукт UnicChat от Unicomm (п. 1.2). Для проверки нужен исходящий 443/tcp на `push1.unic.chat`.
 
 <!-- TOC --><a name="21-docker"></a>
 ### 2.1 Установите Docker
@@ -406,7 +406,18 @@ echo "MINIO_ROOT_PASSWORD=$(gen)"
 
 Nginx берёт `fullchain.pem` и `privkey.pem` из `./certs/config/live/<домен>/`. Пути к файлам — `SSL_CERT`, `SSL_KEY`, `DOCUMENTSERVER_SSL_*` и `MINIO_SSL_*` в `.env`. Каталог `./certs` подключается в контейнер как `/certs`.
 
+Требование одно: три домена (`APP_SERVER_NAME`, `DOCUMENTSERVER_SERVER_NAME`, `MINIO_SERVER_NAME`) должны открываться по HTTPS с сертификатом доверенного удостоверяющего центра. Чем именно терминируется TLS — контейнером `unicchat-nginx`, вашим nginx или балансировщиком — установка не диктует.
+
 Выберите один способ.
+
+| Способ | Когда подходит | Что запускать |
+|--------|----------------|---------------|
+| Let's Encrypt на этом сервере | домены смотрят на этот сервер, порты 80 и 443 свободны | Certbot + `unicchat-nginx` |
+| Готовые файлы сертификатов | сертификат выпущен вашим УЦ или закуплен | только `unicchat-nginx` |
+| Свой nginx на хосте | на сервере уже есть настроенный nginx | ни Certbot, ни `unicchat-nginx` |
+| Балансировщик или реверс-прокси перед сервером | TLS терминируется снаружи | ни Certbot, ни `unicchat-nginx` |
+
+Самоподписанный сертификат для продуктивной установки не подходит: клиентские приложения и DocumentServer его отклонят.
 
 **Let's Encrypt на этом сервере.** Имена из `.env` уже указывают на этот сервер. Порты 80 и 443 свободны. Выпустите три сертификата, по одному на каждый домен.
 
@@ -449,11 +460,50 @@ docker compose start unicchat-nginx
 
 На сервере роли Nginx те же команды с `-f compose.nginx.yml`.
 
-**Свои сертификаты.** Если файлы уже выпущены, положите `fullchain.pem` и `privkey.pem` в `certs/config/live/<домен>/` для каждого из трёх доменов. Пути в `.env` оставьте как в `.env.example`. Certbot не запускайте. Срок действия продлевает тот, кто выпустил сертификат.
+**Готовые файлы сертификатов.** Подходит для сертификата коммерческого УЦ, корпоративного УЦ вашей организации или любого другого доверенного центра. Certbot не запускайте.
 
-**Nginx уже установлен на этом сервере.** Контейнер `unicchat-nginx` не запускайте. Настройте прокси на AppServer `:8080`, DocumentServer `:8880`, MinIO `:9000`. Примеры конфигурации: `multi-server-install/nginx/examples/host/`. Сертификат укажите в своём nginx.
+1. Получите сертификат обычным для вашего УЦ путём. Если нужен CSR, сформируйте его на этом сервере:
 
-**Балансировщик перед сервером.** Если пользователи открывают сайт на балансировщике, а не на портах 80 и 443 этого хоста, контейнер nginx и Certbot не запускайте.
+   ```shell
+   openssl req -new -newkey rsa:2048 -nodes \
+     -keyout privkey.pem -out request.csr \
+     -subj "/CN=<домен>/O=<организация>/C=RU"
+   ```
+
+   Ключ `privkey.pem` с сервера не отдавайте, в УЦ уходит только `request.csr`. Для трёх доменов нужны либо три сертификата, либо один с SAN на все три имени.
+2. Соберите `fullchain.pem`: сначала сертификат сервера, затем промежуточные сертификаты УЦ, каждый блок `BEGIN/END CERTIFICATE` с новой строки. Корневой сертификат добавлять не обязательно.
+3. Положите `fullchain.pem` и `privkey.pem` в `certs/config/live/<домен>/` для каждого из трёх доменов. Пути в `.env` оставьте как в `.env.example`.
+4. Проверьте, что цепочка полная и файлы совпадают друг с другом:
+
+   ```shell
+   openssl verify -untrusted certs/config/live/<домен>/fullchain.pem \
+     certs/config/live/<домен>/fullchain.pem
+   openssl x509 -noout -modulus -in certs/config/live/<домен>/fullchain.pem | openssl md5
+   openssl rsa  -noout -modulus -in certs/config/live/<домен>/privkey.pem  | openssl md5
+   ```
+
+   Две последние команды должны дать одинаковую сумму. Если промежуточных сертификатов в `fullchain.pem` нет, браузер сайт откроет, а мобильные клиенты — нет.
+
+Срок действия отслеживает тот, кто выпустил сертификат. После замены файлов перезапустите nginx: `docker compose up -d --force-recreate nginx-config-init unicchat-nginx`.
+
+**Свой nginx на хосте.** Контейнер `unicchat-nginx` не запускайте, сертификат и его продление настройте в своём nginx. Остальные контейнеры запускаются как обычно и слушают на хосте:
+
+| Домен из `.env` | Куда проксировать | Что это |
+|-----------------|-------------------|---------|
+| `APP_SERVER_NAME` | `127.0.0.1:8080` | AppServer |
+| `DOCUMENTSERVER_SERVER_NAME` | `127.0.0.1:8880` | DocumentServer |
+| `MINIO_SERVER_NAME` | `127.0.0.1:9000` | MinIO S3 API |
+
+Готовые примеры конфигурации: `multi-server-install/nginx/examples/host/`. Обязательные требования к своей конфигурации:
+
+- WebSocket на AppServer: `proxy_http_version 1.1`, `Upgrade` и `Connection`;
+- заголовки `Host`, `X-Forwarded-Proto` и `X-Forwarded-Host` во всех трёх виртуальных хостах;
+- на MinIO: `client_max_body_size 0` и `proxy_buffering off`, иначе не загрузятся крупные файлы;
+- `ROOT_URL` в `.env` совпадает с `https://<APP_SERVER_NAME>`, который отдаёт ваш nginx.
+
+Compose публикует эти порты на всех интерфейсах хоста, поэтому наружу оставьте открытыми только 443/tcp (и 80/tcp для редиректа), а остальные закройте межсетевым экраном (п. 2.9). Из внешней сети не должны быть доступны 8080, 8880, 9000, консоль MinIO 9002, MongoDB 27017, Vault 8200, Logger 8082, Tasker 8881, PostgreSQL и RabbitMQ.
+
+**Балансировщик или реверс-прокси перед сервером.** Если пользователи открывают сайт на балансировщике, а не на портах 80 и 443 этого хоста, контейнер nginx и Certbot не запускайте. Сертификат живёт на балансировщике, до серверов трафик идёт на те же порты 8080, 8880 и 9000. Балансировщик должен передавать `Host`, `X-Forwarded-Proto` и заголовки WebSocket, а `ROOT_URL` в `.env` — совпадать с внешним HTTPS-адресом.
 
 <!-- TOC --><a name="26-nginx"></a>
 ### 2.6 Nginx
@@ -676,8 +726,8 @@ docker compose -f compose.<роль>.yml up -d
 
 1. **MongoDB** — дождаться healthy, в логах `vault-mongo-init` пользователи созданы.
 2. **Logger**.
-3. **Vault** — в логах `vault-init`: `KBTConfigs secret created.` В `.env` уже IP в `KBT_*` и `API_LOGGER_URL`.
-4. **MinIO** — `minio-init`.
+3. **MinIO** — `minio-init`.
+4. **Vault** — MongoDB и MinIO уже работают, иначе `vault-init` не создаст секрет. В `.env` уже IP в `KBT_*` и `API_LOGGER_URL`. В логах `vault-init`: `KBTConfigs secret created.`
 5. **Tasker**.
 6. **Knowledgebase**.
 7. **AppServer**.
@@ -705,16 +755,46 @@ KBT_MINIO_HOST=unicchat-minio:9000
 
 На отдельных серверах возьмите адреса из таблицы выше: хост MongoDB и `хост MinIO:9000`.
 
-До первого запуска Vault проверьте с этого сервера:
+Порядок запуска важен: MongoDB и MinIO должны быть подняты **до** Vault. Перед записью секрета `vault-init` сам проверяет, что адреса из `.env` отвечают, и повторяет проверку 10 раз с интервалом 5 секунд:
 
-| Что должно отвечать | Какой адрес открыть |
-|---------------------|---------------------|
-| MongoDB, порт 27017 | `KBT_MONGO_HOST` |
-| MinIO | `KBT_MINIO_HOST` |
-| Vault отдаёт токен | контейнер Vault запущен, адрес `API_VAULT_URL` |
-| Tasker ходит в тот же Vault | на сервере Tasker в `.env` тот же `API_VAULT_URL` |
+| Проверка | Адрес |
+|----------|-------|
+| MongoDB отвечает на порту 27017 | `KBT_MONGO_HOST` |
+| MinIO отвечает на `/minio/health/live` | `KBT_MINIO_HOST` |
 
-Если адрес неверный, секрет всё равно запишется. Повторный запуск `vault-init` готовый секрет не меняет. После правки `KBT_*` в `.env` удалите секрет и запустите `vault-init` снова — команды ниже. Затем перезапустите Tasker.
+Если хотя бы один адрес недоступен, секрет **не создаётся**, `vault-init` завершается с ошибкой и пишет в лог:
+
+```
+MongoDB or MinIO is not reachable from vault-init. KBTConfigs secret NOT created.
+Check KBT_MONGO_HOST and KBT_MINIO_HOST in .env, then start vault-init again.
+```
+
+В этом случае исправьте `KBT_MONGO_HOST` и `KBT_MINIO_HOST` (или поднимите нужный сервис) и запустите `vault-init` снова:
+
+```shell
+docker compose -f compose.vault.yml up --force-recreate vault-init
+```
+
+После записи `vault-init` перечитывает секрет и сверяет адреса с `.env`. Ожидаемый лог:
+
+```
+KBTConfigs secret created.
+Secret matches .env: mongo=<KBT_MONGO_HOST> minio=<KBT_MINIO_HOST>
+```
+
+Ту же сверку `vault-init` делает, когда секрет уже существует. Готовый секрет он не перезаписывает: если адреса в Vault расходятся с `.env`, в лог попадает предупреждение, а установка продолжается.
+
+```
+WARNING: KBTConfigs in Vault does not match .env (expected mongo=..., minio=...).
+WARNING: Tasker keeps the stored addresses. Recreate the secret by hand, see README, section 'Секрет Vault KBTConfigs'.
+```
+
+Так и задумано: решение, какие адреса правильные, остаётся за вами. Если верны значения из `.env` — удалите секрет и создайте заново (команды ниже), затем перезапустите Tasker. Если верны адреса в Vault — приведите `KBT_*` в `.env` к ним, чтобы предупреждение не повторялось.
+
+Ещё две вещи проверьте вручную, `vault-init` их не контролирует:
+
+- на сервере Tasker в `.env` указан тот же `API_VAULT_URL`, что и на сервере Vault;
+- с сервера Tasker этот адрес Vault доступен по сети.
 
 Посмотреть (на сервере Vault):
 
@@ -761,9 +841,9 @@ docker compose -f compose.vault.yml logs vault-init
 docker compose -f compose.nginx.yml up -d --force-recreate nginx-config-init unicchat-nginx
 ```
 
-Если nginx уже установлен на этом сервере, `compose.nginx.yml` не запускайте. Проксируйте на AppServer `:8080`, DocumentServer `:8880`, MinIO `:9000`. Примеры: `multi-server-install/nginx/examples/host/`. Сертификат укажите в своём nginx.
+Если nginx уже установлен на этом сервере, `compose.nginx.yml` не запускайте. Проксируйте на AppServer `:8080`, DocumentServer `:8880`, MinIO `:9000` — здесь это IP соответствующих серверов, а не `127.0.0.1`. Требования к заголовкам и примеры конфигурации — п. 2.5. Сертификат укажите в своём nginx.
 
-Если пользователи заходят на балансировщик, а не на порты 80 и 443 этого сервера, контейнер nginx и Certbot не запускайте.
+Если пользователи заходят на балансировщик, а не на порты 80 и 443 этого сервера, контейнер nginx и Certbot не запускайте (п. 2.5).
 
 <!-- TOC --><a name="-2a-troubles"></a>
 ### Частые ошибки
@@ -772,6 +852,8 @@ docker compose -f compose.nginx.yml up -d --force-recreate nginx-config-init uni
 |---------|---------|-------------|
 | `Bind for 0.0.0.0:8080 failed: port is already allocated` | на хосте уже занят `8080` | порты ролей: Logger `8082`, Tasker `8881`, AppServer `8080` |
 | В логах AppServer `connect ECONNREFUSED ...:8080` на Tasker | в `UNIC_SOLID_HOST` внутренний порт, а Tasker опубликован на `8881` | `UNIC_SOLID_HOST=http://<tasker-host>:8881` |
+| `vault-init`: `KBTConfigs secret NOT created` | с сервера Vault не отвечают `KBT_MONGO_HOST` или `KBT_MINIO_HOST` | поднять MongoDB и MinIO или исправить адреса, затем запустить `vault-init` заново |
+| `vault-init`: `WARNING: KBTConfigs in Vault does not match .env` | секрет создан раньше с другими `KBT_*` | сверить адреса и при необходимости пересоздать секрет, затем перезапустить Tasker |
 | Tasker не видит MongoDB или MinIO после правки `.env` | секрет `KBTConfigs` создан со старыми `KBT_*` | пересоздать секрет и перезапустить Tasker |
 | Nginx отдаёт 502 на DocumentServer | `DOCUMENT_SERVER_PROXY` без порта | `DOCUMENT_SERVER_PROXY=<kb-host>:8880` |
 | `WARN Found orphan containers ...` | несколько ролей в одном каталоге, общий project name | предупреждение безопасно; `--remove-orphans` не использовать |
