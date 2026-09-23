@@ -2,7 +2,7 @@
 <!-- TOC --><a name="-unicchat"></a>
 # Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat
 
-версия документа 1.16
+версия документа 1.17
 
 <!-- TOC --><a name=""></a>
 ## Оглавление
@@ -573,6 +573,18 @@ docker compose ps
 docker compose logs -f --tail=100
 ```
 
+Каждая команда `up -d` заново прогоняет init-контейнеры, поэтому в логах штатно появляются сообщения о том, что создавать уже нечего:
+
+```
+logger-postgres-init  | ERROR:  role "logger_user" already exists
+logger-postgres-init  | ERROR:  database "logger_db" already exists
+vault-mongo-init      | Vault user already exists, skipping
+vault-mongo-init      | Tasker user already exists, skipping
+vault-init            | KBTConfigs secret already exists.
+```
+
+Это результат повторного прогона одних и тех же идемпотентных шагов, а не сбой: пользователи, базы и секрет уже на месте, и повторный запуск их не портит. На состояние стека такие строки не влияют.
+
 <!-- TOC --><a name="28-check"></a>
 ### 2.8 Проверка
 
@@ -825,7 +837,7 @@ WARNING: Tasker keeps the stored addresses. Recreate the secret by hand, see REA
 - на сервере Tasker в `.env` указан тот же `API_VAULT_URL`, что и на сервере Vault;
 - с сервера Tasker этот адрес Vault доступен по сети.
 
-Посмотреть (на сервере Vault):
+Посмотреть, какие адреса лежат в секрете (на сервере Vault):
 
 ```shell
 TOKEN=$(docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
@@ -833,8 +845,10 @@ TOKEN=$(docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
 
 docker run --rm --network unicchat-network curlimages/curl:8.8.0 \
   -sS -H "Authorization: Bearer ${TOKEN}" \
-  "http://unicchat-vault/api/Secrets/KBTConfigs/data"
+  "http://unicchat-vault/api/Secrets/KBTConfigs"
 ```
+
+Адреса лежат в поле `metadata`: строка подключения `MongoCS` и `MinioHost`. Адрес в конце запроса указывайте без `/data`: по `.../KBTConfigs/data` вернётся только `{"data":"All info in META"}`, без адресов. В том же ответе открытым текстом приходят пароли Tasker и MinIO, поэтому вывод команды не пересылайте в переписке и не прикладывайте к заявкам.
 
 Пересоздать после смены `KBT_*` в `.env`. Значения берутся из текущего файла, затем перезапустите Tasker:
 

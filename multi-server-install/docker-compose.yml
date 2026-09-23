@@ -172,10 +172,16 @@ services:
 
           MONGO_PORT="$${MONGODB_PORT_NUMBER:-27017}"
 
-          read_secret() {
+          read_secret_data() {
             curl -sS -o "$$1" -w "%{http_code}" \
               -H "Authorization: Bearer $${VAULT_TOKEN}" \
               "$${VAULT_URL}api/Secrets/KBTConfigs/data" || true
+          }
+
+          read_secret_object() {
+            curl -sS -o "$$1" -w "%{http_code}" \
+              -H "Authorization: Bearer $${VAULT_TOKEN}" \
+              "$${VAULT_URL}api/Secrets/KBTConfigs" || true
           }
 
           check_dependencies() {
@@ -201,14 +207,25 @@ services:
           }
 
           verify_secret() {
-            if ! grep -q "MongoCS" "$$1"; then
-              echo "Secret is readable, response has no MongoCS field: addresses not compared."
+            SECRET_BODY="$$(mktemp)"
+            SECRET_CODE="$$(read_secret_object "$${SECRET_BODY}")"
+
+            if [ "$${SECRET_CODE}" != "200" ]; then
+              rm -f "$${SECRET_BODY}"
+              echo "WARNING: cannot read KBTConfigs back, HTTP $${SECRET_CODE}. Addresses not compared."
+              return 0
+            fi
+
+            if ! grep -q "MongoCS" "$${SECRET_BODY}"; then
+              rm -f "$${SECRET_BODY}"
+              echo "WARNING: KBTConfigs response has no MongoCS field. Addresses not compared."
               return 0
             fi
 
             MISMATCH=0
-            grep -q "@$${KBT_MONGO_HOST}:" "$$1" || MISMATCH=1
-            grep -q "$${MINIO_HOST}" "$$1" || MISMATCH=1
+            grep -q "@$${KBT_MONGO_HOST}:" "$${SECRET_BODY}" || MISMATCH=1
+            grep -q "$${MINIO_HOST}" "$${SECRET_BODY}" || MISMATCH=1
+            rm -f "$${SECRET_BODY}"
 
             if [ "$${MISMATCH}" = 0 ]; then
               echo "Secret matches .env: mongo=$${KBT_MONGO_HOST} minio=$${MINIO_HOST}"
@@ -226,12 +243,12 @@ services:
             echo "Checking KBTConfigs secret... attempt $${ATTEMPT}/$${VAULT_INIT_RETRIES}"
 
             RESPONSE_BODY="$$(mktemp)"
-            HTTP_CODE="$$(read_secret "$${RESPONSE_BODY}")"
+            HTTP_CODE="$$(read_secret_data "$${RESPONSE_BODY}")"
 
             if [ "$${HTTP_CODE}" = "200" ]; then
-              echo "KBTConfigs secret already exists."
-              verify_secret "$${RESPONSE_BODY}"
               rm -f "$${RESPONSE_BODY}"
+              echo "KBTConfigs secret already exists."
+              verify_secret
               exit 0
             fi
 
@@ -268,17 +285,7 @@ services:
             if [ "$${HTTP_CODE}" -ge 200 ] && [ "$${HTTP_CODE}" -lt 300 ]; then
               rm -f "$${RESPONSE_BODY}"
               echo "KBTConfigs secret created."
-
-              RESPONSE_BODY="$$(mktemp)"
-              HTTP_CODE="$$(read_secret "$${RESPONSE_BODY}")"
-
-              if [ "$${HTTP_CODE}" = "200" ]; then
-                verify_secret "$${RESPONSE_BODY}"
-              else
-                echo "WARNING: secret created, but reading it back returned HTTP $${HTTP_CODE}."
-              fi
-
-              rm -f "$${RESPONSE_BODY}"
+              verify_secret
               exit 0
             fi
 
