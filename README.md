@@ -2,7 +2,7 @@
 <!-- TOC --><a name="-unicchat"></a>
 # Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat
 
-версия документа 1.18
+версия документа 1.19
 
 <!-- TOC --><a name=""></a>
 ## Оглавление
@@ -562,15 +562,13 @@ docker compose pull
 docker compose up -d
 ```
 
-Если `docker compose pull` оборвался по сети (таймаут или сброс соединения с `cr.yandex`), повторите ту же команду. Повторная попытка обычно проходит, уже скачанные слои не качаются заново.
-
 Дождитесь, пока контейнеры перейдут в состояние healthy:
 
 ```shell
 docker compose up -d --wait unicchat-appserver unicchat-documentserver unicchat-logger unicchat-logger-postgres unicchat-minio unicchat-mongodb unicchat-nginx unicchat-postgresql unicchat-rabbitmq unicchat-tasker unicchat-vault
 ```
 
-`--wait` для DocumentServer означает только «контейнер запущен»: своего healthcheck у него нет, а `/healthcheck` отвечает `true` ещё до конца первичной настройки. Первые 3–5 минут после первого запуска DocumentServer ставит плагины. В эту минуту нагрузка на диск высокая, SSH и само приложение могут на несколько секунд перестать отвечать. Это проходит само. Вывод о готовности делайте после строки в логе:
+`--wait` дожидается, пока PostgreSQL ответит на `pg_isready`, RabbitMQ — на `rabbitmq-diagnostics ping`, а DocumentServer — на `GET /healthcheck`. Этот адрес начинает отвечать `true` раньше, чем DocumentServer закончит установку плагинов. Первые 3–5 минут после первого запуска нагрузка на диск высокая, SSH и само приложение могут на несколько секунд перестать отвечать. Это проходит само. Вывод о готовности делайте после строки в логе:
 
 ```shell
 docker compose logs unicchat-documentserver | grep 'Installing plugins'
