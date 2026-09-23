@@ -2,7 +2,7 @@
 <!-- TOC --><a name="-unicchat"></a>
 # Инструкция по установке корпоративного мессенджера для общения и командной работы UnicChat
 
-версия документа 1.19
+версия документа 1.20
 
 <!-- TOC --><a name=""></a>
 ## Оглавление
@@ -568,7 +568,7 @@ docker compose up -d
 docker compose up -d --wait unicchat-appserver unicchat-documentserver unicchat-logger unicchat-logger-postgres unicchat-minio unicchat-mongodb unicchat-nginx unicchat-postgresql unicchat-rabbitmq unicchat-tasker unicchat-vault
 ```
 
-`--wait` дожидается, пока PostgreSQL ответит на `pg_isready`, RabbitMQ — на `rabbitmq-diagnostics ping`, а DocumentServer — на `GET /healthcheck`. Этот адрес начинает отвечать `true` раньше, чем DocumentServer закончит установку плагинов. Первые 3–5 минут после первого запуска нагрузка на диск высокая, SSH и само приложение могут на несколько секунд перестать отвечать. Это проходит само. Вывод о готовности делайте после строки в логе:
+`--wait` дожидается, пока PostgreSQL ответит на `pg_isready`, RabbitMQ — на `rabbitmq-diagnostics ping`, а DocumentServer — на `GET /healthcheck`. Этот адрес начинает отвечать `true` раньше, чем DocumentServer закончит установку плагинов. Первые 3–5 минут после первого запуска нагрузка на диск высокая, SSH и само приложение могут не отвечать до 1–2 минут. В эту же минуту MinIO пишет `taking drive /data offline` и `InsufficientWriteQuorum`: диск не вышел из строя, после строки `Installing plugins, please wait...Done` сообщения прекращаются. Вывод о готовности делайте после неё:
 
 ```shell
 docker compose logs unicchat-documentserver | grep 'Installing plugins'
@@ -596,7 +596,7 @@ vault-init            | KBTConfigs secret already exists.
 <!-- TOC --><a name="28-check"></a>
 ### 2.8 Проверка
 
-Проверку делайте после строки `Installing plugins, please wait...Done` в логе DocumentServer (п. 2.7). До неё кратковременный обрыв ответа ещё не означает, что установка не удалась.
+Проверку делайте после строки `Installing plugins, please wait...Done` в логе DocumentServer (п. 2.7). До неё обрыв ответа до 1–2 минут ещё не означает, что установка не удалась.
 
 ```shell
 cd ~/unicchat.enterprise/multi-server-install
