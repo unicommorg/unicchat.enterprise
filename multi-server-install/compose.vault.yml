@@ -101,7 +101,7 @@ services:
 
         MISMATCH=0
         grep -q "@$${KBT_MONGO_HOST}:" "$${SECRET_BODY}" || MISMATCH=1
-        grep -q "$${MINIO_HOST}" "$${SECRET_BODY}" || MISMATCH=1
+        grep -q "\"MinioHost\":\"$${MINIO_HOST}\"" "$${SECRET_BODY}" || MISMATCH=1
         rm -f "$${SECRET_BODY}"
 
         if [ "$${MISMATCH}" = 0 ]; then
