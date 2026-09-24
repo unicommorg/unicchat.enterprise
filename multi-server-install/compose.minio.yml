@@ -1,0 +1,64 @@
+# Роль MinIO. Запуск: docker compose -f compose.minio.yml up -d
+# Образы — IMAGE_* в .env.
+services:
+  unicchat-minio:
+    image: ${IMAGE_MINIO}
+    container_name: unicchat-minio
+    restart: always
+    command: server --console-address ":9002" /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER: ${MINIO_BROWSER}
+    volumes:
+    - minio_data:/data
+    ports:
+    - 9000:9000
+    - 9002:9002
+    networks:
+    - unicchat-network
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:9000/minio/health/live
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  minio-init:
+    image: ${IMAGE_MINIO_MC}
+    container_name: minio-init
+    restart: 'no'
+    depends_on:
+      unicchat-minio:
+        condition: service_healthy
+    entrypoint:
+    - /bin/sh
+    - -ec
+    command:
+    - |
+      mc alias set local "http://unicchat-minio:9000" "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+
+      echo "Creating bucket $${MINIO_BUCKET}..."
+      mc mb --ignore-existing "local/$${MINIO_BUCKET}"
+
+      # DocumentServer stores rendered documents here and reads them anonymously
+      echo "Creating bucket $${MINIO_DOCS_BUCKET}..."
+      mc mb --ignore-existing "local/$${MINIO_DOCS_BUCKET}"
+      mc anonymous set public "local/$${MINIO_DOCS_BUCKET}"
+
+      echo "Done."
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-unicchat-files}
+      MINIO_DOCS_BUCKET: ${MINIO_DOCS_BUCKET:-uc.onlyoffice.docs}
+    networks:
+    - unicchat-network
+networks:
+  unicchat-network:
+    name: unicchat-network
+volumes:
+  minio_data:
+    driver: local

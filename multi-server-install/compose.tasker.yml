@@ -1,0 +1,17 @@
+# Роль Tasker. Запуск: docker compose -f compose.tasker.yml up -d
+# Образы — IMAGE_* в .env.
+services:
+  unicchat-tasker:
+    image: ${IMAGE_TASKER}
+    container_name: unicchat-tasker
+    restart: always
+    environment:
+      api.vault.url: ${API_VAULT_URL}
+      api.logger.url: ${API_LOGGER_URL}
+    networks:
+    - unicchat-network
+    ports:
+    - 8881:8080
+networks:
+  unicchat-network:
+    name: unicchat-network

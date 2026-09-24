@@ -1,0 +1,80 @@
+# Роль Logger. docker compose -f compose.logger.yml up -d
+# Образы — IMAGE_* в .env.
+services:
+  unicchat-logger-postgres:
+    image: ${IMAGE_POSTGRES}
+    container_name: unicchat-logger-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LOGGER_DB_PASSWORD}
+      POSTGRES_DB: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - logger_postgres_data:/var/lib/postgresql
+    networks:
+      - unicchat-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    expose:
+      - "5432"
+
+  logger-postgres-init:
+    image: ${IMAGE_POSTGRES}
+    container_name: logger-postgres-init
+    restart: "no"
+    depends_on:
+      unicchat-logger-postgres:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+        echo "Waiting for logger postgres..."
+        until pg_isready -h unicchat-logger-postgres -U postgres >/dev/null 2>&1; do
+          sleep 2
+        done
+        echo "Ensuring logger role and database..."
+        psql -h unicchat-logger-postgres -U postgres -d postgres \
+          -c "CREATE ROLE $${LOGGER_DB_USER} LOGIN PASSWORD '$${LOGGER_DB_PASSWORD}';" \
+          || echo "logger role already exists"
+        psql -h unicchat-logger-postgres -U postgres -d postgres \
+          -c "CREATE DATABASE $${LOGGER_DB} OWNER $${LOGGER_DB_USER};" \
+          || echo "logger database already exists"
+        psql -h unicchat-logger-postgres -U postgres -d postgres \
+          -c "GRANT ALL PRIVILEGES ON DATABASE $${LOGGER_DB} TO $${LOGGER_DB_USER};"
+        echo "Logger postgres user ready."
+    environment:
+      LOGGER_DB_USER: ${LOGGER_DB_USER}
+      LOGGER_DB_PASSWORD: ${LOGGER_DB_PASSWORD}
+      LOGGER_DB: ${LOGGER_DB}
+    networks:
+      - unicchat-network
+
+  unicchat-logger:
+    image: ${IMAGE_LOGGER}
+    container_name: unicchat-logger
+    restart: always
+    depends_on:
+      unicchat-logger-postgres:
+        condition: service_healthy
+      logger-postgres-init:
+        condition: service_completed_successfully
+    environment:
+      Storage__ConnectionString: "Host=${LOGGER_PG_HOST};Port=${LOGGER_PG_PORT};Database=${LOGGER_DB};Username=${LOGGER_DB_USER};Password=${LOGGER_DB_PASSWORD}"
+      api.logger.url: ${API_LOGGER_URL}
+    networks:
+      - unicchat-network
+    ports:
+      - 8082:8080
+networks:
+  unicchat-network:
+    name: unicchat-network
+volumes:
+  logger_postgres_data:
+    driver: local
