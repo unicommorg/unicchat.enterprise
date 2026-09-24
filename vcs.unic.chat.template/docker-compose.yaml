@@ -1,0 +1,44 @@
+# This docker-compose requires host networking, which is only available on Linux
+# This compose will not function correctly on Mac or Windows
+# TLS terminates in the nginx container; no Caddy or host nginx is required.
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - vcs
+  coturn:
+    image: coturn/coturn:4.14.0-r0
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./certs:/etc/coturn/certs:ro
+  vcs:
+    image: livekit/livekit-server:v1.11.0
+    command: --config /etc/livekit.yaml
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./vcs.yaml:/etc/livekit.yaml
+  redis:
+    image: redis:7.4.1-alpine
+    command: redis-server /etc/redis.conf
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./redis.conf:/etc/redis.conf
+  egress:
+    image: livekit/egress:v1.11.0
+    restart: unless-stopped
+    environment:
+      - EGRESS_CONFIG_FILE=/etc/egress.yaml
+    network_mode: "host"
+    volumes:
+      - ./egress.yaml:/etc/egress.yaml
+    cap_add:
+      - CAP_SYS_ADMIN
