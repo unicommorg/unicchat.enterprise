@@ -556,6 +556,8 @@ docker compose up -d --force-recreate nginx-config-init unicchat-nginx
 <!-- TOC --><a name="27-unicchat"></a>
 ### 2.7 Запуск
 
+Повторный запуск Tasker после сбоя: [проверка зависимостей и восстановление](docs/tasker-recovery.md). Проверка выполняется с сервера Tasker, включая уже существующий секрет Vault.
+
 ```shell
 cd ~/unicchat.enterprise/multi-server-install
 docker compose pull

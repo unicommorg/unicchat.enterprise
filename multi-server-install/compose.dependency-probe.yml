@@ -1,0 +1,25 @@
+# Overlay for docker-compose.yml or compose.tasker.yml on the Tasker host.
+# Inactive until explicitly requested. No credentials are exposed in metrics.
+services:
+  dependency-probe:
+    image: ${IMAGE_DEPENDENCY_PROBE:-python:3.12-slim}
+    profiles: [operations]
+    restart: unless-stopped
+    entrypoint: [python, /opt/probe/dependency_probe.py]
+    command: [--serve]
+    environment:
+      API_VAULT_URL: ${API_VAULT_URL:?Set API_VAULT_URL}
+      KBT_MONGO_HOST: ${KBT_MONGO_HOST:?Set KBT_MONGO_HOST}
+      MONGODB_PORT_NUMBER: ${MONGODB_PORT_NUMBER:-27017}
+      KBT_MINIO_HOST: ${KBT_MINIO_HOST:?Set KBT_MINIO_HOST}
+      PYTHONDONTWRITEBYTECODE: '1'
+    volumes:
+      - ./ops/dependency_probe.py:/opt/probe/dependency_probe.py:ro
+    ports:
+      - '${DEPENDENCY_PROBE_BIND:-127.0.0.1}:9808:9808'
+    networks:
+      - unicchat-network
+    user: '65534:65534'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
